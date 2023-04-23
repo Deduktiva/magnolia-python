@@ -65,8 +65,10 @@
   <Target Name="RunTest" AfterTargets="Build">
     <ItemGroup>
       <DepsBins Include="$(DepsDir)\*.dll" />
+      <PythonFiles Include="$(DepsDir)\lib\**\*.py" />
     </ItemGroup>
     <Copy SourceFiles="@(DepsBins)" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="@(PythonFiles)" DestinationFolder="$(OutDir)\lib\%(RecursiveDir)" />
     <Exec Command="$(OutDir)\test.exe" UseCommandProcessor="false" ContinueOnError="false" />
   </Target>
 </Project>

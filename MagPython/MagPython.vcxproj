@@ -295,8 +295,11 @@
     <ItemGroup>
       <IncludeFile Include="$(PythonSourceDir)\PC\pyconfig.h" />
       <IncludeFile Include="$(PythonSourceDir)\include\*" />
+      <PythonFiles Include="$(PythonSourceDir)\lib\**\*.py" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)\include\Python" />
     <Copy SourceFiles="@(IncludeFile)" DestinationFolder="$(OutDir)\include\Python\" />
+    <Copy SourceFiles="@(IncludeFile)" DestinationFolder="$(OutDir)\include\Python\" />
+    <Copy SourceFiles="@(PythonFiles)" DestinationFolder="$(OutDir)\lib\%(RecursiveDir)" />
   </Target>
 </Project>
