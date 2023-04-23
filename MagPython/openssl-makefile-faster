@@ -1,0 +1,81 @@
+!INCLUDE makefile
+
+MY_AES=/Focrypto\aes\ crypto\aes\aes_cbc.c crypto\aes\aes_cfb.c crypto\aes\aes_core.c crypto\aes\aes_ecb.c crypto\aes\aes_ige.c crypto\aes\aes_misc.c crypto\aes\aes_ofb.c crypto\aes\aes_wrap.c
+MY_ASN1=/Focrypto\asn1\ crypto\asn1\a_bitstr.c crypto\asn1\a_d2i_fp.c crypto\asn1\a_digest.c crypto\asn1\a_dup.c crypto\asn1\a_gentm.c crypto\asn1\a_i2d_fp.c crypto\asn1\a_int.c crypto\asn1\a_mbstr.c crypto\asn1\a_object.c crypto\asn1\a_octet.c crypto\asn1\a_print.c crypto\asn1\a_sign.c crypto\asn1\a_strex.c crypto\asn1\a_strnid.c crypto\asn1\a_time.c crypto\asn1\a_type.c crypto\asn1\a_utctm.c crypto\asn1\a_utf8.c crypto\asn1\a_verify.c crypto\asn1\ameth_lib.c crypto\asn1\asn1_err.c crypto\asn1\asn1_gen.c crypto\asn1\asn1_item_list.c crypto\asn1\asn1_lib.c crypto\asn1\asn1_par.c crypto\asn1\asn_mime.c crypto\asn1\asn_moid.c crypto\asn1\asn_mstbl.c crypto\asn1\asn_pack.c crypto\asn1\bio_asn1.c crypto\asn1\bio_ndef.c crypto\asn1\d2i_pr.c crypto\asn1\d2i_pu.c crypto\asn1\evp_asn1.c crypto\asn1\f_int.c crypto\asn1\f_string.c crypto\asn1\i2d_pr.c crypto\asn1\i2d_pu.c crypto\asn1\n_pkey.c crypto\asn1\nsseq.c crypto\asn1\p5_pbe.c crypto\asn1\p5_pbev2.c crypto\asn1\p5_scrypt.c crypto\asn1\p8_pkey.c crypto\asn1\t_bitst.c crypto\asn1\t_pkey.c crypto\asn1\t_spki.c crypto\asn1\tasn_dec.c crypto\asn1\tasn_enc.c crypto\asn1\tasn_fre.c crypto\asn1\tasn_new.c crypto\asn1\tasn_prn.c crypto\asn1\tasn_scn.c crypto\asn1\tasn_typ.c crypto\asn1\tasn_utl.c crypto\asn1\x_algor.c crypto\asn1\x_bignum.c crypto\asn1\x_info.c crypto\asn1\x_int64.c crypto\asn1\x_long.c crypto\asn1\x_pkey.c crypto\asn1\x_sig.c crypto\asn1\x_spki.c crypto\asn1\x_val.c
+MY_BIO=/Focrypto\bio\ crypto\bio\b_addr.c crypto\bio\b_dump.c crypto\bio\b_print.c crypto\bio\b_sock.c crypto\bio\b_sock2.c crypto\bio\bf_buff.c crypto\bio\bf_lbuf.c crypto\bio\bf_nbio.c crypto\bio\bf_null.c crypto\bio\bio_cb.c crypto\bio\bio_err.c crypto\bio\bio_lib.c crypto\bio\bio_meth.c crypto\bio\bss_acpt.c crypto\bio\bss_bio.c crypto\bio\bss_conn.c crypto\bio\bss_dgram.c crypto\bio\bss_fd.c crypto\bio\bss_file.c crypto\bio\bss_log.c crypto\bio\bss_mem.c crypto\bio\bss_null.c crypto\bio\bss_sock.c
+MY_BN=/Focrypto\bn\ crypto\bn\bn_add.c crypto\bn\bn_blind.c crypto\bn\bn_const.c crypto\bn\bn_ctx.c crypto\bn\bn_depr.c crypto\bn\bn_dh.c crypto\bn\bn_div.c crypto\bn\bn_err.c crypto\bn\bn_exp.c crypto\bn\bn_exp2.c crypto\bn\bn_gcd.c crypto\bn\bn_gf2m.c crypto\bn\bn_intern.c crypto\bn\bn_kron.c crypto\bn\bn_lib.c crypto\bn\bn_mod.c crypto\bn\bn_mont.c crypto\bn\bn_mpi.c crypto\bn\bn_mul.c crypto\bn\bn_nist.c crypto\bn\bn_prime.c crypto\bn\bn_print.c crypto\bn\bn_rand.c crypto\bn\bn_recp.c crypto\bn\bn_shift.c crypto\bn\bn_sqr.c crypto\bn\bn_sqrt.c crypto\bn\bn_srp.c crypto\bn\bn_word.c crypto\bn\bn_x931p.c
+MY_CAST=/Focrypto\cast\ crypto\cast\c_cfb64.c crypto\cast\c_ecb.c crypto\cast\c_enc.c crypto\cast\c_ofb64.c crypto\cast\c_skey.c crypto\cmac\cm_ameth.c crypto\cmac\cm_pmeth.c crypto\cmac\cmac.c
+MY_CMS=/Focrypto\cms\ crypto\cms\cms_asn1.c crypto\cms\cms_att.c crypto\cms\cms_cd.c crypto\cms\cms_dd.c crypto\cms\cms_enc.c crypto\cms\cms_env.c crypto\cms\cms_err.c crypto\cms\cms_ess.c crypto\cms\cms_io.c crypto\cms\cms_kari.c crypto\cms\cms_lib.c crypto\cms\cms_pwri.c crypto\cms\cms_sd.c crypto\cms\cms_smime.c
+MY_CT=/Focrypto\ct\ crypto\ct\ct_b64.c crypto\ct\ct_err.c crypto\ct\ct_log.c crypto\ct\ct_oct.c crypto\ct\ct_policy.c crypto\ct\ct_prn.c crypto\ct\ct_sct.c crypto\ct\ct_sct_ctx.c crypto\ct\ct_vfy.c crypto\ct\ct_x509v3.c
+MY_DES=/Focrypto\des\ crypto\des\cbc_cksm.c crypto\des\cbc_enc.c crypto\des\cfb64ede.c crypto\des\cfb64enc.c crypto\des\cfb_enc.c crypto\des\ecb3_enc.c crypto\des\ecb_enc.c crypto\des\fcrypt.c crypto\des\ofb64ede.c crypto\des\ofb64enc.c crypto\des\ofb_enc.c crypto\des\pcbc_enc.c crypto\des\qud_cksm.c crypto\des\rand_key.c crypto\des\set_key.c crypto\des\str2key.c crypto\des\xcbc_enc.c
+MY_DH=/Focrypto\dh\ crypto\dh\dh_ameth.c crypto\dh\dh_asn1.c crypto\dh\dh_check.c crypto\dh\dh_depr.c crypto\dh\dh_err.c crypto\dh\dh_gen.c crypto\dh\dh_kdf.c crypto\dh\dh_key.c crypto\dh\dh_lib.c crypto\dh\dh_meth.c crypto\dh\dh_pmeth.c crypto\dh\dh_prn.c crypto\dh\dh_rfc5114.c crypto\dh\dh_rfc7919.c
+MY_DSA=/Focrypto\dsa\ crypto\dsa\dsa_ameth.c crypto\dsa\dsa_asn1.c crypto\dsa\dsa_depr.c crypto\dsa\dsa_err.c crypto\dsa\dsa_gen.c crypto\dsa\dsa_key.c crypto\dsa\dsa_lib.c crypto\dsa\dsa_meth.c crypto\dsa\dsa_ossl.c crypto\dsa\dsa_pmeth.c crypto\dsa\dsa_prn.c crypto\dsa\dsa_sign.c crypto\dsa\dsa_vrf.c
+MY_DSO=/Focrypto\dso\ crypto\dso\dso_dl.c crypto\dso\dso_dlfcn.c crypto\dso\dso_err.c crypto\dso\dso_lib.c crypto\dso\dso_openssl.c crypto\dso\dso_vms.c crypto\dso\dso_win32.c
+MY_EC=/Focrypto\ec\ crypto\ec\curve25519.c crypto\ec\ec2_oct.c crypto\ec\ec2_smpl.c crypto\ec\ec_ameth.c crypto\ec\ec_asn1.c crypto\ec\ec_check.c crypto\ec\ec_curve.c crypto\ec\ec_cvt.c crypto\ec\ec_err.c crypto\ec\ec_key.c crypto\ec\ec_kmeth.c crypto\ec\ec_lib.c crypto\ec\ec_mult.c crypto\ec\ec_oct.c crypto\ec\ec_pmeth.c crypto\ec\ec_print.c crypto\ec\ecdh_kdf.c crypto\ec\ecdh_ossl.c crypto\ec\ecdsa_ossl.c crypto\ec\ecdsa_sign.c crypto\ec\ecdsa_vrf.c crypto\ec\eck_prn.c crypto\ec\ecp_mont.c crypto\ec\ecp_nist.c crypto\ec\ecp_nistp224.c crypto\ec\ecp_nistp256.c crypto\ec\ecp_nistp521.c crypto\ec\ecp_nistputil.c crypto\ec\ecp_nistz256.c crypto\ec\ecp_oct.c crypto\ec\ecp_smpl.c crypto\ec\ecx_meth.c
+MY_ENGINE=/Focrypto\engine\ crypto\engine\eng_all.c crypto\engine\eng_cnf.c crypto\engine\eng_ctrl.c crypto\engine\eng_dyn.c crypto\engine\eng_err.c crypto\engine\eng_fat.c crypto\engine\eng_init.c crypto\engine\eng_lib.c crypto\engine\eng_list.c crypto\engine\eng_openssl.c crypto\engine\eng_pkey.c crypto\engine\eng_rdrand.c crypto\engine\eng_table.c crypto\engine\tb_asnmth.c crypto\engine\tb_cipher.c crypto\engine\tb_dh.c crypto\engine\tb_digest.c crypto\engine\tb_dsa.c crypto\engine\tb_eckey.c crypto\engine\tb_pkmeth.c crypto\engine\tb_rand.c crypto\engine\tb_rsa.c
+MY_EVP=/Focrypto\evp\ crypto\evp\bio_b64.c crypto\evp\bio_enc.c crypto\evp\bio_md.c crypto\evp\bio_ok.c crypto\evp\c_allc.c crypto\evp\c_alld.c crypto\evp\cmeth_lib.c crypto\evp\digest.c crypto\evp\e_bf.c crypto\evp\e_cast.c crypto\evp\e_chacha20_poly1305.c crypto\evp\e_des.c crypto\evp\e_des3.c crypto\evp\e_idea.c crypto\evp\e_null.c crypto\evp\e_old.c crypto\evp\e_rc2.c crypto\evp\e_rc4.c crypto\evp\e_rc4_hmac_md5.c crypto\evp\e_rc5.c crypto\evp\e_seed.c crypto\evp\e_sm4.c crypto\evp\e_xcbc_d.c crypto\evp\encode.c crypto\evp\evp_cnf.c crypto\evp\evp_enc.c crypto\evp\evp_err.c crypto\evp\evp_key.c crypto\evp\evp_lib.c crypto\evp\evp_pbe.c crypto\evp\evp_pkey.c crypto\evp\m_md2.c crypto\evp\m_md4.c crypto\evp\m_md5.c crypto\evp\m_md5_sha1.c crypto\evp\m_null.c crypto\evp\m_ripemd.c crypto\evp\m_sha1.c crypto\evp\m_sha3.c crypto\evp\m_sigver.c crypto\evp\m_wp.c crypto\evp\names.c crypto\evp\p5_crpt.c crypto\evp\p5_crpt2.c crypto\evp\p_dec.c crypto\evp\p_enc.c crypto\evp\p_lib.c crypto\evp\p_open.c crypto\evp\p_seal.c crypto\evp\p_sign.c crypto\evp\p_verify.c crypto\evp\pbe_scrypt.c crypto\evp\pmeth_fn.c crypto\evp\pmeth_gn.c crypto\evp\pmeth_lib.c
+MY_OBJ=/Focrypto\objects\ crypto\objects\o_names.c crypto\objects\obj_dat.c crypto\objects\obj_err.c crypto\objects\obj_lib.c crypto\objects\obj_xref.c
+MY_OCSP=/Focrypto\ocsp\ crypto\ocsp\ocsp_asn.c crypto\ocsp\ocsp_cl.c crypto\ocsp\ocsp_err.c crypto\ocsp\ocsp_ext.c crypto\ocsp\ocsp_ht.c crypto\ocsp\ocsp_lib.c crypto\ocsp\ocsp_prn.c crypto\ocsp\ocsp_srv.c crypto\ocsp\ocsp_vfy.c crypto\ocsp\v3_ocsp.c
+MY_PEM=/Focrypto\pem\ crypto\pem\pem_all.c crypto\pem\pem_err.c crypto\pem\pem_info.c crypto\pem\pem_lib.c crypto\pem\pem_oth.c crypto\pem\pem_pk8.c crypto\pem\pem_pkey.c crypto\pem\pem_sign.c crypto\pem\pem_x509.c crypto\pem\pem_xaux.c crypto\pem\pvkfmt.c
+MY_PKCS12=/Focrypto\pkcs12\ crypto\pkcs12\p12_add.c crypto\pkcs12\p12_asn.c crypto\pkcs12\p12_attr.c crypto\pkcs12\p12_crpt.c crypto\pkcs12\p12_crt.c crypto\pkcs12\p12_decr.c crypto\pkcs12\p12_init.c crypto\pkcs12\p12_key.c crypto\pkcs12\p12_kiss.c crypto\pkcs12\p12_mutl.c crypto\pkcs12\p12_npas.c crypto\pkcs12\p12_p8d.c crypto\pkcs12\p12_p8e.c crypto\pkcs12\p12_sbag.c crypto\pkcs12\p12_utl.c crypto\pkcs12\pk12err.c
+MY_PKCS7=/Focrypto\pkcs7\ crypto\pkcs7\bio_pk7.c crypto\pkcs7\pk7_asn1.c crypto\pkcs7\pk7_attr.c crypto\pkcs7\pk7_doit.c crypto\pkcs7\pk7_lib.c crypto\pkcs7\pk7_mime.c crypto\pkcs7\pk7_smime.c crypto\pkcs7\pkcs7err.c
+MY_POLY1305=/Focrypto\poly1305\ crypto\poly1305\poly1305.c crypto\poly1305\poly1305_ameth.c crypto\poly1305\poly1305_pmeth.c
+MY_RAND=/Focrypto\rand\ crypto\rand\drbg_lib.c crypto\rand\rand_egd.c crypto\rand\rand_err.c crypto\rand\rand_lib.c crypto\rand\rand_unix.c crypto\rand\rand_vms.c crypto\rand\rand_win.c crypto\rand\randfile.c
+MY_RC2=/Focrypto\rc2\ crypto\rc2\rc2_cbc.c crypto\rc2\rc2_ecb.c crypto\rc2\rc2_skey.c crypto\rc2\rc2cfb64.c crypto\rc2\rc2ofb64.c
+MY_RIPEMD=/Focrypto\ripemd\ crypto\ripemd\rmd_dgst.c crypto\ripemd\rmd_one.c
+MY_RSA=/Focrypto\rsa\ crypto\rsa\rsa_ameth.c crypto\rsa\rsa_asn1.c crypto\rsa\rsa_chk.c crypto\rsa\rsa_crpt.c crypto\rsa\rsa_depr.c crypto\rsa\rsa_err.c crypto\rsa\rsa_gen.c crypto\rsa\rsa_lib.c crypto\rsa\rsa_meth.c crypto\rsa\rsa_mp.c crypto\rsa\rsa_none.c crypto\rsa\rsa_oaep.c crypto\rsa\rsa_ossl.c crypto\rsa\rsa_pk1.c crypto\rsa\rsa_pmeth.c crypto\rsa\rsa_prn.c crypto\rsa\rsa_pss.c crypto\rsa\rsa_saos.c crypto\rsa\rsa_sign.c crypto\rsa\rsa_ssl.c crypto\rsa\rsa_x931.c crypto\rsa\rsa_x931g.c
+MY_SEED=/Focrypto\seed\ crypto\seed\seed.c crypto\seed\seed_cbc.c crypto\seed\seed_cfb.c crypto\seed\seed_ecb.c crypto\seed\seed_ofb.c
+MY_SHA=/Focrypto\sha\ crypto\sha\sha1_one.c crypto\sha\sha1dgst.c crypto\sha\sha256.c crypto\sha\sha512.c
+MY_SM2=/Focrypto\sm2\ crypto\sm2\sm2_crypt.c crypto\sm2\sm2_err.c crypto\sm2\sm2_pmeth.c crypto\sm2\sm2_sign.c
+MY_STORE=/Focrypto\store\ crypto\store\loader_file.c crypto\store\store_err.c crypto\store\store_init.c crypto\store\store_lib.c crypto\store\store_register.c crypto\store\store_strings.c
+MY_TS=/Focrypto\ts\ crypto\ts\ts_asn1.c crypto\ts\ts_conf.c crypto\ts\ts_err.c crypto\ts\ts_lib.c crypto\ts\ts_req_print.c crypto\ts\ts_req_utils.c crypto\ts\ts_rsp_print.c crypto\ts\ts_rsp_sign.c crypto\ts\ts_rsp_utils.c crypto\ts\ts_rsp_verify.c crypto\ts\ts_verify_ctx.c
+MY_UI=/Focrypto\ui\ crypto\ui\ui_err.c crypto\ui\ui_lib.c crypto\ui\ui_null.c crypto\ui\ui_openssl.c crypto\ui\ui_util.c
+MY_X509=/Focrypto\x509\ crypto\x509\by_dir.c crypto\x509\by_file.c crypto\x509\t_crl.c crypto\x509\t_req.c crypto\x509\t_x509.c crypto\x509\x509_att.c crypto\x509\x509_cmp.c crypto\x509\x509_d2.c crypto\x509\x509_def.c crypto\x509\x509_err.c crypto\x509\x509_ext.c crypto\x509\x509_lu.c crypto\x509\x509_meth.c crypto\x509\x509_obj.c crypto\x509\x509_r2x.c crypto\x509\x509_req.c crypto\x509\x509_set.c crypto\x509\x509_trs.c crypto\x509\x509_txt.c crypto\x509\x509_v3.c crypto\x509\x509_vfy.c crypto\x509\x509_vpm.c crypto\x509\x509cset.c crypto\x509\x509name.c crypto\x509\x509rset.c crypto\x509\x509spki.c crypto\x509\x509type.c crypto\x509\x_all.c crypto\x509\x_attrib.c crypto\x509\x_crl.c crypto\x509\x_exten.c crypto\x509\x_name.c crypto\x509\x_pubkey.c crypto\x509\x_req.c crypto\x509\x_x509.c crypto\x509\x_x509a.c
+MY_X509V3=/Focrypto\x509v3\ crypto\x509v3\pcy_cache.c crypto\x509v3\pcy_data.c crypto\x509v3\pcy_lib.c crypto\x509v3\pcy_map.c crypto\x509v3\pcy_node.c crypto\x509v3\pcy_tree.c crypto\x509v3\v3_addr.c crypto\x509v3\v3_admis.c crypto\x509v3\v3_akey.c crypto\x509v3\v3_akeya.c crypto\x509v3\v3_alt.c crypto\x509v3\v3_asid.c crypto\x509v3\v3_bcons.c crypto\x509v3\v3_bitst.c crypto\x509v3\v3_conf.c crypto\x509v3\v3_cpols.c crypto\x509v3\v3_crld.c crypto\x509v3\v3_enum.c crypto\x509v3\v3_extku.c crypto\x509v3\v3_genn.c crypto\x509v3\v3_ia5.c crypto\x509v3\v3_info.c crypto\x509v3\v3_int.c crypto\x509v3\v3_lib.c crypto\x509v3\v3_ncons.c crypto\x509v3\v3_pci.c crypto\x509v3\v3_pcia.c crypto\x509v3\v3_pcons.c crypto\x509v3\v3_pku.c crypto\x509v3\v3_pmaps.c crypto\x509v3\v3_prn.c crypto\x509v3\v3_purp.c crypto\x509v3\v3_skey.c crypto\x509v3\v3_sxnet.c crypto\x509v3\v3_tlsf.c crypto\x509v3\v3_utl.c crypto\x509v3\v3err.c
+MY_CRYPTO=/Focrypto\ crypto\threads_none.c crypto\threads_pthread.c crypto\threads_win.c
+
+MY_SSL_RECORD=/Fossl\record\ ssl\record\dtls1_bitmap.c ssl\record\rec_layer_d1.c ssl\record\rec_layer_s3.c ssl\record\ssl3_buffer.c ssl\record\ssl3_record.c ssl\record\ssl3_record_tls13.c
+MY_SSL_STATEM=/Fossl\statem\ ssl\statem\extensions.c ssl\statem\extensions_clnt.c ssl\statem\extensions_cust.c ssl\statem\extensions_srvr.c ssl\statem\statem.c ssl\statem\statem_clnt.c ssl\statem\statem_dtls.c ssl\statem\statem_lib.c ssl\statem\statem_srvr.c
+MY_SSL=/Fossl\ ssl\bio_ssl.c ssl\d1_lib.c ssl\d1_msg.c ssl\d1_srtp.c ssl\methods.c ssl\packet.c ssl\pqueue.c ssl\s3_cbc.c ssl\s3_enc.c ssl\s3_lib.c ssl\s3_msg.c ssl\ssl_asn1.c ssl\ssl_cert.c ssl\ssl_ciph.c ssl\ssl_conf.c ssl\ssl_err.c ssl\ssl_init.c ssl\ssl_lib.c ssl\ssl_mcnf.c ssl\ssl_rsa.c ssl\ssl_sess.c ssl\ssl_stat.c ssl\ssl_txt.c ssl\ssl_utst.c ssl\t1_enc.c ssl\t1_lib.c ssl\t1_trce.c ssl\tls13_enc.c ssl\tls_srp.c
+
+prep_crypto:
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_AES)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_ASN1)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_BIO)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_BN)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_CAST)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_CMS)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_CT)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_DES)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_DH)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_DSA)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_DSO)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_EC)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_ENGINE)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_EVP)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_OBJ)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_OCSP)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_PEM)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_PKCS12)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_PKCS7)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_POLY1305)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_RAND)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_RC2)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_RIPEMD)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_RSA)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SEED)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SHA)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SM2)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_STORE)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_TS)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_UI)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_X509)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_X509V3)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_CRYPTO)
+
+prep_ssl:
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SSL_RECORD)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SSL_STATEM)
+	$(CC) /MP $(LIB_CFLAGS) /I "." /I "include" $(LIB_CPPFLAGS) -c $(MY_SSL)
+
+prep: build_generated prep_ssl prep_crypto
