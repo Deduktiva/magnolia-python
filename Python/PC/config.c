@@ -69,6 +69,13 @@ extern void init_ast(void);
 extern void init_io(void);
 extern void _PyWarnings_Init(void);
 
+extern void init_ssl(void);
+extern void init_hashlib(void);
+extern void init_ctypes(void);
+extern void init_socket(void);
+extern void initselect(void);
+extern void initunicodedata(void);
+
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
 
@@ -164,6 +171,13 @@ struct _inittab _PyImport_Inittab[] = {
     {"_warnings", _PyWarnings_Init},
 
     {"_io", init_io},
+
+	{"_ctypes", init_ctypes},
+	{"_ssl", init_ssl},
+	{"_hashlib", init_hashlib},
+	{"_socket", init_socket},
+	{"select", initselect},
+	{"unicodedata", initunicodedata},
 
     /* Sentinel */
     {0, 0}
