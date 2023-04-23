@@ -3,7 +3,6 @@
 
 int main(int argc, char *argv[]) {
     printf("MagPython smoke test\n");
-    Py_NoSiteFlag++;
     Py_Initialize();
     printf("Compiler: %s\n", Py_GetCompiler());
     int success = PyRun_SimpleString("import sys; sys.stdout.write('Hi from MagPython!\\nsys.path: %r\\n' % sys.path)");
