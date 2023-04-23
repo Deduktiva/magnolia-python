@@ -16,7 +16,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x86
-      - run: '& msbuild /m /p:Configuration=Release MagPython\openssl.vcxproj'
+      - run: '& msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj'
       - run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython.zip MagPython'
       - uses: actions/upload-artifact@v3
         if: success()

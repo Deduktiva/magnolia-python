@@ -1,0 +1,302 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{031984BE-233E-4D2F-9DFC-AB3B1EA4CB67}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>MagPython</RootNamespace>
+    <ProjectName>MagPython</ProjectName>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <PropertyGroup>
+    <TopDir>$(MSBuildProjectDirectory)\..\</TopDir>
+    <IntDir>$(MSBuildProjectDirectory)\$(Configuration)-Int\</IntDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+    <PythonSourceDir>$(TopDir)\Python\</PythonSourceDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <GenerateManifest>false</GenerateManifest>
+    <TargetName>MagPython</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;Py_ENABLE_SHARED;MAG_PY_EMBED;Py_BUILD_CORE;_USRDLL;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(PythonSourceDir)\PC;$(PythonSourceDir)\Python;$(PythonSourceDir)\Modules\zlib;$(PythonSourceDir)\Modules\_ctypes\libffi_msvc;$(PythonSourceDir)\Include;$(OutDir)\include</AdditionalIncludeDirectories>
+      <CompileAsManaged>false</CompileAsManaged>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>ws2_32.lib;Crypt32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>LIBC;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+    </Link>
+    <Lib>
+      <IgnoreSpecificDefaultLibraries>libc;libcmt;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\_bisectmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_codecsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_collectionsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_csv.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_functoolsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_heapqmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_hotshot.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_json.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_localemodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_lsprof.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_math.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_randommodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sre.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_struct.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_weakref.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\arraymodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\audioop.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\binascii.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cmathmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cPickle.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cStringIO.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\datetimemodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\errnomodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\future_builtins.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\gcmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\imageop.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\itertoolsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\main.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\mathmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\md5.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\md5module.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\mmapmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\operator.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\parsermodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\posixmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\rotatingtree.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\sha256module.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\sha512module.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\shamodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\signalmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\stropmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\symtablemodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\threadmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\timemodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\xxsubtype.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zipimport.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlibmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\adler32.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\compress.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\crc32.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\deflate.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\gzclose.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\gzlib.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\gzread.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\gzwrite.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\infback.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\inffast.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\inflate.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\inftrees.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\trees.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\uncompr.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\zlib\zutil.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_cn.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_hk.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_iso2022.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_jp.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_kr.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\_codecs_tw.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\cjkcodecs\multibytecodec.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\_iomodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\bufferedio.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\bytesio.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\fileio.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\iobase.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\stringio.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_io\textio.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\abstract.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\boolobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\bufferobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\bytes_methods.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\bytearrayobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\capsule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\cellobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\classobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\cobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\codeobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\complexobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\descrobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\dictobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\enumobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\exceptions.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\fileobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\floatobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\frameobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\funcobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\genobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\intobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\iterobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\listobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\longobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\memoryobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\methodobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\moduleobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\object.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\obmalloc.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\rangeobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\setobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\sliceobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\stringobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\structseq.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\tupleobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\typeobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\unicodectype.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\unicodeobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Objects\weakrefobject.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\acceler.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\bitset.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\firstsets.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\grammar.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\grammar1.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\listnode.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\metagrammar.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\myreadline.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\node.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\parser.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\parsetok.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\_subprocess.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\_winreg.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\config.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\dl_nt.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\getpathp.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\import_nt.c" />
+    <ClCompile Include="$(PythonSourceDir)\PC\msvcrtmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\_warnings.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\asdl.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\ast.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\bltinmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\ceval.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\codecs.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\compile.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\dtoa.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\dynload_win.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\errors.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\formatter_string.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\formatter_unicode.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\frozen.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\future.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getargs.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getcompiler.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getcopyright.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getopt.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getplatform.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\getversion.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\graminit.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\import.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\importdl.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\marshal.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\modsupport.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\mysnprintf.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\mystrtoul.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\peephole.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pyarena.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pyctype.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pyfpe.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pymath.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pystate.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pystrcmp.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pystrtod.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\Python-ast.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\pythonrun.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\random.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\structmember.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\symtable.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\sysmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\thread.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\traceback.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\getbuildinfo.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\_hashopenssl.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ssl.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\selectmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\socketmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\unicodedata.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\_ctypes.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\callbacks.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\callproc.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\cfield.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\libffi_msvc\ffi.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\malloc_closure.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\libffi_msvc\prep_cif.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\stgdict.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_ctypes\libffi_msvc\win32.c">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <!--
+  <ItemGroup>
+    <CustomBuild Include="$(PythonSourceDir)\Modules\_ctypes\libffi_msvc\win64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+      <Command>ml64 /nologo /c /Zi /Fo "$(IntDir)win64.obj" "%(FullPath)"</Command>
+      <Outputs>$(IntDir)win64.obj;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  -->
+  <ItemGroup>
+    <Library Include="$(OutDir)\libcrypto.lib" />
+    <Library Include="$(OutDir)\libssl.lib" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <IncludeFile Include="$(PythonSourceDir)\PC\pyconfig.h" />
+      <IncludeFile Include="$(PythonSourceDir)\include\*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)\include\Python" />
+    <Copy SourceFiles="@(IncludeFile)" DestinationFolder="$(OutDir)\include\Python\" />
+  </Target>
+</Project>
