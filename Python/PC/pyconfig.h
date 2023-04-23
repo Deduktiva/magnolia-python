@@ -767,4 +767,8 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
    least significant byte first */
 #define DOUBLE_IS_LITTLE_ENDIAN_IEEE754 1
 
+#define _Py_timezone _timezone
+#define _Py_daylight _daylight
+#define _Py_tzname _tzname
+
 #endif /* !Py_CONFIG_H */
