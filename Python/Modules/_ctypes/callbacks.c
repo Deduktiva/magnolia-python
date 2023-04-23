@@ -648,6 +648,7 @@ STDAPI DllCanUnloadNow(void)
     return result;
 }
 
+#ifndef MAG_PY_EMBED
 #ifndef Py_NO_ENABLE_SHARED
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvRes)
 {
@@ -658,6 +659,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvRes)
     }
     return TRUE;
 }
+#endif
 #endif
 
 #endif
