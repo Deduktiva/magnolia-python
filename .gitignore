@@ -2,6 +2,7 @@
 /MagPython/nasm
 /MagPython/nasm.zip
 /MagPython/Release
+/MagPython/Release-test
 /MagPython/Release-Int
 /openssl/**/*.dll
 /openssl/**/*.lib

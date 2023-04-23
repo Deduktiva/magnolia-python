@@ -6,21 +6,28 @@
     <Import Project="common.props"/>
 
     <ItemGroup>
-        <Stage1 Include="$(SolutionDir)\openssl.vcxproj" />
-        <Stage2 Include="$(SolutionDir)\MagPython.vcxproj" />
+        <ProjectOpenSSL Include="$(SolutionDir)\openssl.vcxproj" />
+        <ProjectMagPython Include="$(SolutionDir)\MagPython.vcxproj" />
+        <ProjectTest Include="$(SolutionDir)\test.vcxproj" />
     </ItemGroup>
 
     <Target Name="Build" Outputs="@(CollectedBuildOutput)">
         <MSBuild
                 BuildInParallel="True" StopOnFirstFailure="True"
                 Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
-                Projects="@(Stage1)">
+                Projects="@(ProjectOpenSSL)">
             <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
         </MSBuild>
         <MSBuild
                 BuildInParallel="True" StopOnFirstFailure="True"
                 Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
-                Projects="@(Stage2)">
+                Projects="@(ProjectMagPython)">
+            <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
+        </MSBuild>
+        <MSBuild
+                BuildInParallel="True" StopOnFirstFailure="True"
+                Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
+                Projects="@(ProjectTest)">
             <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
         </MSBuild>
     </Target>
