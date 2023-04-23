@@ -1,0 +1,26 @@
+name: Build All
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+      - run: '& msbuild /m /p:Configuration=Release MagPython\openssl.vcxproj'
+      - run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython.zip MagPython'
+      - uses: actions/upload-artifact@v3
+        if: success()
+        with:
+          name: MagPython.zip
+          retention-days: 7
+          path: MagPython.zip
