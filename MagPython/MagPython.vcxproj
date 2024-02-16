@@ -55,6 +55,7 @@
     <PySourcePath>$(PythonSourceDir)</PySourcePath>
     <PyVPath>$(PythonSourceDir)\\..\\..</PyVPath>
     <zlibDir>$(TopDir)\zlib\</zlibDir>
+    <sqlite3Dir>$(TopDir)\sqlite\</sqlite3Dir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -65,7 +66,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;FFI_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(OutDir)\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OutDir)\include;$(sqlite3Dir)</AdditionalIncludeDirectories>
       <!-- from python.props -->
       <PreprocessorDefinitions>_USRDLL;Py_BUILD_CORE;Py_BUILD_CORE_BUILTIN;Py_ENABLE_SHARED;MS_DLL_ID="";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -616,7 +617,38 @@
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\PC\dl_nt.c" />
   </ItemGroup>
-
+  <!-- from sqlite3.vcxproj -->
+  <ItemGroup>
+    <ClInclude Include="$(sqlite3Dir)\sqlite3.h" />
+    <ClInclude Include="$(sqlite3Dir)\sqlite3ext.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(sqlite3Dir)\sqlite3.c" />
+  </ItemGroup>
+  <!-- from _sqlite3.vcxproj -->
+  <ItemGroup>
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\connection.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\cursor.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\microprotocols.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\module.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\prepare_protocol.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\row.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\statement.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\util.h" />
+    <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\blob.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\connection.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\cursor.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\microprotocols.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\module.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\prepare_protocol.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\row.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\statement.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\util.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sqlite\blob.c" />
+  </ItemGroup>
+  <!-- end -->
   <ItemGroup>
     <Library Include="$(OutDir)\libcrypto.lib" />
     <Library Include="$(OutDir)\libssl.lib" />
