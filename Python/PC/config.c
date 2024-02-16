@@ -77,6 +77,12 @@ extern PyObject* PyInit__opcode(void);
 extern PyObject* PyInit__contextvars(void);
 extern PyObject* PyInit__tokenize(void);
 
+extern PyObject* PyInit__ctypes(void);
+extern PyObject* PyInit__ssl(void);
+extern PyObject* PyInit__hashlib(void);
+extern PyObject* PyInit__socket(void);
+extern PyObject* PyInit_unicodedata(void);
+
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
 
@@ -175,6 +181,12 @@ struct _inittab _PyImport_Inittab[] = {
     {"_opcode", PyInit__opcode},
 
     {"_contextvars", PyInit__contextvars},
+
+    {"_ctypes", PyInit__ctypes},
+    {"_ssl", PyInit__ssl},
+    {"_hashlib", PyInit__hashlib},
+    {"_socket", PyInit__socket},
+    {"unicodedata", PyInit_unicodedata},
 
     /* Sentinel */
     {0, 0}
