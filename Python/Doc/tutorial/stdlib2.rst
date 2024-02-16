@@ -13,12 +13,12 @@ programming needs.  These modules rarely occur in small scripts.
 Output Formatting
 =================
 
-The :mod:`repr` module provides a version of :func:`repr` customized for
+The :mod:`reprlib` module provides a version of :func:`repr` customized for
 abbreviated displays of large or deeply nested containers::
 
-   >>> import repr
-   >>> repr.repr(set('supercalifragilisticexpialidocious'))
-   "set(['a', 'c', 'd', 'e', 'f', 'g', ...])"
+   >>> import reprlib
+   >>> reprlib.repr(set('supercalifragilisticexpialidocious'))
+   "{'a', 'c', 'd', 'e', 'f', 'g', ...}"
 
 The :mod:`pprint` module offers more sophisticated control over printing both
 built-in and user defined objects in a way that is readable by the interpreter.
@@ -44,7 +44,7 @@ width::
    ... a list of strings instead of one big string with newlines to separate
    ... the wrapped lines."""
    ...
-   >>> print textwrap.fill(doc, width=40)
+   >>> print(textwrap.fill(doc, width=40))
    The wrap() method is just like fill()
    except that it returns a list of strings
    instead of one big string with newlines
@@ -59,7 +59,7 @@ formatting numbers with group separators::
    'English_United States.1252'
    >>> conv = locale.localeconv()          # get a mapping of conventions
    >>> x = 1234567.8
-   >>> locale.format("%d", x, grouping=True)
+   >>> locale.format_string("%d", x, grouping=True)
    '1,234,567'
    >>> locale.format_string("%s%.*f", (conv['currency_symbol'],
    ...                      conv['frac_digits'], x), grouping=True)
@@ -108,7 +108,8 @@ placeholders such as the current date, image sequence number, or file format::
    >>> photofiles = ['img_1074.jpg', 'img_1076.jpg', 'img_1077.jpg']
    >>> class BatchRename(Template):
    ...     delimiter = '%'
-   >>> fmt = raw_input('Enter rename style (%d-date %n-seqnum %f-format):  ')
+   ...
+   >>> fmt = input('Enter rename style (%d-date %n-seqnum %f-format):  ')
    Enter rename style (%d-date %n-seqnum %f-format):  Ashley_%n%f
 
    >>> t = BatchRename(fmt)
@@ -116,7 +117,7 @@ placeholders such as the current date, image sequence number, or file format::
    >>> for i, filename in enumerate(photofiles):
    ...     base, ext = os.path.splitext(filename)
    ...     newname = t.substitute(d=date, n=i, f=ext)
-   ...     print '{0} --> {1}'.format(filename, newname)
+   ...     print('{0} --> {1}'.format(filename, newname))
 
    img_1074.jpg --> Ashley_0.jpg
    img_1076.jpg --> Ashley_1.jpg
@@ -142,7 +143,9 @@ standard size and in little-endian byte order::
 
    import struct
 
-   data = open('myfile.zip', 'rb').read()
+   with open('myfile.zip', 'rb') as f:
+       data = f.read()
+
    start = 0
    for i in range(3):                      # show the first 3 file headers
        start += 14
@@ -153,7 +156,7 @@ standard size and in little-endian byte order::
        filename = data[start:start+filenamesize]
        start += filenamesize
        extra = data[start:start+extra_size]
-       print filename, hex(crc32), comp_size, uncomp_size
+       print(filename, hex(crc32), comp_size, uncomp_size)
 
        start += extra_size + comp_size     # skip to the next header
 
@@ -183,14 +186,14 @@ tasks in background while the main program continues to run::
            f = zipfile.ZipFile(self.outfile, 'w', zipfile.ZIP_DEFLATED)
            f.write(self.infile)
            f.close()
-           print 'Finished background zip of: ', self.infile
+           print('Finished background zip of:', self.infile)
 
    background = AsyncZip('mydata.txt', 'myarchive.zip')
    background.start()
-   print 'The main program continues to run in foreground.'
+   print('The main program continues to run in foreground.')
 
    background.join()    # Wait for the background task to finish
-   print 'Main program waited until background was done.'
+   print('Main program waited until background was done.')
 
 The principal challenge of multi-threaded applications is coordinating threads
 that share data or other resources.  To that end, the threading module provides
@@ -200,9 +203,9 @@ variables, and semaphores.
 While those tools are powerful, minor design errors can result in problems that
 are difficult to reproduce.  So, the preferred approach to task coordination is
 to concentrate all access to a resource in a single thread and then use the
-:mod:`Queue` module to feed that thread with requests from other threads.
-Applications using :class:`Queue.Queue` objects for inter-thread communication
-and coordination are easier to design, more readable, and more reliable.
+:mod:`queue` module to feed that thread with requests from other threads.
+Applications using :class:`~queue.Queue` objects for inter-thread communication and
+coordination are easier to design, more readable, and more reliable.
 
 
 .. _tut-logging:
@@ -276,7 +279,7 @@ applications include caching objects that are expensive to create::
    Traceback (most recent call last):
      File "<stdin>", line 1, in <module>
        d['primary']                # entry was automatically removed
-     File "C:/python26/lib/weakref.py", line 46, in __getitem__
+     File "C:/python312/lib/weakref.py", line 46, in __getitem__
        o = self.data[key]()
    KeyError: 'primary'
 
@@ -311,7 +314,7 @@ and breadth first tree searches::
    >>> from collections import deque
    >>> d = deque(["task1", "task2", "task3"])
    >>> d.append("task4")
-   >>> print "Handling", d.popleft()
+   >>> print("Handling", d.popleft())
    Handling task1
 
 ::
@@ -369,12 +372,9 @@ results in decimal floating point and binary floating point. The difference
 becomes significant if the results are rounded to the nearest cent::
 
    >>> from decimal import *
-   >>> x = Decimal('0.70') * Decimal('1.05')
-   >>> x
-   Decimal('0.7350')
-   >>> x.quantize(Decimal('0.01'))  # round to nearest cent
+   >>> round(Decimal('0.70') * Decimal('1.05'), 2)
    Decimal('0.74')
-   >>> round(.70 * 1.05, 2)         # same calculation with floats
+   >>> round(.70 * 1.05, 2)
    0.73
 
 The :class:`~decimal.Decimal` result keeps a trailing zero, automatically
@@ -394,7 +394,7 @@ point::
 
    >>> sum([Decimal('0.1')]*10) == Decimal('1.0')
    True
-   >>> sum([0.1]*10) == 1.0
+   >>> 0.1 + 0.1 + 0.1 + 0.1 + 0.1 + 0.1 + 0.1 + 0.1 + 0.1 + 0.1 == 1.0
    False
 
 The :mod:`decimal` module provides arithmetic with as much precision as needed::

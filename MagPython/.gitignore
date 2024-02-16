@@ -1,2 +1,6 @@
 /Debug
 /Release
+/Release-Int*
+/Release-test
+/nasm
+/nasm.zip

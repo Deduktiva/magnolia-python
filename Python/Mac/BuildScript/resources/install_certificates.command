@@ -35,7 +35,7 @@ def main():
     print(" -- removing any existing file or link")
     try:
         os.remove(openssl_cafile)
-    except OSError:
+    except FileNotFoundError:
         pass
     print(" -- creating symlink to certifi certificate bundle")
     os.symlink(relpath_to_certifi_cafile, openssl_cafile)

@@ -1,16 +1,21 @@
-
 :mod:`spwd` --- The shadow password database
 ============================================
 
 .. module:: spwd
    :platform: Unix
    :synopsis: The shadow password database (getspnam() and friends).
+   :deprecated:
 
+.. deprecated-removed:: 3.11 3.13
+   The :mod:`spwd` module is deprecated
+   (see :pep:`PEP 594 <594#spwd>` for details and alternatives).
 
-.. versionadded:: 2.5
+--------------
 
 This module provides access to the Unix shadow password database. It is
 available on various Unix versions.
+
+.. include:: ../includes/wasm-notavail.rst
 
 You must have enough privileges to access the shadow password database (this
 usually means you have to be root).
@@ -22,9 +27,9 @@ below, see ``<shadow.h>``):
 +-------+---------------+---------------------------------+
 | Index | Attribute     | Meaning                         |
 +=======+===============+=================================+
-| 0     | ``sp_nam``    | Login name                      |
+| 0     | ``sp_namp``   | Login name                      |
 +-------+---------------+---------------------------------+
-| 1     | ``sp_pwd``    | Encrypted password              |
+| 1     | ``sp_pwdp``   | Encrypted password              |
 +-------+---------------+---------------------------------+
 | 2     | ``sp_lstchg`` | Date of last change             |
 +-------+---------------+---------------------------------+
@@ -39,24 +44,27 @@ below, see ``<shadow.h>``):
 +-------+---------------+---------------------------------+
 | 6     | ``sp_inact``  | Number of days after password   |
 |       |               | expires until account is        |
-|       |               | blocked                         |
+|       |               | disabled                        |
 +-------+---------------+---------------------------------+
 | 7     | ``sp_expire`` | Number of days since 1970-01-01 |
-|       |               | until account is disabled       |
+|       |               | when account expires            |
 +-------+---------------+---------------------------------+
 | 8     | ``sp_flag``   | Reserved                        |
 +-------+---------------+---------------------------------+
 
-The sp_nam and sp_pwd items are strings, all others are integers.
+The sp_namp and sp_pwdp items are strings, all others are integers.
 :exc:`KeyError` is raised if the entry asked for cannot be found.
 
-It defines the following items:
+The following functions are defined:
 
 
 .. function:: getspnam(name)
 
    Return the shadow password database entry for the given user name.
 
+   .. versionchanged:: 3.6
+      Raises a :exc:`PermissionError` instead of :exc:`KeyError` if the user
+      doesn't have privileges.
 
 .. function:: getspall()
 

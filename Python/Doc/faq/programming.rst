@@ -16,61 +16,58 @@ Is there a source code level debugger with breakpoints, single-stepping, etc.?
 
 Yes.
 
+Several debuggers for Python are described below, and the built-in function
+:func:`breakpoint` allows you to drop into any of them.
+
 The pdb module is a simple but adequate console-mode debugger for Python. It is
 part of the standard Python library, and is :mod:`documented in the Library
 Reference Manual <pdb>`. You can also write your own debugger by using the code
 for pdb as an example.
 
 The IDLE interactive development environment, which is part of the standard
-Python distribution (normally available as Tools/scripts/idle), includes a
-graphical debugger.
+Python distribution (normally available as
+`Tools/scripts/idle3 <https://github.com/python/cpython/blob/main/Tools/scripts/idle3>`_),
+includes a graphical debugger.
 
 PythonWin is a Python IDE that includes a GUI debugger based on pdb.  The
-Pythonwin debugger colors breakpoints and has quite a few cool features such as
-debugging non-Pythonwin programs.  Pythonwin is available as part of the `Python
-for Windows Extensions <https://sourceforge.net/projects/pywin32/>`__ project and
-as a part of the ActivePython distribution (see
-https://www.activestate.com/activepython\ ).
+PythonWin debugger colors breakpoints and has quite a few cool features such as
+debugging non-PythonWin programs.  PythonWin is available as part of
+`pywin32 <https://github.com/mhammond/pywin32>`_ project and
+as a part of the
+`ActivePython <https://www.activestate.com/products/python/>`_ distribution.
 
-`Boa Constructor <http://boa-constructor.sourceforge.net/>`_ is an IDE and GUI
-builder that uses wxWidgets.  It offers visual frame creation and manipulation,
-an object inspector, many views on the source like object browsers, inheritance
-hierarchies, doc string generated html documentation, an advanced debugger,
-integrated help, and Zope support.
-
-`Eric <http://eric-ide.python-projects.org/>`_ is an IDE built on PyQt
+`Eric <https://eric-ide.python-projects.org/>`_ is an IDE built on PyQt
 and the Scintilla editing component.
 
-Pydb is a version of the standard Python debugger pdb, modified for use with DDD
-(Data Display Debugger), a popular graphical debugger front end.  Pydb can be
-found at http://bashdb.sourceforge.net/pydb/ and DDD can be found at
-https://www.gnu.org/software/ddd.
+`trepan3k <https://github.com/rocky/python3-trepan/>`_ is a gdb-like debugger.
+
+`Visual Studio Code <https://code.visualstudio.com/>`_ is an IDE with debugging
+tools that integrates with version-control software.
 
 There are a number of commercial Python IDEs that include graphical debuggers.
 They include:
 
-* Wing IDE (https://wingware.com/)
-* Komodo IDE (https://komodoide.com/)
-* PyCharm (https://www.jetbrains.com/pycharm/)
+* `Wing IDE <https://wingware.com/>`_
+* `Komodo IDE <https://www.activestate.com/products/komodo-ide/>`_
+* `PyCharm <https://www.jetbrains.com/pycharm/>`_
 
 
-Is there a tool to help find bugs or perform static analysis?
+Are there tools to help find bugs or perform static analysis?
 -------------------------------------------------------------
 
 Yes.
 
-PyChecker is a static analysis tool that finds bugs in Python source code and
-warns about code complexity and style.  You can get PyChecker from
-http://pychecker.sourceforge.net/.
+`Pylint <https://pylint.pycqa.org/en/latest/index.html>`_ and
+`Pyflakes <https://github.com/PyCQA/pyflakes>`_ do basic checking that will
+help you catch bugs sooner.
 
-`Pylint <https://www.pylint.org/>`_ is another tool that checks
-if a module satisfies a coding standard, and also makes it possible to write
-plug-ins to add a custom feature.  In addition to the bug checking that
-PyChecker performs, Pylint offers some additional features such as checking line
-length, whether variable names are well-formed according to your coding
-standard, whether declared interfaces are fully implemented, and more.
-https://docs.pylint.org/ provides a full list of Pylint's features.
+Static type checkers such as `Mypy <https://mypy-lang.org/>`_,
+`Pyre <https://pyre-check.org/>`_, and
+`Pytype <https://github.com/google/pytype>`_ can check type hints in Python
+source code.
 
+
+.. _faq-create-standalone-binary:
 
 How can I create a stand-alone binary from a Python script?
 -----------------------------------------------------------
@@ -82,7 +79,8 @@ set of modules required by a program and bind these modules together with a
 Python binary to produce a single executable.
 
 One is to use the freeze tool, which is included in the Python source tree as
-``Tools/freeze``. It converts Python byte code to C arrays; a C compiler you can
+`Tools/freeze <https://github.com/python/cpython/tree/main/Tools/freeze>`_.
+It converts Python byte code to C arrays; with a C compiler you can
 embed all your modules into a new program, which is then linked with the
 standard Python modules.
 
@@ -95,13 +93,15 @@ only contains those built-in modules which are actually used in the program.  It
 then compiles the generated C code and links it with the rest of the Python
 interpreter to form a self-contained binary which acts exactly like your script.
 
-Obviously, freeze requires a C compiler.  There are several other utilities
-which don't. One is Thomas Heller's py2exe (Windows only) at
+The following packages can help with the creation of console and GUI
+executables:
 
-    http://www.py2exe.org/
-
-Another tool is Anthony Tuininga's `cx_Freeze <http://cx-freeze.sourceforge.net/>`_.
-
+* `Nuitka <https://nuitka.net/>`_ (Cross-platform)
+* `PyInstaller <https://pyinstaller.org/>`_ (Cross-platform)
+* `PyOxidizer <https://pyoxidizer.readthedocs.io/en/stable/>`_ (Cross-platform)
+* `cx_Freeze <https://marcelotduarte.github.io/cx_Freeze/>`_ (Cross-platform)
+* `py2app <https://github.com/ronaldoussoren/py2app>`_ (macOS only)
+* `py2exe <https://www.py2exe.org/>`_ (Windows only)
 
 Are there coding standards or a style guide for Python programs?
 ----------------------------------------------------------------
@@ -110,174 +110,15 @@ Yes.  The coding style required for standard library modules is documented as
 :pep:`8`.
 
 
-My program is too slow. How do I speed it up?
----------------------------------------------
-
-That's a tough one, in general.  There are many tricks to speed up Python code;
-consider rewriting parts in C as a last resort.
-
-In some cases it's possible to automatically translate Python to C or x86
-assembly language, meaning that you don't have to modify your code to gain
-increased speed.
-
-.. XXX seems to have overlap with other questions!
-
-`Pyrex <http://www.cosc.canterbury.ac.nz/~greg/python/Pyrex/>`_ can compile a
-slightly modified version of Python code into a C extension, and can be used on
-many different platforms.
-
-`Psyco <http://psyco.sourceforge.net>`_ is a just-in-time compiler that
-translates Python code into x86 assembly language.  If you can use it, Psyco can
-provide dramatic speedups for critical functions.
-
-The rest of this answer will discuss various tricks for squeezing a bit more
-speed out of Python code.  *Never* apply any optimization tricks unless you know
-you need them, after profiling has indicated that a particular function is the
-heavily executed hot spot in the code.  Optimizations almost always make the
-code less clear, and you shouldn't pay the costs of reduced clarity (increased
-development time, greater likelihood of bugs) unless the resulting performance
-benefit is worth it.
-
-There is a page on the wiki devoted to `performance tips
-<https://wiki.python.org/moin/PythonSpeed/PerformanceTips>`_.
-
-Guido van Rossum has written up an anecdote related to optimization at
-https://www.python.org/doc/essays/list2str.
-
-One thing to notice is that function and (especially) method calls are rather
-expensive; if you have designed a purely OO interface with lots of tiny
-functions that don't do much more than get or set an instance variable or call
-another method, you might consider using a more direct way such as directly
-accessing instance variables.  Also see the standard module :mod:`profile` which
-makes it possible to find out where your program is spending most of its time
-(if you have some patience -- the profiling itself can slow your program down by
-an order of magnitude).
-
-Remember that many standard optimization heuristics you may know from other
-programming experience may well apply to Python.  For example it may be faster
-to send output to output devices using larger writes rather than smaller ones in
-order to reduce the overhead of kernel system calls.  Thus CGI scripts that
-write all output in "one shot" may be faster than those that write lots of small
-pieces of output.
-
-Also, be sure to use Python's core features where appropriate.  For example,
-slicing allows programs to chop up lists and other sequence objects in a single
-tick of the interpreter's mainloop using highly optimized C implementations.
-Thus to get the same effect as::
-
-   L2 = []
-   for i in range(3):
-       L2.append(L1[i])
-
-it is much shorter and far faster to use ::
-
-   L2 = list(L1[:3])  # "list" is redundant if L1 is a list.
-
-Note that the functionally-oriented built-in functions such as :func:`map`,
-:func:`zip`, and friends can be a convenient accelerator for loops that
-perform a single task.  For example to pair the elements of two lists
-together::
-
-   >>> zip([1, 2, 3], [4, 5, 6])
-   [(1, 4), (2, 5), (3, 6)]
-
-or to compute a number of sines::
-
-   >>> map(math.sin, (1, 2, 3, 4))
-   [0.841470984808, 0.909297426826, 0.14112000806, -0.756802495308]
-
-The operation completes very quickly in such cases.
-
-Other examples include the ``join()`` and ``split()`` :ref:`methods
-of string objects <string-methods>`.
-For example if s1..s7 are large (10K+) strings then
-``"".join([s1,s2,s3,s4,s5,s6,s7])`` may be far faster than the more obvious
-``s1+s2+s3+s4+s5+s6+s7``, since the "summation" will compute many
-subexpressions, whereas ``join()`` does all the copying in one pass.  For
-manipulating strings, use the ``replace()`` and the ``format()`` :ref:`methods
-on string objects <string-methods>`.  Use regular expressions only when you're
-not dealing with constant string patterns.  You may still use :ref:`the old %
-operations <string-formatting>` ``string % tuple`` and ``string % dictionary``.
-
-Be sure to use the :meth:`list.sort` built-in method to do sorting, and see the
-`sorting mini-HOWTO <https://wiki.python.org/moin/HowTo/Sorting>`_ for examples
-of moderately advanced usage.  :meth:`list.sort` beats other techniques for
-sorting in all but the most extreme circumstances.
-
-Another common trick is to "push loops into functions or methods."  For example
-suppose you have a program that runs slowly and you use the profiler to
-determine that a Python function ``ff()`` is being called lots of times.  If you
-notice that ``ff()``::
-
-   def ff(x):
-       ... # do something with x computing result...
-       return result
-
-tends to be called in loops like::
-
-   list = map(ff, oldlist)
-
-or::
-
-   for x in sequence:
-       value = ff(x)
-       ... # do something with value...
-
-then you can often eliminate function call overhead by rewriting ``ff()`` to::
-
-   def ffseq(seq):
-       resultseq = []
-       for x in seq:
-           ... # do something with x computing result...
-           resultseq.append(result)
-       return resultseq
-
-and rewrite the two examples to ``list = ffseq(oldlist)`` and to::
-
-   for value in ffseq(sequence):
-       ... # do something with value...
-
-Single calls to ``ff(x)`` translate to ``ffseq([x])[0]`` with little penalty.
-Of course this technique is not always appropriate and there are other variants
-which you can figure out.
-
-You can gain some performance by explicitly storing the results of a function or
-method lookup into a local variable.  A loop like::
-
-   for key in token:
-       dict[key] = dict.get(key, 0) + 1
-
-resolves ``dict.get`` every iteration.  If the method isn't going to change, a
-slightly faster implementation is::
-
-   dict_get = dict.get  # look up the method once
-   for key in token:
-       dict[key] = dict_get(key, 0) + 1
-
-Default arguments can be used to determine values once, at compile time instead
-of at run time.  This can only be done for functions or objects which will not
-be changed during program execution, such as replacing ::
-
-   def degree_sin(deg):
-       return math.sin(deg * math.pi / 180.0)
-
-with ::
-
-   def degree_sin(deg, factor=math.pi/180.0, sin=math.sin):
-       return sin(deg * factor)
-
-Because this trick uses default arguments for terms which should not be changed,
-it should only be used when you are not concerned with presenting a possibly
-confusing API to your users.
-
-
 Core Language
 =============
+
+.. _faq-unboundlocalerror:
 
 Why am I getting an UnboundLocalError when the variable has a value?
 --------------------------------------------------------------------
 
-It can be a surprise to get the UnboundLocalError in previously working
+It can be a surprise to get the :exc:`UnboundLocalError` in previously working
 code when it is modified by adding an assignment statement somewhere in
 the body of a function.
 
@@ -285,7 +126,8 @@ This code:
 
    >>> x = 10
    >>> def bar():
-   ...     print x
+   ...     print(x)
+   ...
    >>> bar()
    10
 
@@ -293,10 +135,10 @@ works, but this code:
 
    >>> x = 10
    >>> def foo():
-   ...     print x
+   ...     print(x)
    ...     x += 1
 
-results in an UnboundLocalError:
+results in an :exc:`!UnboundLocalError`:
 
    >>> foo()
    Traceback (most recent call last):
@@ -307,7 +149,7 @@ This is because when you make an assignment to a variable in a scope, that
 variable becomes local to that scope and shadows any similarly named variable
 in the outer scope.  Since the last statement in foo assigns a new value to
 ``x``, the compiler recognizes it as a local variable.  Consequently when the
-earlier ``print x`` attempts to print the uninitialized local variable and
+earlier ``print(x)`` attempts to print the uninitialized local variable and
 an error results.
 
 In the example above you can access the outer scope variable by declaring it
@@ -316,8 +158,9 @@ global:
    >>> x = 10
    >>> def foobar():
    ...     global x
-   ...     print x
+   ...     print(x)
    ...     x += 1
+   ...
    >>> foobar()
    10
 
@@ -325,7 +168,23 @@ This explicit declaration is required in order to remind you that (unlike the
 superficially analogous situation with class and instance variables) you are
 actually modifying the value of the variable in the outer scope:
 
-   >>> print x
+   >>> print(x)
+   11
+
+You can do a similar thing in a nested scope using the :keyword:`nonlocal`
+keyword:
+
+   >>> def foo():
+   ...    x = 10
+   ...    def bar():
+   ...        nonlocal x
+   ...        print(x)
+   ...        x += 1
+   ...    bar()
+   ...    print(x)
+   ...
+   >>> foo()
+   10
    11
 
 
@@ -419,9 +278,9 @@ main.py::
 
    import config
    import mod
-   print config.x
+   print(config.x)
 
-Note that using a module is also the basis for implementing the Singleton design
+Note that using a module is also the basis for implementing the singleton design
 pattern, for the same reason.
 
 
@@ -439,15 +298,10 @@ using multiple imports per line uses less screen space.
 
 It's good practice if you import modules in the following order:
 
-1. standard library modules -- e.g. ``sys``, ``os``, ``getopt``, ``re``
+1. standard library modules -- e.g. :mod:`sys`, :mod:`os`, :mod:`argparse`, :mod:`re`
 2. third-party library modules (anything installed in Python's site-packages
-   directory) -- e.g. mx.DateTime, ZODB, PIL.Image, etc.
-3. locally-developed modules
-
-Only use explicit relative package imports.  If you're writing code that's in
-the ``package.sub.m1`` module and want to import ``package.sub.m2``, do not just
-write ``import m2``, even though it's legal.  Write ``from package.sub import
-m2`` or ``from . import m2`` instead.
+   directory) -- e.g. :mod:`!dateutil`, :mod:`!requests`, :mod:`!PIL.Image`
+3. locally developed modules
 
 It is sometimes necessary to move imports to a function or class to avoid
 problems with circular imports.  Gordon McMillan says:
@@ -522,8 +376,8 @@ compute, a common technique is to cache the parameters and the resulting value
 of each call to the function, and return the cached value if the same value is
 requested again.  This is called "memoizing", and can be implemented like this::
 
-   # Callers will never provide a third parameter for this function.
-   def expensive(arg1, arg2, _cache={}):
+   # Callers can only provide two parameters and optionally pass _cache by keyword
+   def expensive(arg1, arg2, *, _cache={}):
        if (arg1, arg2) in _cache:
            return _cache[(arg1, arg2)]
 
@@ -550,15 +404,6 @@ calling another function by using ``*`` and ``**``::
        ...
        g(x, *args, **kwargs)
 
-In the unlikely case that you care about Python versions older than 2.0, use
-:func:`apply`::
-
-   def f(x, *args, **kwargs):
-       ...
-       kwargs['width'] = '14.3c'
-       ...
-       apply(g, (x,)+args, kwargs)
-
 
 .. index::
    single: argument; difference from parameter
@@ -571,8 +416,9 @@ What is the difference between arguments and parameters?
 
 :term:`Parameters <parameter>` are defined by the names that appear in a
 function definition, whereas :term:`arguments <argument>` are the values
-actually passed to a function when calling it.  Parameters define what types of
-arguments a function can accept.  For example, given the function definition::
+actually passed to a function when calling it.  Parameters define what
+:term:`kind of arguments <parameter>` a function can accept.  For
+example, given the function definition::
 
    def func(foo, bar=None, **kwargs):
        pass
@@ -608,7 +454,7 @@ There are two factors that produce this result:
    (the list), and both ``x`` and ``y`` refer to it.
 2) Lists are :term:`mutable`, which means that you can change their content.
 
-After the call to :meth:`~list.append`, the content of the mutable object has
+After the call to :meth:`!append`, the content of the mutable object has
 changed from ``[]`` to ``[10]``.  Since both the variables refer to the same
 object, using either name accesses the modified value ``[10]``.
 
@@ -632,7 +478,7 @@ object ``x`` refers to).  After this assignment we have two objects (the ints
 
 Some operations (for example ``y.append(10)`` and ``y.sort()``) mutate the
 object, whereas superficially similar operations (for example ``y = y + [10]``
-and ``sorted(y)``) create a new object.  In general in Python (and in all cases
+and :func:`sorted(y) <sorted>`) create a new object.  In general in Python (and in all cases
 in the standard library) a method that mutates an object will return ``None``
 to help avoid getting the two types of operations confused.  So if you
 mistakenly write ``y.sort()`` thinking it will give you a sorted copy of ``y``,
@@ -670,14 +516,14 @@ desired effect in a number of ways.
 
 1) By returning a tuple of the results::
 
-      def func2(a, b):
-          a = 'new-value'        # a and b are local names
-          b = b + 1              # assigned to new objects
-          return a, b            # return new values
-
-      x, y = 'old-value', 99
-      x, y = func2(x, y)
-      print x, y                 # output: new-value 100
+      >>> def func1(a, b):
+      ...     a = 'new-value'        # a and b are local names
+      ...     b = b + 1              # assigned to new objects
+      ...     return a, b            # return new values
+      ...
+      >>> x, y = 'old-value', 99
+      >>> func1(x, y)
+      ('new-value', 100)
 
    This is almost always the clearest solution.
 
@@ -685,38 +531,41 @@ desired effect in a number of ways.
 
 3) By passing a mutable (changeable in-place) object::
 
-      def func1(a):
-          a[0] = 'new-value'     # 'a' references a mutable list
-          a[1] = a[1] + 1        # changes a shared object
-
-      args = ['old-value', 99]
-      func1(args)
-      print args[0], args[1]     # output: new-value 100
+      >>> def func2(a):
+      ...     a[0] = 'new-value'     # 'a' references a mutable list
+      ...     a[1] = a[1] + 1        # changes a shared object
+      ...
+      >>> args = ['old-value', 99]
+      >>> func2(args)
+      >>> args
+      ['new-value', 100]
 
 4) By passing in a dictionary that gets mutated::
 
-      def func3(args):
-          args['a'] = 'new-value'     # args is a mutable dictionary
-          args['b'] = args['b'] + 1   # change it in-place
-
-      args = {'a': 'old-value', 'b': 99}
-      func3(args)
-      print args['a'], args['b']
+      >>> def func3(args):
+      ...     args['a'] = 'new-value'     # args is a mutable dictionary
+      ...     args['b'] = args['b'] + 1   # change it in-place
+      ...
+      >>> args = {'a': 'old-value', 'b': 99}
+      >>> func3(args)
+      >>> args
+      {'a': 'new-value', 'b': 100}
 
 5) Or bundle up values in a class instance::
 
-      class callByRef:
-          def __init__(self, **args):
-              for (key, value) in args.items():
-                  setattr(self, key, value)
-
-      def func4(args):
-          args.a = 'new-value'        # args is a mutable callByRef
-          args.b = args.b + 1         # change object in-place
-
-      args = callByRef(a='old-value', b=99)
-      func4(args)
-      print args.a, args.b
+      >>> class Namespace:
+      ...     def __init__(self, /, **args):
+      ...         for key, value in args.items():
+      ...             setattr(self, key, value)
+      ...
+      >>> def func4(args):
+      ...     args.a = 'new-value'        # args is a mutable Namespace
+      ...     args.b = args.b + 1         # change object in-place
+      ...
+      >>> args = Namespace(a='old-value', b=99)
+      >>> func4(args)
+      >>> vars(args)
+      {'a': 'new-value', 'b': 100}
 
 
    There's almost never a good reason to get this complicated.
@@ -802,7 +651,7 @@ Sequences can be copied by slicing::
 How can I find the methods or attributes of an object?
 ------------------------------------------------------
 
-For an instance x of a user-defined class, ``dir(x)`` returns an alphabetized
+For an instance ``x`` of a user-defined class, :func:`dir(x) <dir>` returns an alphabetized
 list of the names containing the instance attributes and methods and attributes
 defined by its class.
 
@@ -811,7 +660,7 @@ How can my code discover the name of an object?
 -----------------------------------------------
 
 Generally speaking, it can't, because objects don't really have names.
-Essentially, assignment always binds a name to a value; The same is true of
+Essentially, assignment always binds a name to a value; the same is true of
 ``def`` and ``class`` statements, but in that case the value is a
 callable. Consider the following code::
 
@@ -821,15 +670,15 @@ callable. Consider the following code::
    >>> B = A
    >>> a = B()
    >>> b = a
-   >>> print b
-   <__main__.A instance at 0x16D07CC>
-   >>> print a
-   <__main__.A instance at 0x16D07CC>
+   >>> print(b)
+   <__main__.A object at 0x16D07CC>
+   >>> print(a)
+   <__main__.A object at 0x16D07CC>
 
 Arguably the class has a name: even though it is bound to two names and invoked
-through the name B the created instance is still reported as an instance of
-class A.  However, it is impossible to say whether the instance's name is a or
-b, since both names are bound to the same value.
+through the name ``B`` the created instance is still reported as an instance of
+class ``A``.  However, it is impossible to say whether the instance's name is ``a`` or
+``b``, since both names are bound to the same value.
 
 Generally speaking it should not be necessary for your code to "know the names"
 of particular values. Unless you are deliberately writing introspective
@@ -872,39 +721,47 @@ are not truly operators but syntactic delimiters in assignment statements.
 Is there an equivalent of C's "?:" ternary operator?
 ----------------------------------------------------
 
-Yes, this feature was added in Python 2.5. The syntax would be as follows::
+Yes, there is. The syntax is as follows::
 
    [on_true] if [expression] else [on_false]
 
    x, y = 50, 25
-
    small = x if x < y else y
 
-For versions previous to 2.5 the answer would be 'No'.
+Before this syntax was introduced in Python 2.5, a common idiom was to use
+logical operators::
+
+   [expression] and [on_true] or [on_false]
+
+However, this idiom is unsafe, as it can give wrong results when *on_true*
+has a false boolean value.  Therefore, it is always better to use
+the ``... if ... else ...`` form.
 
 
 Is it possible to write obfuscated one-liners in Python?
 --------------------------------------------------------
 
 Yes.  Usually this is done by nesting :keyword:`lambda` within
-:keyword:`lambda`.  See the following three examples, due to Ulf Bartelt::
+:keyword:`!lambda`.  See the following three examples, slightly adapted from Ulf Bartelt::
+
+   from functools import reduce
 
    # Primes < 1000
-   print filter(None,map(lambda y:y*reduce(lambda x,y:x*y!=0,
-   map(lambda x,y=y:y%x,range(2,int(pow(y,0.5)+1))),1),range(2,1000)))
+   print(list(filter(None,map(lambda y:y*reduce(lambda x,y:x*y!=0,
+   map(lambda x,y=y:y%x,range(2,int(pow(y,0.5)+1))),1),range(2,1000)))))
 
    # First 10 Fibonacci numbers
-   print map(lambda x,f=lambda x,f:(f(x-1,f)+f(x-2,f)) if x>1 else 1: f(x,f),
-   range(10))
+   print(list(map(lambda x,f=lambda x,f:(f(x-1,f)+f(x-2,f)) if x>1 else 1:
+   f(x,f), range(10))))
 
    # Mandelbrot set
-   print (lambda Ru,Ro,Iu,Io,IM,Sx,Sy:reduce(lambda x,y:x+y,map(lambda y,
+   print((lambda Ru,Ro,Iu,Io,IM,Sx,Sy:reduce(lambda x,y:x+'\n'+y,map(lambda y,
    Iu=Iu,Io=Io,Ru=Ru,Ro=Ro,Sy=Sy,L=lambda yc,Iu=Iu,Io=Io,Ru=Ru,Ro=Ro,i=IM,
    Sx=Sx,Sy=Sy:reduce(lambda x,y:x+y,map(lambda x,xc=Ru,yc=yc,Ru=Ru,Ro=Ro,
    i=i,Sx=Sx,F=lambda xc,yc,x,y,k,f=lambda xc,yc,x,y,k,f:(k<=0)or (x*x+y*y
    >=4.0) or 1+f(xc,yc,x*x-y*y+xc,2.0*x*y+yc,k-1,f):f(xc,yc,x,y,k,f):chr(
    64+F(Ru+x*(Ro-Ru)/Sx,yc,0,0,i)),range(Sx))):L(Iu+y*(Io-Iu)/Sy),range(Sy
-   ))))(-2.1, 0.7, -1.2, 1.2, 30, 80, 24)
+   ))))(-2.1, 0.7, -1.2, 1.2, 30, 80, 24))
    #    \___ ___/  \___ ___/  |   |   |__ lines on screen
    #        V          V      |   |______ columns on screen
    #        |          |      |__________ maximum of "iterations"
@@ -912,6 +769,34 @@ Yes.  Usually this is done by nesting :keyword:`lambda` within
    #        |____________________________ range on x axis
 
 Don't try this at home, kids!
+
+
+.. _faq-positional-only-arguments:
+
+What does the slash(/) in the parameter list of a function mean?
+----------------------------------------------------------------
+
+A slash in the argument list of a function denotes that the parameters prior to
+it are positional-only.  Positional-only parameters are the ones without an
+externally usable name.  Upon calling a function that accepts positional-only
+parameters, arguments are mapped to parameters based solely on their position.
+For example, :func:`divmod` is a function that accepts positional-only
+parameters. Its documentation looks like this::
+
+   >>> help(divmod)
+   Help on built-in function divmod in module builtins:
+
+   divmod(x, y, /)
+       Return the tuple (x//y, x%y).  Invariant: div*y + mod == x.
+
+The slash at the end of the parameter list means that both parameters are
+positional-only. Thus, calling :func:`divmod` with keyword arguments would lead
+to an error::
+
+   >>> divmod(x=3, y=4)
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   TypeError: divmod() takes no keyword arguments
 
 
 Numbers and strings
@@ -958,11 +843,26 @@ is positive, there are many, and in virtually all of them it's more useful for
 ago?  ``-190 % 12 == 2`` is useful; ``-190 % 12 == -10`` is a bug waiting to
 bite.
 
-.. note::
 
-   On Python 2, ``a / b`` returns the same as ``a // b`` if
-   ``__future__.division`` is not in effect.  This is also known as "classic"
-   division.
+How do I get int literal attribute instead of SyntaxError?
+----------------------------------------------------------
+
+Trying to lookup an ``int`` literal attribute in the normal manner gives
+a :exc:`SyntaxError` because the period is seen as a decimal point::
+
+   >>> 1.__class__
+     File "<stdin>", line 1
+     1.__class__
+      ^
+   SyntaxError: invalid decimal literal
+
+The solution is to separate the literal from the period
+with either a space or parentheses.
+
+   >>> 1 .__class__
+   <class 'int'>
+   >>> (1).__class__
+   <class 'int'>
 
 
 How do I convert a string to a number?
@@ -973,10 +873,11 @@ For integers, use the built-in :func:`int` type constructor, e.g. ``int('144')
 e.g. ``float('144') == 144.0``.
 
 By default, these interpret the number as decimal, so that ``int('0144') ==
-144`` and ``int('0x144')`` raises :exc:`ValueError`. ``int(string, base)`` takes
-the base to convert from as a second optional argument, so ``int('0x144', 16) ==
-324``.  If the base is specified as 0, the number is interpreted using Python's
-rules: a leading '0' indicates octal, and '0x' indicates a hex number.
+144`` holds true, and ``int('0x144')`` raises :exc:`ValueError`. ``int(string,
+base)`` takes the base to convert from as a second optional argument, so ``int(
+'0x144', 16) == 324``.  If the base is specified as 0, the number is interpreted
+using Python's rules: a leading '0o' indicates octal, and '0x' indicates a hex
+number.
 
 Do not use the built-in function :func:`eval` if all you need is to convert
 strings to numbers.  :func:`eval` will be significantly slower and it presents a
@@ -986,62 +887,50 @@ unwanted side effects.  For example, someone could pass
 directory.
 
 :func:`eval` also has the effect of interpreting numbers as Python expressions,
-so that e.g. ``eval('09')`` gives a syntax error because Python regards numbers
-starting with '0' as octal (base 8).
+so that e.g. ``eval('09')`` gives a syntax error because Python does not allow
+leading '0' in a decimal number (except '0').
 
 
 How do I convert a number to a string?
 --------------------------------------
 
-To convert, e.g., the number 144 to the string '144', use the built-in type
+To convert, e.g., the number ``144`` to the string ``'144'``, use the built-in type
 constructor :func:`str`.  If you want a hexadecimal or octal representation, use
 the built-in functions :func:`hex` or :func:`oct`.  For fancy formatting, see
-the :ref:`formatstrings` section, e.g. ``"{:04d}".format(144)`` yields
-``'0144'`` and ``"{:.3f}".format(1.0/3.0)`` yields ``'0.333'``. In Python 2, the
-division (/) operator returns the floor of the mathematical result of division
-if the arguments are ints or longs, but it returns a reasonable approximation of
-the division result if the arguments are floats or complex::
-
-   >>> print('{:.3f}'.format(1/3))
-   0.000
-   >>> print('{:.3f}'.format(1.0/3))
-   0.333
-
-In Python 3, the default behaviour of the division operator (see :pep:`238`) has
-been changed but you can have the same behaviour in Python 2 if you import
-``division`` from :mod:`__future__`::
-
-   >>> from __future__ import division
-   >>> print('{:.3f}'.format(1/3))
-   0.333
-
-
-You may also use :ref:`the % operator <string-formatting>` on strings.  See the
-library reference manual for details.
+the :ref:`f-strings` and :ref:`formatstrings` sections,
+e.g. ``"{:04d}".format(144)`` yields
+``'0144'`` and ``"{:.3f}".format(1.0/3.0)`` yields ``'0.333'``.
 
 
 How do I modify a string in place?
 ----------------------------------
 
-You can't, because strings are immutable.  If you need an object with this
-ability, try converting the string to a list or use the array module::
+You can't, because strings are immutable.  In most situations, you should
+simply construct a new string from the various parts you want to assemble
+it from.  However, if you need an object with the ability to modify in-place
+unicode data, try using an :class:`io.StringIO` object or the :mod:`array`
+module::
 
    >>> import io
    >>> s = "Hello, world"
-   >>> a = list(s)
-   >>> print a
-   ['H', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd']
-   >>> a[7:] = list("there!")
-   >>> ''.join(a)
+   >>> sio = io.StringIO(s)
+   >>> sio.getvalue()
+   'Hello, world'
+   >>> sio.seek(7)
+   7
+   >>> sio.write("there!")
+   6
+   >>> sio.getvalue()
    'Hello, there!'
 
    >>> import array
-   >>> a = array.array('c', s)
-   >>> print a
-   array('c', 'Hello, world')
-   >>> a[0] = 'y'; print a
-   array('c', 'yello, world')
-   >>> a.tostring()
+   >>> a = array.array('u', s)
+   >>> print(a)
+   array('u', 'Hello, world')
+   >>> a[0] = 'y'
+   >>> print(a)
+   array('u', 'yello, world')
+   >>> a.tounicode()
    'yello, world'
 
 
@@ -1086,31 +975,25 @@ There are various techniques.
      f()
 
 
-* Use :func:`locals` or :func:`eval` to resolve the function name::
+* Use :func:`locals` to resolve the function name::
 
      def myFunc():
-         print "hello"
+         print("hello")
 
      fname = "myFunc"
 
      f = locals()[fname]
      f()
 
-     f = eval(fname)
-     f()
-
-  Note: Using :func:`eval` is slow and dangerous.  If you don't have absolute
-  control over the contents of the string, someone could pass a string that
-  resulted in an arbitrary function being executed.
 
 Is there an equivalent to Perl's chomp() for removing trailing newlines from strings?
 -------------------------------------------------------------------------------------
 
-Starting with Python 2.2, you can use ``S.rstrip("\r\n")`` to remove all
-occurrences of any line terminator from the end of the string ``S`` without
-removing other trailing whitespace.  If the string ``S`` represents more than
-one line, with several empty lines at the end, the line terminators for all the
-blank lines will be removed::
+You can use ``S.rstrip("\r\n")`` to remove all occurrences of any line
+terminator from the end of the string ``S`` without removing other trailing
+whitespace.  If the string ``S`` represents more than one line, with several
+empty lines at the end, the line terminators for all the blank lines will
+be removed::
 
    >>> lines = ("line 1 \r\n"
    ...          "\r\n"
@@ -1121,15 +1004,6 @@ blank lines will be removed::
 Since this is typically only desired when reading text one line at a time, using
 ``S.rstrip()`` this way works well.
 
-For older versions of Python, there are two partial substitutes:
-
-- If you want to remove all trailing whitespace, use the ``rstrip()`` method of
-  string objects.  This removes all trailing whitespace, not just a single
-  newline.
-
-- Otherwise, if there is only one line in the string ``S``, use
-  ``S.splitlines()[0]``.
-
 
 Is there a scanf() or sscanf() equivalent?
 ------------------------------------------
@@ -1139,52 +1013,144 @@ Not as such.
 For simple input parsing, the easiest approach is usually to split the line into
 whitespace-delimited words using the :meth:`~str.split` method of string objects
 and then convert decimal strings to numeric values using :func:`int` or
-:func:`float`.  ``split()`` supports an optional "sep" parameter which is useful
+:func:`float`.  :meth:`!split()` supports an optional "sep" parameter which is useful
 if the line uses something other than whitespace as a separator.
 
 For more complicated input parsing, regular expressions are more powerful
-than C's :c:func:`sscanf` and better suited for the task.
+than C's ``sscanf`` and better suited for the task.
 
 
-What does 'UnicodeError: ASCII [decoding,encoding] error: ordinal not in range(128)' mean?
-------------------------------------------------------------------------------------------
+What does 'UnicodeDecodeError' or 'UnicodeEncodeError' error  mean?
+-------------------------------------------------------------------
 
-This error indicates that your Python installation can handle only 7-bit ASCII
-strings.  There are a couple ways to fix or work around the problem.
+See the :ref:`unicode-howto`.
 
-If your programs must handle data in arbitrary character set encodings, the
-environment the application runs in will generally identify the encoding of the
-data it is handing you.  You need to convert the input to Unicode data using
-that encoding.  For example, a program that handles email or web input will
-typically find character set encoding information in Content-Type headers.  This
-can then be used to properly convert input data to Unicode. Assuming the string
-referred to by ``value`` is encoded as UTF-8::
 
-   value = unicode(value, "utf-8")
+.. _faq-programming-raw-string-backslash:
 
-will return a Unicode object.  If the data is not correctly encoded as UTF-8,
-the above call will raise a :exc:`UnicodeError` exception.
+Can I end a raw string with an odd number of backslashes?
+---------------------------------------------------------
 
-If you only want strings converted to Unicode which have non-ASCII data, you can
-try converting them first assuming an ASCII encoding, and then generate Unicode
-objects if that fails::
+A raw string ending with an odd number of backslashes will escape the string's quote::
 
-   try:
-       x = unicode(value, "ascii")
-   except UnicodeError:
-       value = unicode(value, "utf-8")
-   else:
-       # value was valid ASCII data
-       pass
+   >>> r'C:\this\will\not\work\'
+     File "<stdin>", line 1
+       r'C:\this\will\not\work\'
+            ^
+   SyntaxError: unterminated string literal (detected at line 1)
 
-It's possible to set a default encoding in a file called ``sitecustomize.py``
-that's part of the Python library.  However, this isn't recommended because
-changing the Python-wide default encoding may cause third-party extension
-modules to fail.
+There are several workarounds for this. One is to use regular strings and double
+the backslashes::
 
-Note that on Windows, there is an encoding known as "mbcs", which uses an
-encoding specific to your current locale.  In many cases, and particularly when
-working with COM, this may be an appropriate default encoding to use.
+   >>> 'C:\\this\\will\\work\\'
+   'C:\\this\\will\\work\\'
+
+Another is to concatenate a regular string containing an escaped backslash to the
+raw string::
+
+   >>> r'C:\this\will\work' '\\'
+   'C:\\this\\will\\work\\'
+
+It is also possible to use :func:`os.path.join` to append a backslash on Windows::
+
+   >>> os.path.join(r'C:\this\will\work', '')
+   'C:\\this\\will\\work\\'
+
+Note that while a backslash will "escape" a quote for the purposes of
+determining where the raw string ends, no escaping occurs when interpreting the
+value of the raw string. That is, the backslash remains present in the value of
+the raw string::
+
+   >>> r'backslash\'preserved'
+   "backslash\\'preserved"
+
+Also see the specification in the :ref:`language reference <strings>`.
+
+Performance
+===========
+
+My program is too slow. How do I speed it up?
+---------------------------------------------
+
+That's a tough one, in general.  First, here are a list of things to
+remember before diving further:
+
+* Performance characteristics vary across Python implementations.  This FAQ
+  focuses on :term:`CPython`.
+* Behaviour can vary across operating systems, especially when talking about
+  I/O or multi-threading.
+* You should always find the hot spots in your program *before* attempting to
+  optimize any code (see the :mod:`profile` module).
+* Writing benchmark scripts will allow you to iterate quickly when searching
+  for improvements (see the :mod:`timeit` module).
+* It is highly recommended to have good code coverage (through unit testing
+  or any other technique) before potentially introducing regressions hidden
+  in sophisticated optimizations.
+
+That being said, there are many tricks to speed up Python code.  Here are
+some general principles which go a long way towards reaching acceptable
+performance levels:
+
+* Making your algorithms faster (or changing to faster ones) can yield
+  much larger benefits than trying to sprinkle micro-optimization tricks
+  all over your code.
+
+* Use the right data structures.  Study documentation for the :ref:`bltin-types`
+  and the :mod:`collections` module.
+
+* When the standard library provides a primitive for doing something, it is
+  likely (although not guaranteed) to be faster than any alternative you
+  may come up with.  This is doubly true for primitives written in C, such
+  as builtins and some extension types.  For example, be sure to use
+  either the :meth:`list.sort` built-in method or the related :func:`sorted`
+  function to do sorting (and see the :ref:`sortinghowto` for examples
+  of moderately advanced usage).
+
+* Abstractions tend to create indirections and force the interpreter to work
+  more.  If the levels of indirection outweigh the amount of useful work
+  done, your program will be slower.  You should avoid excessive abstraction,
+  especially under the form of tiny functions or methods (which are also often
+  detrimental to readability).
+
+If you have reached the limit of what pure Python can allow, there are tools
+to take you further away.  For example, `Cython <https://cython.org>`_ can
+compile a slightly modified version of Python code into a C extension, and
+can be used on many different platforms.  Cython can take advantage of
+compilation (and optional type annotations) to make your code significantly
+faster than when interpreted.  If you are confident in your C programming
+skills, you can also :ref:`write a C extension module <extending-index>`
+yourself.
+
+.. seealso::
+   The wiki page devoted to `performance tips
+   <https://wiki.python.org/moin/PythonSpeed/PerformanceTips>`_.
+
+.. _efficient_string_concatenation:
+
+What is the most efficient way to concatenate many strings together?
+--------------------------------------------------------------------
+
+:class:`str` and :class:`bytes` objects are immutable, therefore concatenating
+many strings together is inefficient as each concatenation creates a new
+object.  In the general case, the total runtime cost is quadratic in the
+total string length.
+
+To accumulate many :class:`str` objects, the recommended idiom is to place
+them into a list and call :meth:`str.join` at the end::
+
+   chunks = []
+   for s in my_strings:
+       chunks.append(s)
+   result = ''.join(chunks)
+
+(another reasonably efficient idiom is to use :class:`io.StringIO`)
+
+To accumulate many :class:`bytes` objects, the recommended idiom is to extend
+a :class:`bytearray` object using in-place concatenation (the ``+=`` operator)::
+
+   result = bytearray()
+   for b in my_bytes_objects:
+       result += b
 
 
 Sequences (Tuples/Lists)
@@ -1223,18 +1189,13 @@ trailing newline from a string.
 How do I iterate over a sequence in reverse order?
 --------------------------------------------------
 
-Use the :func:`reversed` built-in function, which is new in Python 2.4::
+Use the :func:`reversed` built-in function::
 
    for x in reversed(sequence):
        ...  # do something with x ...
 
 This won't touch your original sequence, but build a new copy with reversed
 order to iterate over.
-
-With Python 2.3, you can use an extended slice syntax::
-
-   for x in sequence[::-1]:
-       ...  # do something with x ...
 
 
 How do you remove duplicates from a list?
@@ -1256,20 +1217,28 @@ list, deleting duplicates as you go::
            else:
                last = mylist[i]
 
-If all elements of the list may be used as dictionary keys (i.e. they are all
-hashable) this is often faster ::
-
-   d = {}
-   for x in mylist:
-       d[x] = 1
-   mylist = list(d.keys())
-
-In Python 2.5 and later, the following is possible instead::
+If all elements of the list may be used as set keys (i.e. they are all
+:term:`hashable`) this is often faster ::
 
    mylist = list(set(mylist))
 
 This converts the list into a set, thereby removing duplicates, and then back
 into a list.
+
+
+How do you remove multiple items from a list
+--------------------------------------------
+
+As with removing duplicates, explicitly iterating in reverse with a
+delete condition is one possibility.  However, it is easier and faster
+to use slice replacement with an implicit or explicit forward iteration.
+Here are three variations.::
+
+   mylist[:] = filter(keep_function, mylist)
+   mylist[:] = (x for x in mylist if keep_condition)
+   mylist[:] = [x for x in mylist if keep_condition]
+
+The list comprehension may be fastest.
 
 
 How do you make an array in Python?
@@ -1284,15 +1253,16 @@ difference is that a Python list can contain objects of many different types.
 
 The ``array`` module also provides methods for creating arrays of fixed types
 with compact representations, but they are slower to index than lists.  Also
-note that the Numeric extensions and others define array-like structures with
+note that `NumPy <https://numpy.org/>`_
+and other third party packages define array-like structures with
 various characteristics as well.
 
-To get Lisp-style linked lists, you can emulate cons cells using tuples::
+To get Lisp-style linked lists, you can emulate *cons cells* using tuples::
 
    lisp_list = ("like",  ("this",  ("example", None) ) )
 
 If mutability is desired, you could use lists instead of tuples.  Here the
-analogue of lisp car is ``lisp_list[0]`` and the analogue of cdr is
+analogue of a Lisp *car* is ``lisp_list[0]`` and the analogue of *cdr* is
 ``lisp_list[1]``.  Only do this if you're sure you really need to, because it's
 usually a lot slower than using Python lists.
 
@@ -1306,16 +1276,28 @@ You probably tried to make a multidimensional array like this::
 
    >>> A = [[None] * 2] * 3
 
-This looks correct if you print it::
+This looks correct if you print it:
+
+.. testsetup::
+
+   A = [[None] * 2] * 3
+
+.. doctest::
 
    >>> A
    [[None, None], [None, None], [None, None]]
 
 But when you assign a value, it shows up in multiple places:
 
-  >>> A[0][0] = 5
-  >>> A
-  [[5, None], [5, None], [5, None]]
+.. testsetup::
+
+   A = [[None] * 2] * 3
+
+.. doctest::
+
+   >>> A[0][0] = 5
+   >>> A
+   [[5, None], [5, None], [5, None]]
 
 The reason is that replicating a list with ``*`` doesn't create copies, it only
 creates references to the existing objects.  The ``*3`` creates a list
@@ -1336,24 +1318,29 @@ use a list comprehension::
    A = [[None] * w for i in range(h)]
 
 Or, you can use an extension that provides a matrix datatype; `NumPy
-<http://www.numpy.org/>`_ is the best known.
+<https://numpy.org/>`_ is the best known.
 
 
-How do I apply a method to a sequence of objects?
--------------------------------------------------
+How do I apply a method or function to a sequence of objects?
+-------------------------------------------------------------
 
-Use a list comprehension::
+To call a method or function and accumulate the return values is a list,
+a :term:`list comprehension` is an elegant solution::
 
    result = [obj.method() for obj in mylist]
 
-More generically, you can try the following function::
+   result = [function(obj) for obj in mylist]
 
-   def method_map(objects, method, arguments):
-       """method_map([a,b], "meth", (1,2)) gives [a.meth(1,2), b.meth(1,2)]"""
-       nobjects = len(objects)
-       methods = map(getattr, objects, [method]*nobjects)
-       return map(apply, methods, [arguments]*nobjects)
+To just run the method or function without saving the return values,
+a plain :keyword:`for` loop will suffice::
 
+   for obj in mylist:
+       obj.method()
+
+   for obj in mylist:
+       function(obj)
+
+.. _faq-augmented-assignment-tuple-error:
 
 Why does a_tuple[i] += ['item'] raise an exception when the addition works?
 ---------------------------------------------------------------------------
@@ -1407,11 +1394,12 @@ that even though there was an error, the append worked::
     ['foo', 'item']
 
 To see why this happens, you need to know that (a) if an object implements an
-``__iadd__`` magic method, it gets called when the ``+=`` augmented assignment
+:meth:`~object.__iadd__` magic method, it gets called when the ``+=`` augmented
+assignment
 is executed, and its return value is what gets used in the assignment statement;
-and (b) for lists, ``__iadd__`` is equivalent to calling ``extend`` on the list
+and (b) for lists, :meth:`!__iadd__` is equivalent to calling :meth:`!extend` on the list
 and returning the list.  That's why we say that for lists, ``+=`` is a
-"shorthand" for ``list.extend``::
+"shorthand" for :meth:`!list.extend`::
 
     >>> a_list = []
     >>> a_list += [1]
@@ -1436,41 +1424,9 @@ Thus, in our tuple example what is happening is equivalent to::
      ...
    TypeError: 'tuple' object does not support item assignment
 
-The ``__iadd__`` succeeds, and thus the list is extended, but even though
+The :meth:`!__iadd__` succeeds, and thus the list is extended, but even though
 ``result`` points to the same object that ``a_tuple[0]`` already points to,
 that final assignment still results in an error, because tuples are immutable.
-
-
-Dictionaries
-============
-
-How can I get a dictionary to display its keys in a consistent order?
----------------------------------------------------------------------
-
-You can't.  Dictionaries store their keys in an unpredictable order, so the
-display order of a dictionary's elements will be similarly unpredictable.
-
-This can be frustrating if you want to save a printable version to a file, make
-some changes and then compare it with some other printed dictionary.  In this
-case, use the ``pprint`` module to pretty-print the dictionary; the items will
-be presented in order sorted by the key.
-
-A more complicated solution is to subclass ``dict`` to create a
-``SortedDict`` class that prints itself in a predictable order.  Here's one
-simpleminded implementation of such a class::
-
-   class SortedDict(dict):
-       def __repr__(self):
-           keys = sorted(self.keys())
-           result = ("{!r}: {!r}".format(k, self[k]) for k in keys)
-           return "{{{}}}".format(", ".join(result))
-
-       __str__ = __repr__
-
-This will work for many common situations you might encounter, though it's far
-from a perfect solution. The largest flaw is that if some values in the
-dictionary are also dictionaries, their values won't be presented in any
-particular order.
 
 
 I want to do a complicated sort: can you do a Schwartzian Transform in Python?
@@ -1478,7 +1434,7 @@ I want to do a complicated sort: can you do a Schwartzian Transform in Python?
 
 The technique, attributed to Randal Schwartz of the Perl community, sorts the
 elements of a list by a metric which maps each element to its "sort value". In
-Python, use the ``key`` argument for the :func:`sort()` function::
+Python, use the ``key`` argument for the :meth:`list.sort` method::
 
    Isorted = L[:]
    Isorted.sort(key=lambda s: int(s[10:15]))
@@ -1487,31 +1443,18 @@ Python, use the ``key`` argument for the :func:`sort()` function::
 How can I sort one list by values from another list?
 ----------------------------------------------------
 
-Merge them into a single list of tuples, sort the resulting list, and then pick
+Merge them into an iterator of tuples, sort the resulting list, and then pick
 out the element you want. ::
 
    >>> list1 = ["what", "I'm", "sorting", "by"]
    >>> list2 = ["something", "else", "to", "sort"]
    >>> pairs = zip(list1, list2)
+   >>> pairs = sorted(pairs)
    >>> pairs
-   [('what', 'something'), ("I'm", 'else'), ('sorting', 'to'), ('by', 'sort')]
-   >>> pairs.sort()
-   >>> result = [ x[1] for x in pairs ]
+   [("I'm", 'else'), ('by', 'sort'), ('sorting', 'to'), ('what', 'something')]
+   >>> result = [x[1] for x in pairs]
    >>> result
    ['else', 'sort', 'to', 'something']
-
-An alternative for the last step is::
-
-   >>> result = []
-   >>> for p in pairs: result.append(p[1])
-
-If you find this more legible, you might prefer to use this instead of the final
-list comprehension.  However, it is almost twice as slow for long lists.  Why?
-First, the ``append()`` operation has to reallocate memory, and while it uses
-some tricks to avoid doing that each time, it still has to do it occasionally,
-and that costs quite a bit.  Second, the expression "result.append" requires an
-extra attribute lookup, and third, there's a speed reduction from having to make
-all those function calls.
 
 
 Objects
@@ -1558,11 +1501,47 @@ See also :ref:`why-self`.
 How do I check if an object is an instance of a given class or of a subclass of it?
 -----------------------------------------------------------------------------------
 
-Use the built-in function ``isinstance(obj, cls)``.  You can check if an object
+Use the built-in function :func:`isinstance(obj, cls) <isinstance>`.  You can
+check if an object
 is an instance of any of a number of classes by providing a tuple instead of a
 single class, e.g. ``isinstance(obj, (class1, class2, ...))``, and can also
 check whether an object is one of Python's built-in types, e.g.
-``isinstance(obj, str)`` or ``isinstance(obj, (int, long, float, complex))``.
+``isinstance(obj, str)`` or ``isinstance(obj, (int, float, complex))``.
+
+Note that :func:`isinstance` also checks for virtual inheritance from an
+:term:`abstract base class`.  So, the test will return ``True`` for a
+registered class even if hasn't directly or indirectly inherited from it.  To
+test for "true inheritance", scan the :term:`MRO` of the class:
+
+.. testcode::
+
+    from collections.abc import Mapping
+
+    class P:
+         pass
+
+    class C(P):
+        pass
+
+    Mapping.register(P)
+
+.. doctest::
+
+    >>> c = C()
+    >>> isinstance(c, C)        # direct
+    True
+    >>> isinstance(c, P)        # indirect
+    True
+    >>> isinstance(c, Mapping)  # virtual
+    True
+
+    # Actual inheritance chain
+    >>> type(c).__mro__
+    (<class 'C'>, <class 'P'>, <class 'object'>)
+
+    # Test for "true inheritance"
+    >>> Mapping in type(c).__mro__
+    False
 
 Note that most programs do not use :func:`isinstance` on user-defined classes
 very often.  If you are developing the classes yourself, a more proper
@@ -1618,15 +1597,15 @@ to uppercase::
 
 Here the ``UpperOut`` class redefines the ``write()`` method to convert the
 argument string to uppercase before calling the underlying
-``self.__outfile.write()`` method.  All other methods are delegated to the
-underlying ``self.__outfile`` object.  The delegation is accomplished via the
-``__getattr__`` method; consult :ref:`the language reference <attribute-access>`
+``self._outfile.write()`` method.  All other methods are delegated to the
+underlying ``self._outfile`` object.  The delegation is accomplished via the
+:meth:`~object.__getattr__` method; consult :ref:`the language reference <attribute-access>`
 for more information about controlling attribute access.
 
 Note that for more general cases delegation can get trickier. When attributes
-must be set as well as retrieved, the class must define a :meth:`__setattr__`
+must be set as well as retrieved, the class must define a :meth:`~object.__setattr__`
 method too, and it must do so carefully.  The basic implementation of
-:meth:`__setattr__` is roughly equivalent to the following::
+:meth:`!__setattr__` is roughly equivalent to the following::
 
    class X:
        ...
@@ -1634,41 +1613,41 @@ method too, and it must do so carefully.  The basic implementation of
            self.__dict__[name] = value
        ...
 
-Most :meth:`__setattr__` implementations must modify ``self.__dict__`` to store
+Most :meth:`!__setattr__` implementations must modify
+:meth:`self.__dict__ <object.__dict__>` to store
 local state for self without causing an infinite recursion.
 
 
-How do I call a method defined in a base class from a derived class that overrides it?
---------------------------------------------------------------------------------------
+How do I call a method defined in a base class from a derived class that extends it?
+------------------------------------------------------------------------------------
 
-If you're using new-style classes, use the built-in :func:`super` function::
+Use the built-in :func:`super` function::
 
    class Derived(Base):
        def meth(self):
-           super(Derived, self).meth()
+           super().meth()  # calls Base.meth
 
-If you're using classic classes: For a class definition such as ``class
-Derived(Base): ...`` you can call method ``meth()`` defined in ``Base`` (or one
-of ``Base``'s base classes) as ``Base.meth(self, arguments...)``.  Here,
-``Base.meth`` is an unbound method, so you need to provide the ``self``
-argument.
+In the example, :func:`super` will automatically determine the instance from
+which it was called (the ``self`` value), look up the :term:`method resolution
+order` (MRO) with ``type(self).__mro__``, and return the next in line after
+``Derived`` in the MRO: ``Base``.
 
 
 How can I organize my code to make it easier to change the base class?
 ----------------------------------------------------------------------
 
-You could define an alias for the base class, assign the real base class to it
-before your class definition, and use the alias throughout your class.  Then all
+You could assign the base class to an alias and derive from the alias.  Then all
 you have to change is the value assigned to the alias.  Incidentally, this trick
 is also handy if you want to decide dynamically (e.g. depending on availability
 of resources) which base class to use.  Example::
 
-   BaseAlias = <real base class>
+   class Base:
+       ...
+
+   BaseAlias = Base
 
    class Derived(BaseAlias):
-       def meth(self):
-           BaseAlias.meth(self)
-           ...
+       ...
 
 
 How do I create static class data and static class methods?
@@ -1700,15 +1679,7 @@ not::
 
    C.count = 314
 
-Static methods are possible since Python 2.2::
-
-   class C:
-       def static(arg1, arg2, arg3):
-           # No 'self' parameter!
-           ...
-       static = staticmethod(static)
-
-With Python 2.4's decorators, this can also be written as ::
+Static methods are possible::
 
    class C:
        @staticmethod
@@ -1747,9 +1718,9 @@ default arguments.  For example::
    class C:
        def __init__(self, i=None):
            if i is None:
-               print "No arguments"
+               print("No arguments")
            else:
-               print "Argument is", i
+               print("Argument is", i)
 
 This is not entirely equivalent, but close enough in practice.
 
@@ -1781,25 +1752,25 @@ My class defines __del__ but it is not called when I delete the object.
 
 There are several possible reasons for this.
 
-The del statement does not necessarily call :meth:`__del__` -- it simply
+The :keyword:`del` statement does not necessarily call :meth:`~object.__del__` -- it simply
 decrements the object's reference count, and if this reaches zero
-:meth:`__del__` is called.
+:meth:`!__del__` is called.
 
 If your data structures contain circular links (e.g. a tree where each child has
 a parent reference and each parent has a list of children) the reference counts
 will never go back to zero.  Once in a while Python runs an algorithm to detect
 such cycles, but the garbage collector might run some time after the last
-reference to your data structure vanishes, so your :meth:`__del__` method may be
+reference to your data structure vanishes, so your :meth:`!__del__` method may be
 called at an inconvenient and random time. This is inconvenient if you're trying
-to reproduce a problem. Worse, the order in which object's :meth:`__del__`
+to reproduce a problem. Worse, the order in which object's :meth:`!__del__`
 methods are executed is arbitrary.  You can run :func:`gc.collect` to force a
 collection, but there *are* pathological cases where objects will never be
 collected.
 
 Despite the cycle collector, it's still a good idea to define an explicit
 ``close()`` method on objects to be called whenever you're done with them.  The
-``close()`` method can then remove attributes that refer to subobjecs.  Don't
-call :meth:`__del__` directly -- :meth:`__del__` should call ``close()`` and
+``close()`` method can then remove attributes that refer to subobjects.  Don't
+call :meth:`!__del__` directly -- :meth:`!__del__` should call ``close()`` and
 ``close()`` should make sure that it can be called more than once for the same
 object.
 
@@ -1808,13 +1779,15 @@ which allows you to point to objects without incrementing their reference count.
 Tree data structures, for instance, should use weak references for their parent
 and sibling references (if they need them!).
 
-If the object has ever been a local variable in a function that caught an
-expression in an except clause, chances are that a reference to the object still
-exists in that function's stack frame as contained in the stack trace.
-Normally, calling :func:`sys.exc_clear` will take care of this by clearing the
-last recorded exception.
+.. XXX relevant for Python 3?
 
-Finally, if your :meth:`__del__` method raises an exception, a warning message
+   If the object has ever been a local variable in a function that caught an
+   expression in an except clause, chances are that a reference to the object
+   still exists in that function's stack frame as contained in the stack trace.
+   Normally, calling :func:`sys.exc_clear` will take care of this by clearing
+   the last recorded exception.
+
+Finally, if your :meth:`!__del__` method raises an exception, a warning message
 is printed to :data:`sys.stderr`.
 
 
@@ -1835,9 +1808,9 @@ address, it happens frequently that after an object is deleted from memory, the
 next freshly created object is allocated at the same position in memory.  This
 is illustrated by this example:
 
->>> id(1000)
+>>> id(1000) # doctest: +SKIP
 13901272
->>> id(2000)
+>>> id(2000) # doctest: +SKIP
 13901272
 
 The two ids belong to different integer objects that are created before, and
@@ -1846,10 +1819,227 @@ objects whose id you want to examine are still alive, create another reference
 to the object:
 
 >>> a = 1000; b = 2000
->>> id(a)
+>>> id(a) # doctest: +SKIP
 13901272
->>> id(b)
+>>> id(b) # doctest: +SKIP
 13891296
+
+
+When can I rely on identity tests with the *is* operator?
+---------------------------------------------------------
+
+The ``is`` operator tests for object identity.  The test ``a is b`` is
+equivalent to ``id(a) == id(b)``.
+
+The most important property of an identity test is that an object is always
+identical to itself, ``a is a`` always returns ``True``.  Identity tests are
+usually faster than equality tests.  And unlike equality tests, identity tests
+are guaranteed to return a boolean ``True`` or ``False``.
+
+However, identity tests can *only* be substituted for equality tests when
+object identity is assured.  Generally, there are three circumstances where
+identity is guaranteed:
+
+1) Assignments create new names but do not change object identity.  After the
+assignment ``new = old``, it is guaranteed that ``new is old``.
+
+2) Putting an object in a container that stores object references does not
+change object identity.  After the list assignment ``s[0] = x``, it is
+guaranteed that ``s[0] is x``.
+
+3) If an object is a singleton, it means that only one instance of that object
+can exist.  After the assignments ``a = None`` and ``b = None``, it is
+guaranteed that ``a is b`` because ``None`` is a singleton.
+
+In most other circumstances, identity tests are inadvisable and equality tests
+are preferred.  In particular, identity tests should not be used to check
+constants such as :class:`int` and :class:`str` which aren't guaranteed to be
+singletons::
+
+    >>> a = 1000
+    >>> b = 500
+    >>> c = b + 500
+    >>> a is c
+    False
+
+    >>> a = 'Python'
+    >>> b = 'Py'
+    >>> c = b + 'thon'
+    >>> a is c
+    False
+
+Likewise, new instances of mutable containers are never identical::
+
+    >>> a = []
+    >>> b = []
+    >>> a is b
+    False
+
+In the standard library code, you will see several common patterns for
+correctly using identity tests:
+
+1) As recommended by :pep:`8`, an identity test is the preferred way to check
+for ``None``.  This reads like plain English in code and avoids confusion with
+other objects that may have boolean values that evaluate to false.
+
+2) Detecting optional arguments can be tricky when ``None`` is a valid input
+value.  In those situations, you can create a singleton sentinel object
+guaranteed to be distinct from other objects.  For example, here is how
+to implement a method that behaves like :meth:`dict.pop`::
+
+   _sentinel = object()
+
+   def pop(self, key, default=_sentinel):
+       if key in self:
+           value = self[key]
+           del self[key]
+           return value
+       if default is _sentinel:
+           raise KeyError(key)
+       return default
+
+3) Container implementations sometimes need to augment equality tests with
+identity tests.  This prevents the code from being confused by objects such as
+``float('NaN')`` that are not equal to themselves.
+
+For example, here is the implementation of
+:meth:`!collections.abc.Sequence.__contains__`::
+
+    def __contains__(self, value):
+        for v in self:
+            if v is value or v == value:
+                return True
+        return False
+
+
+How can a subclass control what data is stored in an immutable instance?
+------------------------------------------------------------------------
+
+When subclassing an immutable type, override the :meth:`~object.__new__` method
+instead of the :meth:`~object.__init__` method.  The latter only runs *after* an
+instance is created, which is too late to alter data in an immutable
+instance.
+
+All of these immutable classes have a different signature than their
+parent class:
+
+.. testcode::
+
+    from datetime import date
+
+    class FirstOfMonthDate(date):
+        "Always choose the first day of the month"
+        def __new__(cls, year, month, day):
+            return super().__new__(cls, year, month, 1)
+
+    class NamedInt(int):
+        "Allow text names for some numbers"
+        xlat = {'zero': 0, 'one': 1, 'ten': 10}
+        def __new__(cls, value):
+            value = cls.xlat.get(value, value)
+            return super().__new__(cls, value)
+
+    class TitleStr(str):
+        "Convert str to name suitable for a URL path"
+        def __new__(cls, s):
+            s = s.lower().replace(' ', '-')
+            s = ''.join([c for c in s if c.isalnum() or c == '-'])
+            return super().__new__(cls, s)
+
+The classes can be used like this:
+
+.. doctest::
+
+    >>> FirstOfMonthDate(2012, 2, 14)
+    FirstOfMonthDate(2012, 2, 1)
+    >>> NamedInt('ten')
+    10
+    >>> NamedInt(20)
+    20
+    >>> TitleStr('Blog: Why Python Rocks')
+    'blog-why-python-rocks'
+
+
+.. _faq-cache-method-calls:
+
+How do I cache method calls?
+----------------------------
+
+The two principal tools for caching methods are
+:func:`functools.cached_property` and :func:`functools.lru_cache`.  The
+former stores results at the instance level and the latter at the class
+level.
+
+The *cached_property* approach only works with methods that do not take
+any arguments.  It does not create a reference to the instance.  The
+cached method result will be kept only as long as the instance is alive.
+
+The advantage is that when an instance is no longer used, the cached
+method result will be released right away.  The disadvantage is that if
+instances accumulate, so too will the accumulated method results.  They
+can grow without bound.
+
+The *lru_cache* approach works with methods that have :term:`hashable`
+arguments.  It creates a reference to the instance unless special
+efforts are made to pass in weak references.
+
+The advantage of the least recently used algorithm is that the cache is
+bounded by the specified *maxsize*.  The disadvantage is that instances
+are kept alive until they age out of the cache or until the cache is
+cleared.
+
+This example shows the various techniques::
+
+    class Weather:
+        "Lookup weather information on a government website"
+
+        def __init__(self, station_id):
+            self._station_id = station_id
+            # The _station_id is private and immutable
+
+        def current_temperature(self):
+            "Latest hourly observation"
+            # Do not cache this because old results
+            # can be out of date.
+
+        @cached_property
+        def location(self):
+            "Return the longitude/latitude coordinates of the station"
+            # Result only depends on the station_id
+
+        @lru_cache(maxsize=20)
+        def historic_rainfall(self, date, units='mm'):
+            "Rainfall on a given date"
+            # Depends on the station_id, date, and units.
+
+The above example assumes that the *station_id* never changes.  If the
+relevant instance attributes are mutable, the *cached_property* approach
+can't be made to work because it cannot detect changes to the
+attributes.
+
+To make the *lru_cache* approach work when the *station_id* is mutable,
+the class needs to define the :meth:`~object.__eq__` and :meth:`~object.__hash__`
+methods so that the cache can detect relevant attribute updates::
+
+    class Weather:
+        "Example with a mutable station identifier"
+
+        def __init__(self, station_id):
+            self.station_id = station_id
+
+        def change_station(self, station_id):
+            self.station_id = station_id
+
+        def __eq__(self, other):
+            return self.station_id == other.station_id
+
+        def __hash__(self):
+            return hash(self.station_id)
+
+        @lru_cache(maxsize=20)
+        def historic_rainfall(self, date, units='cm'):
+            'Rainfall on a given date'
+            # Depends on the station_id, date, and units.
 
 
 Modules
@@ -1858,26 +2048,34 @@ Modules
 How do I create a .pyc file?
 ----------------------------
 
-When a module is imported for the first time (or when the source is more recent
-than the current compiled file) a ``.pyc`` file containing the compiled code
-should be created in the same directory as the ``.py`` file.
+When a module is imported for the first time (or when the source file has
+changed since the current compiled file was created) a ``.pyc`` file containing
+the compiled code should be created in a ``__pycache__`` subdirectory of the
+directory containing the ``.py`` file.  The ``.pyc`` file will have a
+filename that starts with the same name as the ``.py`` file, and ends with
+``.pyc``, with a middle component that depends on the particular ``python``
+binary that created it.  (See :pep:`3147` for details.)
 
-One reason that a ``.pyc`` file may not be created is permissions problems with
-the directory. This can happen, for example, if you develop as one user but run
-as another, such as if you are testing with a web server.  Creation of a .pyc
-file is automatic if you're importing a module and Python has the ability
-(permissions, free space, etc...) to write the compiled module back to the
-directory.
+One reason that a ``.pyc`` file may not be created is a permissions problem
+with the directory containing the source file, meaning that the ``__pycache__``
+subdirectory cannot be created. This can happen, for example, if you develop as
+one user but run as another, such as if you are testing with a web server.
+
+Unless the :envvar:`PYTHONDONTWRITEBYTECODE` environment variable is set,
+creation of a .pyc file is automatic if you're importing a module and Python
+has the ability (permissions, free space, etc...) to create a ``__pycache__``
+subdirectory and write the compiled module to that subdirectory.
 
 Running Python on a top level script is not considered an import and no
 ``.pyc`` will be created.  For example, if you have a top-level module
-``foo.py`` that imports another module ``xyz.py``, when you run ``foo``,
-``xyz.pyc`` will be created since ``xyz`` is imported, but no ``foo.pyc`` file
-will be created since ``foo.py`` isn't being imported.
+``foo.py`` that imports another module ``xyz.py``, when you run ``foo`` (by
+typing ``python foo.py`` as a shell command), a ``.pyc`` will be created for
+``xyz`` because ``xyz`` is imported, but no ``.pyc`` file will be created for
+``foo`` since ``foo.py`` isn't being imported.
 
-If you need to create ``foo.pyc`` -- that is, to create a ``.pyc`` file for a module
-that is not imported -- you can, using the :mod:`py_compile` and
-:mod:`compileall` modules.
+If you need to create a ``.pyc`` file for ``foo`` -- that is, to create a
+``.pyc`` file for a module that is not imported -- you can, using the
+:mod:`py_compile` and :mod:`compileall` modules.
 
 The :mod:`py_compile` module can manually compile any module.  One way is to use
 the ``compile()`` function in that module interactively::
@@ -1885,8 +2083,9 @@ the ``compile()`` function in that module interactively::
    >>> import py_compile
    >>> py_compile.compile('foo.py')                 # doctest: +SKIP
 
-This will write the ``.pyc`` to the same location as ``foo.py`` (or you can
-override that with the optional parameter ``cfile``).
+This will write the ``.pyc`` to a ``__pycache__`` subdirectory in the same
+location as ``foo.py`` (or you can override that with the optional parameter
+``cfile``).
 
 You can also automatically compile all files in a directory or directories using
 the :mod:`compileall` module.  You can do it from the shell prompt by running
@@ -1906,7 +2105,7 @@ provide a command-line interface or a self-test, and only execute this code
 after checking ``__name__``::
 
    def main():
-       print 'Running test...'
+       print('Running test...')
        ...
 
    if __name__ == '__main__':
@@ -1918,26 +2117,26 @@ How can I have modules that mutually import each other?
 
 Suppose you have the following modules:
 
-foo.py::
+:file:`foo.py`::
 
    from bar import bar_var
    foo_var = 1
 
-bar.py::
+:file:`bar.py`::
 
    from foo import foo_var
    bar_var = 2
 
 The problem is that the interpreter will perform the following steps:
 
-* main imports foo
-* Empty globals for foo are created
-* foo is compiled and starts executing
-* foo imports bar
-* Empty globals for bar are created
-* bar is compiled and starts executing
-* bar imports foo (which is a no-op since there already is a module named foo)
-* bar.foo_var = foo.foo_var
+* main imports ``foo``
+* Empty globals for ``foo`` are created
+* ``foo`` is compiled and starts executing
+* ``foo`` imports ``bar``
+* Empty globals for ``bar`` are created
+* ``bar`` is compiled and starts executing
+* ``bar`` imports ``foo`` (which is a no-op since there already is a module named ``foo``)
+* The import mechanism tries to read ``foo_var`` from ``foo`` globals, to set ``bar.foo_var = foo.foo_var``
 
 The last step fails, because Python isn't done with interpreting ``foo`` yet and
 the global symbol dictionary for ``foo`` is still empty.
@@ -1959,7 +2158,7 @@ Jim Roskind suggests performing steps in the following order in each module:
 * ``import`` statements
 * active code (including globals that are initialized from imported values).
 
-van Rossum doesn't like this approach much because the imports appear in a
+Van Rossum doesn't like this approach much because the imports appear in a
 strange place, but it does work.
 
 Matthias Urlichs recommends restructuring your code so that the recursive import
@@ -1983,11 +2182,12 @@ When I edit an imported module and reimport it, the changes don't show up.  Why 
 For reasons of efficiency as well as consistency, Python only reads the module
 file on the first time a module is imported.  If it didn't, in a program
 consisting of many modules where each one imports the same basic module, the
-basic module would be parsed and re-parsed many times.  To force rereading of a
+basic module would be parsed and re-parsed many times.  To force re-reading of a
 changed module, do this::
 
+   import importlib
    import modname
-   reload(modname)
+   importlib.reload(modname)
 
 Warning: this technique is not 100% fool-proof.  In particular, modules
 containing statements like ::
@@ -1997,19 +2197,20 @@ containing statements like ::
 will continue to work with the old version of the imported objects.  If the
 module contains class definitions, existing class instances will *not* be
 updated to use the new class definition.  This can result in the following
-paradoxical behaviour:
+paradoxical behaviour::
 
+   >>> import importlib
    >>> import cls
    >>> c = cls.C()                # Create an instance of C
-   >>> reload(cls)
-   <module 'cls' from 'cls.pyc'>
+   >>> importlib.reload(cls)
+   <module 'cls' from 'cls.py'>
    >>> isinstance(c, cls.C)       # isinstance is false?!?
    False
 
-The nature of the problem is made clear if you print out the class objects:
+The nature of the problem is made clear if you print out the "identity" of the
+class objects::
 
-   >>> c.__class__
-   <class cls.C at 0x7352a0>
-   >>> cls.C
-   <class cls.C at 0x4198d0>
-
+   >>> hex(id(c.__class__))
+   '0x7352a0'
+   >>> hex(id(cls.C))
+   '0x4198d0'

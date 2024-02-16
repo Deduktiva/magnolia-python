@@ -9,5 +9,6 @@ with a local index server, or without any index server at all.
 
 .. toctree::
 
-   distutils.rst
    ensurepip.rst
+   venv.rst
+   zipapp.rst

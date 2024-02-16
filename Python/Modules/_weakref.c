@@ -1,8 +1,39 @@
 #include "Python.h"
+#include "pycore_object.h"   // _PyObject_GET_WEAKREFS_LISTPTR
 
 
 #define GET_WEAKREFS_LISTPTR(o) \
-        ((PyWeakReference **) PyObject_GET_WEAKREFS_LISTPTR(o))
+        ((PyWeakReference **) _PyObject_GET_WEAKREFS_LISTPTR(o))
+
+/*[clinic input]
+module _weakref
+[clinic start generated code]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=ffec73b85846596d]*/
+
+#include "clinic/_weakref.c.h"
+
+/*[clinic input]
+
+_weakref.getweakrefcount -> Py_ssize_t
+
+  object: object
+  /
+
+Return the number of weak references to 'object'.
+[clinic start generated code]*/
+
+static Py_ssize_t
+_weakref_getweakrefcount_impl(PyObject *module, PyObject *object)
+/*[clinic end generated code: output=301806d59558ff3e input=cedb69711b6a2507]*/
+{
+    PyWeakReference **list;
+
+    if (!_PyType_SUPPORTS_WEAKREFS(Py_TYPE(object)))
+        return 0;
+
+    list = GET_WEAKREFS_LISTPTR(object);
+    return _PyWeakref_GetWeakrefCount(*list);
+}
 
 
 static int
@@ -15,19 +46,22 @@ is_dead_weakref(PyObject *value)
     return PyWeakref_GET_OBJECT(value) == Py_None;
 }
 
-PyDoc_STRVAR(remove_dead_weakref__doc__,
-"_remove_dead_weakref(dict, key) -- atomically remove key from dict\n"
-"if it points to a dead weakref.");
+/*[clinic input]
+
+_weakref._remove_dead_weakref -> object
+
+  dct: object(subclass_of='&PyDict_Type')
+  key: object
+  /
+
+Atomically remove key from dict if it points to a dead weakref.
+[clinic start generated code]*/
 
 static PyObject *
-remove_dead_weakref(PyObject *self, PyObject *args)
+_weakref__remove_dead_weakref_impl(PyObject *module, PyObject *dct,
+                                   PyObject *key)
+/*[clinic end generated code: output=d9ff53061fcb875c input=19fc91f257f96a1d]*/
 {
-    PyObject *dct, *key;
-
-    if (!PyArg_ParseTuple(args, "O!O:_remove_dead_weakref",
-                          &PyDict_Type, &dct, &key)) {
-        return NULL;
-    }
     if (_PyDict_DelItemIf(dct, key, is_dead_weakref) < 0) {
         if (PyErr_ExceptionMatches(PyExc_KeyError))
             /* This function is meant to allow safe weak-value dicts
@@ -42,37 +76,21 @@ remove_dead_weakref(PyObject *self, PyObject *args)
 }
 
 
-PyDoc_STRVAR(weakref_getweakrefcount__doc__,
-"getweakrefcount(object) -- return the number of weak references\n"
-"to 'object'.");
+/*[clinic input]
+_weakref.getweakrefs
+    object: object
+    /
+
+Return a list of all weak reference objects pointing to 'object'.
+[clinic start generated code]*/
 
 static PyObject *
-weakref_getweakrefcount(PyObject *self, PyObject *object)
+_weakref_getweakrefs(PyObject *module, PyObject *object)
+/*[clinic end generated code: output=25c7731d8e011824 input=00c6d0e5d3206693]*/
 {
     PyObject *result = NULL;
 
-    if (PyType_SUPPORTS_WEAKREFS(Py_TYPE(object))) {
-        PyWeakReference **list = GET_WEAKREFS_LISTPTR(object);
-
-        result = PyInt_FromSsize_t(_PyWeakref_GetWeakrefCount(*list));
-    }
-    else
-        result = PyInt_FromLong(0);
-
-    return result;
-}
-
-
-PyDoc_STRVAR(weakref_getweakrefs__doc__,
-"getweakrefs(object) -- return a list of all weak reference objects\n"
-"that point to 'object'.");
-
-static PyObject *
-weakref_getweakrefs(PyObject *self, PyObject *object)
-{
-    PyObject *result = NULL;
-
-    if (PyType_SUPPORTS_WEAKREFS(Py_TYPE(object))) {
+    if (_PyType_SUPPORTS_WEAKREFS(Py_TYPE(object))) {
         PyWeakReference **list = GET_WEAKREFS_LISTPTR(object);
         Py_ssize_t count = _PyWeakref_GetWeakrefCount(*list);
 
@@ -94,58 +112,86 @@ weakref_getweakrefs(PyObject *self, PyObject *object)
 }
 
 
-PyDoc_STRVAR(weakref_proxy__doc__,
-"proxy(object[, callback]) -- create a proxy object that weakly\n"
-"references 'object'.  'callback', if given, is called with a\n"
-"reference to the proxy when 'object' is about to be finalized.");
+/*[clinic input]
+
+_weakref.proxy
+    object: object
+    callback: object(c_default="NULL") = None
+    /
+
+Create a proxy object that weakly references 'object'.
+
+'callback', if given, is called with a reference to the
+proxy when 'object' is about to be finalized.
+[clinic start generated code]*/
 
 static PyObject *
-weakref_proxy(PyObject *self, PyObject *args)
+_weakref_proxy_impl(PyObject *module, PyObject *object, PyObject *callback)
+/*[clinic end generated code: output=d68fa4ad9ea40519 input=4808adf22fd137e7]*/
 {
-    PyObject *object;
-    PyObject *callback = NULL;
-    PyObject *result = NULL;
-
-    if (PyArg_UnpackTuple(args, "proxy", 1, 2, &object, &callback)) {
-        result = PyWeakref_NewProxy(object, callback);
-    }
-    return result;
+    return PyWeakref_NewProxy(object, callback);
 }
 
 
 static PyMethodDef
 weakref_functions[] =  {
-    {"getweakrefcount", weakref_getweakrefcount,        METH_O,
-     weakref_getweakrefcount__doc__},
-    {"getweakrefs",     weakref_getweakrefs,            METH_O,
-     weakref_getweakrefs__doc__},
-    {"proxy",           weakref_proxy,                  METH_VARARGS,
-     weakref_proxy__doc__},
-    {"_remove_dead_weakref", remove_dead_weakref,       METH_VARARGS,
-     remove_dead_weakref__doc__},
+    _WEAKREF_GETWEAKREFCOUNT_METHODDEF
+    _WEAKREF__REMOVE_DEAD_WEAKREF_METHODDEF
+    _WEAKREF_GETWEAKREFS_METHODDEF
+    _WEAKREF_PROXY_METHODDEF
     {NULL, NULL, 0, NULL}
 };
 
+static int
+weakref_exec(PyObject *module)
+{
+    Py_INCREF(&_PyWeakref_RefType);
+    if (PyModule_AddObject(module, "ref", (PyObject *) &_PyWeakref_RefType) < 0) {
+        Py_DECREF(&_PyWeakref_RefType);
+        return -1;
+    }
+    Py_INCREF(&_PyWeakref_RefType);
+    if (PyModule_AddObject(module, "ReferenceType",
+                           (PyObject *) &_PyWeakref_RefType) < 0) {
+        Py_DECREF(&_PyWeakref_RefType);
+        return -1;
+    }
+    Py_INCREF(&_PyWeakref_ProxyType);
+    if (PyModule_AddObject(module, "ProxyType",
+                           (PyObject *) &_PyWeakref_ProxyType) < 0) {
+        Py_DECREF(&_PyWeakref_ProxyType);
+        return -1;
+    }
+    Py_INCREF(&_PyWeakref_CallableProxyType);
+    if (PyModule_AddObject(module, "CallableProxyType",
+                           (PyObject *) &_PyWeakref_CallableProxyType) < 0) {
+        Py_DECREF(&_PyWeakref_CallableProxyType);
+        return -1;
+    }
+
+    return 0;
+}
+
+static struct PyModuleDef_Slot weakref_slots[] = {
+    {Py_mod_exec, weakref_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {0, NULL}
+};
+
+static struct PyModuleDef weakrefmodule = {
+    PyModuleDef_HEAD_INIT,
+    "_weakref",
+    "Weak-reference support module.",
+    0,
+    weakref_functions,
+    weakref_slots,
+    NULL,
+    NULL,
+    NULL
+};
 
 PyMODINIT_FUNC
-init_weakref(void)
+PyInit__weakref(void)
 {
-    PyObject *m;
-
-    m = Py_InitModule3("_weakref", weakref_functions,
-                       "Weak-reference support module.");
-    if (m != NULL) {
-        Py_INCREF(&_PyWeakref_RefType);
-        PyModule_AddObject(m, "ref",
-                           (PyObject *) &_PyWeakref_RefType);
-        Py_INCREF(&_PyWeakref_RefType);
-        PyModule_AddObject(m, "ReferenceType",
-                           (PyObject *) &_PyWeakref_RefType);
-        Py_INCREF(&_PyWeakref_ProxyType);
-        PyModule_AddObject(m, "ProxyType",
-                           (PyObject *) &_PyWeakref_ProxyType);
-        Py_INCREF(&_PyWeakref_CallableProxyType);
-        PyModule_AddObject(m, "CallableProxyType",
-                           (PyObject *) &_PyWeakref_CallableProxyType);
-    }
+    return PyModuleDef_Init(&weakrefmodule);
 }

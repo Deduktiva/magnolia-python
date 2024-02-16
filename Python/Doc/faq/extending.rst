@@ -9,6 +9,9 @@ Extending/Embedding FAQ
 .. highlight:: c
 
 
+.. XXX need review for Python 3.
+
+
 Can I create my own functions in C?
 -----------------------------------
 
@@ -36,26 +39,20 @@ Writing C is hard; are there any alternatives?
 There are a number of alternatives to writing your own C extensions, depending
 on what you're trying to do.
 
-.. XXX make sure these all work; mention Cython
+.. XXX make sure these all work
 
-If you need more speed, `Psyco <http://psyco.sourceforge.net/>`_ generates x86
-assembly code from Python bytecode.  You can use Psyco to compile the most
-time-critical functions in your code, and gain a significant improvement with
-very little effort, as long as you're running on a machine with an
-x86-compatible processor.
-
-`Cython <http://cython.org>`_ and its relative `Pyrex
-<https://www.cosc.canterbury.ac.nz/greg.ewing/python/Pyrex/>`_ are compilers
+`Cython <https://cython.org>`_ and its relative `Pyrex
+<https://www.csse.canterbury.ac.nz/greg.ewing/python/Pyrex/>`_ are compilers
 that accept a slightly modified form of Python and generate the corresponding
-C code.  Pyrex makes it possible to write an extension without having to learn
-Python's C API.
+C code.  Cython and Pyrex make it possible to write an extension without having
+to learn Python's C API.
 
 If you need to interface to some C or C++ library for which no Python extension
 currently exists, you can try wrapping the library's data types and functions
-with a tool such as `SWIG <http://www.swig.org>`_.  `SIP
+with a tool such as `SWIG <https://www.swig.org>`_.  `SIP
 <https://riverbankcomputing.com/software/sip/intro>`__, `CXX
-<http://cxx.sourceforge.net/>`_ `Boost
-<http://www.boost.org/libs/python/doc/index.html>`_, or `Weave
+<https://cxx.sourceforge.net/>`_ `Boost
+<https://www.boost.org/libs/python/doc/index.html>`_, or `Weave
 <https://github.com/scipy/weave>`_ are also
 alternatives for wrapping C++ libraries.
 
@@ -65,8 +62,8 @@ How can I execute arbitrary Python statements from C?
 
 The highest-level function to do this is :c:func:`PyRun_SimpleString` which takes
 a single string argument to be executed in the context of the module
-``__main__`` and returns 0 for success and -1 when an exception occurred
-(including ``SyntaxError``).  If you want more control, use
+``__main__`` and returns ``0`` for success and ``-1`` when an exception occurred
+(including :exc:`SyntaxError`).  If you want more control, use
 :c:func:`PyRun_String`; see the source for :c:func:`PyRun_SimpleString` in
 ``Python/pythonrun.c``.
 
@@ -84,32 +81,29 @@ How do I extract C values from a Python object?
 
 That depends on the object's type.  If it's a tuple, :c:func:`PyTuple_Size`
 returns its length and :c:func:`PyTuple_GetItem` returns the item at a specified
-index.  Lists have similar functions, :c:func:`PyListSize` and
+index.  Lists have similar functions, :c:func:`PyList_Size` and
 :c:func:`PyList_GetItem`.
 
-For strings, :c:func:`PyString_Size` returns its length and
-:c:func:`PyString_AsString` a pointer to its value.  Note that Python strings may
-contain null bytes so C's :c:func:`strlen` should not be used.
+For bytes, :c:func:`PyBytes_Size` returns its length and
+:c:func:`PyBytes_AsStringAndSize` provides a pointer to its value and its
+length.  Note that Python bytes objects may contain null bytes so C's
+:c:func:`!strlen` should not be used.
 
-To test the type of an object, first make sure it isn't *NULL*, and then use
-:c:func:`PyString_Check`, :c:func:`PyTuple_Check`, :c:func:`PyList_Check`, etc.
+To test the type of an object, first make sure it isn't ``NULL``, and then use
+:c:func:`PyBytes_Check`, :c:func:`PyTuple_Check`, :c:func:`PyList_Check`, etc.
 
 There is also a high-level API to Python objects which is provided by the
 so-called 'abstract' interface -- read ``Include/abstract.h`` for further
 details.  It allows interfacing with any kind of Python sequence using calls
-like :c:func:`PySequence_Length`, :c:func:`PySequence_GetItem`, etc.)  as well as
-many other useful protocols.
+like :c:func:`PySequence_Length`, :c:func:`PySequence_GetItem`, etc. as well
+as many other useful protocols such as numbers (:c:func:`PyNumber_Index` et
+al.) and mappings in the PyMapping APIs.
 
 
 How do I use Py_BuildValue() to create a tuple of arbitrary length?
 -------------------------------------------------------------------
 
-You can't.  Use ``t = PyTuple_New(n)`` instead, and fill it with objects using
-``PyTuple_SetItem(t, i, o)`` -- note that this "eats" a reference count of
-``o``, so you have to :c:func:`Py_INCREF` it.  Lists have similar functions
-``PyList_New(n)`` and ``PyList_SetItem(l, i, o)``.  Note that you *must* set all
-the tuple items to some value before you pass the tuple to Python code --
-``PyTuple_New(n)`` initializes them to NULL, which isn't a valid Python value.
+You can't.  Use :c:func:`PyTuple_Pack` instead.
 
 
 How do I call an object's method from C?
@@ -121,8 +115,8 @@ call, a format string like that used with :c:func:`Py_BuildValue`, and the
 argument values::
 
    PyObject *
-   PyObject_CallMethod(PyObject *object, char *method_name,
-                       char *arg_format, ...);
+   PyObject_CallMethod(PyObject *object, const char *method_name,
+                       const char *arg_format, ...);
 
 This works for any object that has methods -- whether built-in or user-defined.
 You are responsible for eventually :c:func:`Py_DECREF`\ 'ing the return value.
@@ -152,23 +146,34 @@ this object to :data:`sys.stdout` and :data:`sys.stderr`.  Call print_error, or
 just allow the standard traceback mechanism to work. Then, the output will go
 wherever your ``write()`` method sends it.
 
-The easiest way to do this is to use the StringIO class in the standard library.
-
-Sample code and use for catching stdout:
+The easiest way to do this is to use the :class:`io.StringIO` class:
 
 .. code-block:: pycon
 
-   >>> class StdoutCatcher:
+   >>> import io, sys
+   >>> sys.stdout = io.StringIO()
+   >>> print('foo')
+   >>> print('hello world!')
+   >>> sys.stderr.write(sys.stdout.getvalue())
+   foo
+   hello world!
+
+A custom object to do the same would look like this:
+
+.. code-block:: pycon
+
+   >>> import io, sys
+   >>> class StdoutCatcher(io.TextIOBase):
    ...     def __init__(self):
-   ...         self.data = ''
+   ...         self.data = []
    ...     def write(self, stuff):
-   ...         self.data = self.data + stuff
+   ...         self.data.append(stuff)
    ...
    >>> import sys
    >>> sys.stdout = StdoutCatcher()
-   >>> print 'foo'
-   >>> print 'hello world!'
-   >>> sys.stderr.write(sys.stdout.data)
+   >>> print('foo')
+   >>> print('hello world!')
+   >>> sys.stderr.write(''.join(sys.stdout.data))
    foo
    hello world!
 
@@ -249,21 +254,6 @@ For Red Hat, install the python-devel RPM to get the necessary files.
 
 For Debian, run ``apt-get install python-dev``.
 
-
-What does "SystemError: _PyImport_FixupExtension: module yourmodule not loaded" mean?
--------------------------------------------------------------------------------------
-
-This means that you have created an extension module named "yourmodule", but
-your module init function does not initialize with that name.
-
-Every module init function will have a line similar to::
-
-   module = Py_InitModule("yourmodule", yourmodule_functions);
-
-If the string passed to this function is not the same name as your extension
-module, the :exc:`SystemError` exception will be raised.
-
-
 How do I tell "incomplete input" from "invalid input"?
 ------------------------------------------------------
 
@@ -282,159 +272,6 @@ you. You can also set the :c:func:`PyOS_ReadlineFunctionPointer` to point at you
 custom input function. See ``Modules/readline.c`` and ``Parser/myreadline.c``
 for more hints.
 
-However sometimes you have to run the embedded Python interpreter in the same
-thread as your rest application and you can't allow the
-:c:func:`PyRun_InteractiveLoop` to stop while waiting for user input.  The one
-solution then is to call :c:func:`PyParser_ParseString` and test for ``e.error``
-equal to ``E_EOF``, which means the input is incomplete.  Here's a sample code
-fragment, untested, inspired by code from Alex Farber::
-
-   #include <Python.h>
-   #include <node.h>
-   #include <errcode.h>
-   #include <grammar.h>
-   #include <parsetok.h>
-   #include <compile.h>
-
-   int testcomplete(char *code)
-     /* code should end in \n */
-     /* return -1 for error, 0 for incomplete, 1 for complete */
-   {
-     node *n;
-     perrdetail e;
-
-     n = PyParser_ParseString(code, &_PyParser_Grammar,
-                              Py_file_input, &e);
-     if (n == NULL) {
-       if (e.error == E_EOF)
-         return 0;
-       return -1;
-     }
-
-     PyNode_Free(n);
-     return 1;
-   }
-
-Another solution is trying to compile the received string with
-:c:func:`Py_CompileString`. If it compiles without errors, try to execute the
-returned code object by calling :c:func:`PyEval_EvalCode`. Otherwise save the
-input for later. If the compilation fails, find out if it's an error or just
-more input is required - by extracting the message string from the exception
-tuple and comparing it to the string "unexpected EOF while parsing".  Here is a
-complete example using the GNU readline library (you may want to ignore
-**SIGINT** while calling readline())::
-
-   #include <stdio.h>
-   #include <readline.h>
-
-   #include <Python.h>
-   #include <object.h>
-   #include <compile.h>
-   #include <eval.h>
-
-   int main (int argc, char* argv[])
-   {
-     int i, j, done = 0;                          /* lengths of line, code */
-     char ps1[] = ">>> ";
-     char ps2[] = "... ";
-     char *prompt = ps1;
-     char *msg, *line, *code = NULL;
-     PyObject *src, *glb, *loc;
-     PyObject *exc, *val, *trb, *obj, *dum;
-
-     Py_Initialize ();
-     loc = PyDict_New ();
-     glb = PyDict_New ();
-     PyDict_SetItemString (glb, "__builtins__", PyEval_GetBuiltins ());
-
-     while (!done)
-     {
-       line = readline (prompt);
-
-       if (NULL == line)                          /* Ctrl-D pressed */
-       {
-         done = 1;
-       }
-       else
-       {
-         i = strlen (line);
-
-         if (i > 0)
-           add_history (line);                    /* save non-empty lines */
-
-         if (NULL == code)                        /* nothing in code yet */
-           j = 0;
-         else
-           j = strlen (code);
-
-         code = realloc (code, i + j + 2);
-         if (NULL == code)                        /* out of memory */
-           exit (1);
-
-         if (0 == j)                              /* code was empty, so */
-           code[0] = '\0';                        /* keep strncat happy */
-
-         strncat (code, line, i);                 /* append line to code */
-         code[i + j] = '\n';                      /* append '\n' to code */
-         code[i + j + 1] = '\0';
-
-         src = Py_CompileString (code, "<stdin>", Py_single_input);
-
-         if (NULL != src)                         /* compiled just fine - */
-         {
-           if (ps1  == prompt ||                  /* ">>> " or */
-               '\n' == code[i + j - 1])           /* "... " and double '\n' */
-           {                                               /* so execute it */
-             dum = PyEval_EvalCode ((PyCodeObject *)src, glb, loc);
-             Py_XDECREF (dum);
-             Py_XDECREF (src);
-             free (code);
-             code = NULL;
-             if (PyErr_Occurred ())
-               PyErr_Print ();
-             prompt = ps1;
-           }
-         }                                        /* syntax error or E_EOF? */
-         else if (PyErr_ExceptionMatches (PyExc_SyntaxError))
-         {
-           PyErr_Fetch (&exc, &val, &trb);        /* clears exception! */
-
-           if (PyArg_ParseTuple (val, "sO", &msg, &obj) &&
-               !strcmp (msg, "unexpected EOF while parsing")) /* E_EOF */
-           {
-             Py_XDECREF (exc);
-             Py_XDECREF (val);
-             Py_XDECREF (trb);
-             prompt = ps2;
-           }
-           else                                   /* some other syntax error */
-           {
-             PyErr_Restore (exc, val, trb);
-             PyErr_Print ();
-             free (code);
-             code = NULL;
-             prompt = ps1;
-           }
-         }
-         else                                     /* some non-syntax error */
-         {
-           PyErr_Print ();
-           free (code);
-           code = NULL;
-           prompt = ps1;
-         }
-
-         free (line);
-       }
-     }
-
-     Py_XDECREF(glb);
-     Py_XDECREF(loc);
-     Py_Finalize();
-     exit(0);
-   }
-
-
 How do I find undefined g++ symbols __builtin_new or __pure_virtual?
 --------------------------------------------------------------------
 
@@ -449,42 +286,6 @@ Can I create an object class with some methods implemented in C and others in Py
 Yes, you can inherit from built-in classes such as :class:`int`, :class:`list`,
 :class:`dict`, etc.
 
-The Boost Python Library (BPL, http://www.boost.org/libs/python/doc/index.html)
+The Boost Python Library (BPL, https://www.boost.org/libs/python/doc/index.html)
 provides a way of doing this from C++ (i.e. you can inherit from an extension
 class written in C++ using the BPL).
-
-
-When importing module X, why do I get "undefined symbol: PyUnicodeUCS2*"?
--------------------------------------------------------------------------
-
-You are using a version of Python that uses a 4-byte representation for Unicode
-characters, but some C extension module you are importing was compiled using a
-Python that uses a 2-byte representation for Unicode characters (the default).
-
-If instead the name of the undefined symbol starts with ``PyUnicodeUCS4``, the
-problem is the reverse: Python was built using 2-byte Unicode characters, and
-the extension module was compiled using a Python with 4-byte Unicode characters.
-
-This can easily occur when using pre-built extension packages.  RedHat Linux
-7.x, in particular, provided a "python2" binary that is compiled with 4-byte
-Unicode.  This only causes the link failure if the extension uses any of the
-``PyUnicode_*()`` functions.  It is also a problem if an extension uses any of
-the Unicode-related format specifiers for :c:func:`Py_BuildValue` (or similar) or
-parameter specifications for :c:func:`PyArg_ParseTuple`.
-
-You can check the size of the Unicode character a Python interpreter is using by
-checking the value of sys.maxunicode:
-
-.. code-block:: pycon
-
-   >>> import sys
-   >>> if sys.maxunicode > 65535:
-   ...     print 'UCS4 build'
-   ... else:
-   ...     print 'UCS2 build'
-
-The only way to solve this problem is to use extension modules compiled with a
-Python binary built using the same size for Unicode characters.
-
-
-

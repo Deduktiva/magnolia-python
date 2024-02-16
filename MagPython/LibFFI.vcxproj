@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{36DFC1C0-EB3A-48D0-8E5B-A09387F102E2}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>LibFFI</RootNamespace>
+    <ProjectName>LibFFI</ProjectName>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <PropertyGroup>
+    <TopDir>$(MSBuildProjectDirectory)\..\</TopDir>
+    <IntDir>$(MSBuildProjectDirectory)\$(Configuration)-Int-libffi\</IntDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+    <SourceDir>$(TopDir)\libffi\</SourceDir>
+    <LibFFITarget>X86_WIN32</LibFFITarget>
+    <LibFFISourceDir>$(SourceDir)\src</LibFFISourceDir>
+    <LibFFITargetSourceDir>$(SourceDir)\src\x86</LibFFITargetSourceDir>
+    <LibFFITargetPregeneratedIncludeDir>$(SourceDir)\msvc_build\x86_win32\include</LibFFITargetPregeneratedIncludeDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_WIN32;X86;$(LibFFITarget);_M_IX86;FFI_STATIC_BUILD;USE_DL_PREFIX;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SourceDir)\include;$(LibFFITargetSourceDir);$(LibFFITargetPregeneratedIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OmitFramePointers>true</OmitFramePointers>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <AdditionalUsingDirectories>$(LibFFISourceDir);$(LibFFITargetSourceDir);$(LibFFITargetPregeneratedIncludeDir);%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="$(LibFFITargetPregeneratedIncludeDir)\ffi.h" />
+    <ClInclude Include="$(LibFFITargetPregeneratedIncludeDir)\fficonfig.h" />
+    <ClInclude Include="$(SourceDir)\include\ffi_cfi.h" />
+    <ClInclude Include="$(SourceDir)\include\ffi_common.h" />
+    <ClInclude Include="$(LibFFITargetSourceDir)\asmnames.h" /> 
+    <ClInclude Include="$(LibFFITargetSourceDir)\ffitarget.h" /> 
+    <ClInclude Include="$(LibFFITargetSourceDir)\internal.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(LibFFISourceDir)\closures.c" />
+    <ClCompile Include="$(LibFFISourceDir)\dlmalloc.c" />
+    <ClCompile Include="$(LibFFISourceDir)\prep_cif.c" />
+    <ClCompile Include="$(LibFFISourceDir)\types.c" />
+    <ClCompile Include="$(LibFFITargetSourceDir)\ffi.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="$(LibFFITargetSourceDir)\sysv_intel.S">
+      <Command>
+        cd "$(IntDir)"
+        cl /FA /EP /nologo /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" "%(FullPath)" &gt; asm.i
+        ml /safeseh /c /I"$(SourceDir)\src" /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" /Foasm.obj asm.i
+      </Command>
+      <Outputs>$(IntDir)asm.obj;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\ffi.h" />
+    <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\fficonfig.h" />
+    <PublicHeader Include="$(LibFFITargetSourceDir)\ffitarget.h" />
+  </ItemGroup>
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)" />
+    <MakeDir Directories="$(OutDir)\include" />
+    <Copy SourceFiles="@(PublicHeader)" DestinationFolder="$(OutDir)\include\" />
+  </Target>
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

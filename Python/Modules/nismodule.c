@@ -12,6 +12,7 @@
 
 #include "Python.h"
 
+#include <stdlib.h>               // free()
 #include <sys/time.h>
 #include <sys/types.h>
 #include <rpc/rpc.h>
@@ -44,12 +45,42 @@ PyDoc_STRVAR(maps__doc__,
 Returns an array of all available NIS maps within a domain. If domain\n\
 is not specified it defaults to the system default domain.\n");
 
-static PyObject *NisError;
+typedef struct {
+    PyObject *nis_error;
+} nis_state;
+
+static inline nis_state*
+get_nis_state(PyObject *module)
+{
+    void *state = PyModule_GetState(module);
+    assert(state != NULL);
+    return (nis_state *)state;
+}
+
+static int
+nis_clear(PyObject *m)
+{
+    Py_CLEAR(get_nis_state(m)->nis_error);
+    return 0;
+}
+
+static int
+nis_traverse(PyObject *m, visitproc visit, void *arg)
+{
+    Py_VISIT(get_nis_state(m)->nis_error);
+    return 0;
+}
+
+static void
+nis_free(void *m)
+{
+    nis_clear((PyObject *) m);
+}
 
 static PyObject *
-nis_error (int err)
+nis_error(nis_state *state, int err)
 {
-    PyErr_SetString(NisError, yperr_string(err));
+    PyErr_SetString(state->nis_error, yperr_string(err));
     return NULL;
 }
 
@@ -70,17 +101,13 @@ static struct nis_map {
 };
 
 static char *
-nis_mapname (char *map, int *pfix)
+nis_mapname(char *map, int *pfix)
 {
     int i;
 
     *pfix = 0;
     for (i=0; aliases[i].alias != 0L; i++) {
-        if (!strcmp (aliases[i].alias, map)) {
-            *pfix = aliases[i].fix;
-            return aliases[i].map;
-        }
-        if (!strcmp (aliases[i].map, map)) {
+        if (!strcmp (aliases[i].alias, map) || !strcmp (aliases[i].map, map)) {
             *pfix = aliases[i].fix;
             return aliases[i].map;
         }
@@ -102,7 +129,7 @@ struct ypcallback_data {
 };
 
 static int
-nis_foreach (int instatus, char *inkey, int inkeylen, char *inval,
+nis_foreach(int instatus, char *inkey, int inkeylen, char *inval,
              int invallen, struct ypcallback_data *indata)
 {
     if (instatus == YP_TRUE) {
@@ -117,8 +144,8 @@ nis_foreach (int instatus, char *inkey, int inkeylen, char *inval,
             if (invallen > 0 && inval[invallen-1] == '\0')
             invallen--;
         }
-        key = PyString_FromStringAndSize(inkey, inkeylen);
-        val = PyString_FromStringAndSize(inval, invallen);
+        key = PyUnicode_DecodeFSDefaultAndSize(inkey, inkeylen);
+        val = PyUnicode_DecodeFSDefaultAndSize(inval, invallen);
         if (key == NULL || val == NULL) {
             /* XXX error -- don't know how to handle */
             PyErr_Clear();
@@ -141,54 +168,71 @@ nis_foreach (int instatus, char *inkey, int inkeylen, char *inval,
 }
 
 static PyObject *
-nis_get_default_domain (PyObject *self)
+nis_get_default_domain(PyObject *module, PyObject *Py_UNUSED(ignored))
 {
     char *domain;
     int err;
     PyObject *res;
+    nis_state *state = get_nis_state(module);
+    if ((err = yp_get_default_domain(&domain)) != 0) {
+        return nis_error(state, err);
+    }
 
-    if ((err = yp_get_default_domain(&domain)) != 0)
-        return nis_error(err);
-
-    res = PyString_FromStringAndSize (domain, strlen(domain));
+    res = PyUnicode_FromStringAndSize (domain, strlen(domain));
     return res;
 }
 
 static PyObject *
-nis_match (PyObject *self, PyObject *args, PyObject *kwdict)
+nis_match(PyObject *module, PyObject *args, PyObject *kwdict)
 {
     char *match;
     char *domain = NULL;
-    int keylen, len;
+    Py_ssize_t keylen;
+    int len;
     char *key, *map;
     int err;
-    PyObject *res;
+    PyObject *ukey, *bkey, *res;
     int fix;
     static char *kwlist[] = {"key", "map", "domain", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwdict,
-                                     "t#s|s:match", kwlist,
-                                     &key, &keylen, &map, &domain))
+                                     "Us|s:match", kwlist,
+                                     &ukey, &map, &domain)) {
         return NULL;
-    if (!domain && ((err = yp_get_default_domain(&domain)) != 0))
-        return nis_error(err);
+    }
+    if ((bkey = PyUnicode_EncodeFSDefault(ukey)) == NULL) {
+        return NULL;
+    }
+    /* check for embedded null bytes */
+    if (PyBytes_AsStringAndSize(bkey, &key, &keylen) == -1) {
+        Py_DECREF(bkey);
+        return NULL;
+    }
+
+    nis_state *state = get_nis_state(module);
+    if (!domain && ((err = yp_get_default_domain(&domain)) != 0)) {
+        Py_DECREF(bkey);
+        return nis_error(state, err);
+    }
     map = nis_mapname (map, &fix);
     if (fix)
         keylen++;
     Py_BEGIN_ALLOW_THREADS
     err = yp_match (domain, map, key, keylen, &match, &len);
     Py_END_ALLOW_THREADS
+    Py_DECREF(bkey);
     if (fix)
         len--;
-    if (err != 0)
-        return nis_error(err);
-    res = PyString_FromStringAndSize (match, len);
+    if (err != 0) {
+        return nis_error(state, err);
+    }
+    res = PyUnicode_DecodeFSDefaultAndSize(match, len);
     free (match);
     return res;
 }
 
 static PyObject *
-nis_cat (PyObject *self, PyObject *args, PyObject *kwdict)
+nis_cat(PyObject *module, PyObject *args, PyObject *kwdict)
 {
     char *domain = NULL;
     char *map;
@@ -199,10 +243,13 @@ nis_cat (PyObject *self, PyObject *args, PyObject *kwdict)
     static char *kwlist[] = {"map", "domain", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwdict, "s|s:cat",
-                                     kwlist, &map, &domain))
+                                     kwlist, &map, &domain)) {
         return NULL;
-    if (!domain && ((err = yp_get_default_domain(&domain)) != 0))
-        return nis_error(err);
+    }
+    nis_state *state = get_nis_state(module);
+    if (!domain && ((err = yp_get_default_domain(&domain)) != 0)) {
+        return nis_error(state, err);
+    }
     dict = PyDict_New ();
     if (dict == NULL)
         return NULL;
@@ -215,7 +262,7 @@ nis_cat (PyObject *self, PyObject *args, PyObject *kwdict)
     PyEval_RestoreThread(data.state);
     if (err != 0) {
         Py_DECREF(dict);
-        return nis_error(err);
+        return nis_error(state, err);
     }
     return dict;
 }
@@ -345,7 +392,7 @@ nisproc_maplist_2(domainname *argp, CLIENT *clnt)
 
 static
 nismaplist *
-nis_maplist (char *dom)
+nis_maplist(nis_state *state, char *dom)
 {
     nisresp_maplist *list;
     CLIENT *cl;
@@ -357,12 +404,12 @@ nis_maplist (char *dom)
         mapi++;
     }
     if (!server) {
-        PyErr_SetString(NisError, "No NIS master found for any map");
+        PyErr_SetString(state->nis_error, "No NIS master found for any map");
         return NULL;
     }
     cl = clnt_create(server, YPPROG, YPVERS, "tcp");
     if (cl == NULL) {
-        PyErr_SetString(NisError, clnt_spcreateerror(server));
+        PyErr_SetString(state->nis_error, clnt_spcreateerror(server));
         goto finally;
     }
     list = nisproc_maplist_2 (&dom, cl);
@@ -381,7 +428,7 @@ nis_maplist (char *dom)
 }
 
 static PyObject *
-nis_maps (PyObject *self, PyObject *args, PyObject *kwdict)
+nis_maps (PyObject *module, PyObject *args, PyObject *kwdict)
 {
     char *domain = NULL;
     nismaplist *maps;
@@ -390,24 +437,28 @@ nis_maps (PyObject *self, PyObject *args, PyObject *kwdict)
     static char *kwlist[] = {"domain", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwdict,
-                                     "|s:maps", kwlist, &domain))
-        return NULL;
-    if (!domain && ((err = yp_get_default_domain (&domain)) != 0)) {
-        nis_error(err);
+                                     "|s:maps", kwlist, &domain)) {
         return NULL;
     }
 
-    if ((maps = nis_maplist (domain)) == NULL)
+    nis_state *state = get_nis_state(module);
+    if (!domain && ((err = yp_get_default_domain (&domain)) != 0)) {
+        nis_error(state, err);
         return NULL;
-    if ((list = PyList_New(0)) == NULL)
+    }
+
+    if ((maps = nis_maplist(state, domain)) == NULL) {
         return NULL;
-    for (maps = maps; maps; maps = maps->next) {
-        PyObject *str = PyString_FromString(maps->map);
+    }
+    if ((list = PyList_New(0)) == NULL) {
+        return NULL;
+    }
+    for (; maps; maps = maps->next) {
+        PyObject *str = PyUnicode_FromString(maps->map);
         if (!str || PyList_Append(list, str) < 0)
         {
             Py_XDECREF(str);
-            Py_DECREF(list);
-            list = NULL;
+            Py_SETREF(list, NULL);
             break;
         }
         Py_DECREF(str);
@@ -417,33 +468,69 @@ nis_maps (PyObject *self, PyObject *args, PyObject *kwdict)
 }
 
 static PyMethodDef nis_methods[] = {
-    {"match",                   (PyCFunction)nis_match,
+    {"match",                   _PyCFunction_CAST(nis_match),
                                     METH_VARARGS | METH_KEYWORDS,
                                     match__doc__},
-    {"cat",                     (PyCFunction)nis_cat,
+    {"cat",                     _PyCFunction_CAST(nis_cat),
                                     METH_VARARGS | METH_KEYWORDS,
                                     cat__doc__},
-    {"maps",                    (PyCFunction)nis_maps,
+    {"maps",                    _PyCFunction_CAST(nis_maps),
                                     METH_VARARGS | METH_KEYWORDS,
                                     maps__doc__},
-    {"get_default_domain",      (PyCFunction)nis_get_default_domain,
+    {"get_default_domain",      nis_get_default_domain,
                                     METH_NOARGS,
                                     get_default_domain__doc__},
     {NULL,                      NULL}            /* Sentinel */
 };
 
+static int
+nis_exec(PyObject *module)
+{
+    nis_state* state = get_nis_state(module);
+    state->nis_error = PyErr_NewException("nis.error", NULL, NULL);
+    if (state->nis_error == NULL) {
+        return -1;
+    }
+
+    Py_INCREF(state->nis_error);
+    if (PyModule_AddObject(module, "error", state->nis_error) < 0) {
+        Py_DECREF(state->nis_error);
+        return -1;
+    }
+    return 0;
+}
+
+static PyModuleDef_Slot nis_slots[] = {
+    {Py_mod_exec, nis_exec},
+    // XXX gh-103092: fix isolation.
+    {Py_mod_multiple_interpreters, Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED},
+    //{Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {0, NULL}
+};
+
 PyDoc_STRVAR(nis__doc__,
 "This module contains functions for accessing NIS maps.\n");
 
-void
-initnis (void)
+static struct PyModuleDef nismodule = {
+    PyModuleDef_HEAD_INIT,
+    .m_name = "nis",
+    .m_doc = nis__doc__,
+    .m_size = sizeof(nis_state),
+    .m_methods = nis_methods,
+    .m_traverse = nis_traverse,
+    .m_clear = nis_clear,
+    .m_free = nis_free,
+    .m_slots = nis_slots,
+};
+
+PyMODINIT_FUNC
+PyInit_nis(void)
 {
-    PyObject *m, *d;
-    m = Py_InitModule3("nis", nis_methods, nis__doc__);
-    if (m == NULL)
-        return;
-    d = PyModule_GetDict(m);
-    NisError = PyErr_NewException("nis.error", NULL, NULL);
-    if (NisError != NULL)
-        PyDict_SetItemString(d, "error", NisError);
+    if (PyErr_WarnEx(PyExc_DeprecationWarning,
+                     "'nis' is deprecated and slated for removal in "
+                     "Python 3.13",
+                     7)) {
+        return NULL;
+    }
+    return PyModuleDef_Init(&nismodule);
 }

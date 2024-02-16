@@ -1,11 +1,11 @@
-.. highlightlang:: c
+.. highlight:: c
 
 .. _dictobjects:
 
 Dictionary Objects
 ------------------
 
-.. index:: object: dictionary
+.. index:: pair: object; dictionary
 
 
 .. c:type:: PyDictObject
@@ -15,44 +15,32 @@ Dictionary Objects
 
 .. c:var:: PyTypeObject PyDict_Type
 
-   .. index::
-      single: DictType (in module types)
-      single: DictionaryType (in module types)
-
    This instance of :c:type:`PyTypeObject` represents the Python dictionary
-   type.  This is exposed to Python programs as ``dict`` and
-   ``types.DictType``.
+   type.  This is the same object as :class:`dict` in the Python layer.
 
 
 .. c:function:: int PyDict_Check(PyObject *p)
 
    Return true if *p* is a dict object or an instance of a subtype of the dict
-   type.
-
-   .. versionchanged:: 2.2
-      Allowed subtypes to be accepted.
+   type.  This function always succeeds.
 
 
 .. c:function:: int PyDict_CheckExact(PyObject *p)
 
    Return true if *p* is a dict object, but not an instance of a subtype of
-   the dict type.
-
-   .. versionadded:: 2.4
+   the dict type.  This function always succeeds.
 
 
 .. c:function:: PyObject* PyDict_New()
 
-   Return a new empty dictionary, or *NULL* on failure.
+   Return a new empty dictionary, or ``NULL`` on failure.
 
 
-.. c:function:: PyObject* PyDictProxy_New(PyObject *dict)
+.. c:function:: PyObject* PyDictProxy_New(PyObject *mapping)
 
-   Return a proxy object for a mapping which enforces read-only behavior.
-   This is normally used to create a proxy to prevent modification of the
-   dictionary for non-dynamic class types.
-
-   .. versionadded:: 2.2
+   Return a :class:`types.MappingProxyType` object for a mapping which
+   enforces read-only behavior.  This is normally used to create a view to
+   prevent modification of the dictionary for non-dynamic class types.
 
 
 .. c:function:: void PyDict_Clear(PyObject *p)
@@ -66,86 +54,113 @@ Dictionary Objects
    *key*, return ``1``, otherwise return ``0``.  On error, return ``-1``.
    This is equivalent to the Python expression ``key in p``.
 
-   .. versionadded:: 2.4
-
 
 .. c:function:: PyObject* PyDict_Copy(PyObject *p)
 
    Return a new dictionary that contains the same key-value pairs as *p*.
 
-   .. versionadded:: 1.6
-
 
 .. c:function:: int PyDict_SetItem(PyObject *p, PyObject *key, PyObject *val)
 
-   Insert *value* into the dictionary *p* with a key of *key*.  *key* must be
+   Insert *val* into the dictionary *p* with a key of *key*.  *key* must be
    :term:`hashable`; if it isn't, :exc:`TypeError` will be raised. Return
-   ``0`` on success or ``-1`` on failure.
+   ``0`` on success or ``-1`` on failure.  This function *does not* steal a
+   reference to *val*.
 
 
 .. c:function:: int PyDict_SetItemString(PyObject *p, const char *key, PyObject *val)
 
-   .. index:: single: PyString_FromString()
-
-   Insert *value* into the dictionary *p* using *key* as a key. *key* should
-   be a :c:type:`char\*`.  The key object is created using
-   ``PyString_FromString(key)``.  Return ``0`` on success or ``-1`` on
-   failure.
+   This is the same as :c:func:`PyDict_SetItem`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
 
 
 .. c:function:: int PyDict_DelItem(PyObject *p, PyObject *key)
 
-   Remove the entry in dictionary *p* with key *key*. *key* must be hashable;
-   if it isn't, :exc:`TypeError` is raised.  Return ``0`` on success or ``-1``
-   on failure.
+   Remove the entry in dictionary *p* with key *key*. *key* must be :term:`hashable`;
+   if it isn't, :exc:`TypeError` is raised.
+   If *key* is not in the dictionary, :exc:`KeyError` is raised.
+   Return ``0`` on success or ``-1`` on failure.
 
 
-.. c:function:: int PyDict_DelItemString(PyObject *p, char *key)
+.. c:function:: int PyDict_DelItemString(PyObject *p, const char *key)
 
-   Remove the entry in dictionary *p* which has a key specified by the string
-   *key*.  Return ``0`` on success or ``-1`` on failure.
+   This is the same as :c:func:`PyDict_DelItem`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
 
 
 .. c:function:: PyObject* PyDict_GetItem(PyObject *p, PyObject *key)
 
-   Return the object from dictionary *p* which has a key *key*.  Return *NULL*
+   Return the object from dictionary *p* which has a key *key*.  Return ``NULL``
    if the key *key* is not present, but *without* setting an exception.
+
+   .. note::
+
+      Exceptions that occur while this calls :meth:`~object.__hash__` and
+      :meth:`~object.__eq__` methods are silently ignored.
+      Prefer the :c:func:`PyDict_GetItemWithError` function instead.
+
+   .. versionchanged:: 3.10
+      Calling this API without :term:`GIL` held had been allowed for historical
+      reason. It is no longer allowed.
+
+
+.. c:function:: PyObject* PyDict_GetItemWithError(PyObject *p, PyObject *key)
+
+   Variant of :c:func:`PyDict_GetItem` that does not suppress
+   exceptions. Return ``NULL`` **with** an exception set if an exception
+   occurred.  Return ``NULL`` **without** an exception set if the key
+   wasn't present.
 
 
 .. c:function:: PyObject* PyDict_GetItemString(PyObject *p, const char *key)
 
    This is the same as :c:func:`PyDict_GetItem`, but *key* is specified as a
-   :c:type:`char\*`, rather than a :c:type:`PyObject\*`.
+   :c:expr:`const char*` UTF-8 encoded bytes string, rather than a
+   :c:expr:`PyObject*`.
 
+   .. note::
+
+      Exceptions that occur while this calls :meth:`~object.__hash__` and
+      :meth:`~object.__eq__` methods or while creating the temporary :class:`str`
+      object are silently ignored.
+      Prefer using the :c:func:`PyDict_GetItemWithError` function with your own
+      :c:func:`PyUnicode_FromString` *key* instead.
+
+
+.. c:function:: PyObject* PyDict_SetDefault(PyObject *p, PyObject *key, PyObject *defaultobj)
+
+   This is the same as the Python-level :meth:`dict.setdefault`.  If present, it
+   returns the value corresponding to *key* from the dictionary *p*.  If the key
+   is not in the dict, it is inserted with value *defaultobj* and *defaultobj*
+   is returned.  This function evaluates the hash function of *key* only once,
+   instead of evaluating it independently for the lookup and the insertion.
+
+   .. versionadded:: 3.4
 
 .. c:function:: PyObject* PyDict_Items(PyObject *p)
 
-   Return a :c:type:`PyListObject` containing all the items from the
-   dictionary, as in the dictionary method :meth:`dict.items`.
+   Return a :c:type:`PyListObject` containing all the items from the dictionary.
 
 
 .. c:function:: PyObject* PyDict_Keys(PyObject *p)
 
-   Return a :c:type:`PyListObject` containing all the keys from the dictionary,
-   as in the dictionary method :meth:`dict.keys`.
+   Return a :c:type:`PyListObject` containing all the keys from the dictionary.
 
 
 .. c:function:: PyObject* PyDict_Values(PyObject *p)
 
-   Return a :c:type:`PyListObject` containing all the values from the
-   dictionary *p*, as in the dictionary method :meth:`dict.values`.
+   Return a :c:type:`PyListObject` containing all the values from the dictionary
+   *p*.
 
 
 .. c:function:: Py_ssize_t PyDict_Size(PyObject *p)
 
-   .. index:: builtin: len
+   .. index:: pair: built-in function; len
 
    Return the number of items in the dictionary.  This is equivalent to
    ``len(p)`` on a dictionary.
-
-   .. versionchanged:: 2.5
-      This function returned an :c:type:`int` type.  This might require changes
-      in your code for properly supporting 64-bit systems.
 
 
 .. c:function:: int PyDict_Next(PyObject *p, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
@@ -155,8 +170,8 @@ Dictionary Objects
    prior to the first call to this function to start the iteration; the
    function returns true for each pair in the dictionary, and false once all
    pairs have been reported.  The parameters *pkey* and *pvalue* should either
-   point to :c:type:`PyObject\*` variables that will be filled in with each key
-   and value, respectively, or may be *NULL*.  Any references returned through
+   point to :c:expr:`PyObject*` variables that will be filled in with each key
+   and value, respectively, or may be ``NULL``.  Any references returned through
    them are borrowed.  *ppos* should not be altered during iteration. Its
    value represents offsets within the internal dictionary structure, and
    since the structure is sparse, the offsets are not consecutive.
@@ -171,17 +186,19 @@ Dictionary Objects
           ...
       }
 
-   The dictionary *p* should not be mutated during iteration.  It is safe
-   (since Python 2.1) to modify the values of the keys as you iterate over the
-   dictionary, but only so long as the set of keys does not change.  For
-   example::
+   The dictionary *p* should not be mutated during iteration.  It is safe to
+   modify the values of the keys as you iterate over the dictionary, but only
+   so long as the set of keys does not change.  For example::
 
       PyObject *key, *value;
       Py_ssize_t pos = 0;
 
       while (PyDict_Next(self->dict, &pos, &key, &value)) {
-          int i = PyInt_AS_LONG(value) + 1;
-          PyObject *o = PyInt_FromLong(i);
+          long i = PyLong_AsLong(value);
+          if (i == -1 && PyErr_Occurred()) {
+              return -1;
+          }
+          PyObject *o = PyLong_FromLong(i + 1);
           if (o == NULL)
               return -1;
           if (PyDict_SetItem(self->dict, key, o) < 0) {
@@ -190,10 +207,6 @@ Dictionary Objects
           }
           Py_DECREF(o);
       }
-
-   .. versionchanged:: 2.5
-      This function used an :c:type:`int *` type for *ppos*. This might require
-      changes in your code for properly supporting 64-bit systems.
 
 
 .. c:function:: int PyDict_Merge(PyObject *a, PyObject *b, int override)
@@ -205,8 +218,6 @@ Dictionary Objects
    only be added if there is not a matching key in *a*. Return ``0`` on
    success or ``-1`` if an exception was raised.
 
-   .. versionadded:: 2.2
-
 
 .. c:function:: int PyDict_Update(PyObject *a, PyObject *b)
 
@@ -215,8 +226,6 @@ Dictionary Objects
    back to the iterating over a sequence of key value pairs if the second
    argument has no "keys" attribute.  Return ``0`` on success or ``-1`` if an
    exception was raised.
-
-   .. versionadded:: 2.2
 
 
 .. c:function:: int PyDict_MergeFromSeq2(PyObject *a, PyObject *seq2, int override)
@@ -233,4 +242,85 @@ Dictionary Objects
               if override or key not in a:
                   a[key] = value
 
-   .. versionadded:: 2.2
+.. c:function:: int PyDict_AddWatcher(PyDict_WatchCallback callback)
+
+   Register *callback* as a dictionary watcher. Return a non-negative integer
+   id which must be passed to future calls to :c:func:`PyDict_Watch`. In case
+   of error (e.g. no more watcher IDs available), return ``-1`` and set an
+   exception.
+
+   .. versionadded:: 3.12
+
+.. c:function:: int PyDict_ClearWatcher(int watcher_id)
+
+   Clear watcher identified by *watcher_id* previously returned from
+   :c:func:`PyDict_AddWatcher`. Return ``0`` on success, ``-1`` on error (e.g.
+   if the given *watcher_id* was never registered.)
+
+   .. versionadded:: 3.12
+
+.. c:function:: int PyDict_Watch(int watcher_id, PyObject *dict)
+
+   Mark dictionary *dict* as watched. The callback granted *watcher_id* by
+   :c:func:`PyDict_AddWatcher` will be called when *dict* is modified or
+   deallocated. Return ``0`` on success or ``-1`` on error.
+
+   .. versionadded:: 3.12
+
+.. c:function:: int PyDict_Unwatch(int watcher_id, PyObject *dict)
+
+   Mark dictionary *dict* as no longer watched. The callback granted
+   *watcher_id* by :c:func:`PyDict_AddWatcher` will no longer be called when
+   *dict* is modified or deallocated. The dict must previously have been
+   watched by this watcher. Return ``0`` on success or ``-1`` on error.
+
+   .. versionadded:: 3.12
+
+.. c:type:: PyDict_WatchEvent
+
+   Enumeration of possible dictionary watcher events: ``PyDict_EVENT_ADDED``,
+   ``PyDict_EVENT_MODIFIED``, ``PyDict_EVENT_DELETED``, ``PyDict_EVENT_CLONED``,
+   ``PyDict_EVENT_CLEARED``, or ``PyDict_EVENT_DEALLOCATED``.
+
+   .. versionadded:: 3.12
+
+.. c:type:: int (*PyDict_WatchCallback)(PyDict_WatchEvent event, PyObject *dict, PyObject *key, PyObject *new_value)
+
+   Type of a dict watcher callback function.
+
+   If *event* is ``PyDict_EVENT_CLEARED`` or ``PyDict_EVENT_DEALLOCATED``, both
+   *key* and *new_value* will be ``NULL``. If *event* is ``PyDict_EVENT_ADDED``
+   or ``PyDict_EVENT_MODIFIED``, *new_value* will be the new value for *key*.
+   If *event* is ``PyDict_EVENT_DELETED``, *key* is being deleted from the
+   dictionary and *new_value* will be ``NULL``.
+
+   ``PyDict_EVENT_CLONED`` occurs when *dict* was previously empty and another
+   dict is merged into it. To maintain efficiency of this operation, per-key
+   ``PyDict_EVENT_ADDED`` events are not issued in this case; instead a
+   single ``PyDict_EVENT_CLONED`` is issued, and *key* will be the source
+   dictionary.
+
+   The callback may inspect but must not modify *dict*; doing so could have
+   unpredictable effects, including infinite recursion. Do not trigger Python
+   code execution in the callback, as it could modify the dict as a side effect.
+
+   If *event* is ``PyDict_EVENT_DEALLOCATED``, taking a new reference in the
+   callback to the about-to-be-destroyed dictionary will resurrect it and
+   prevent it from being freed at this time. When the resurrected object is
+   destroyed later, any watcher callbacks active at that time will be called
+   again.
+
+   Callbacks occur before the notified modification to *dict* takes place, so
+   the prior state of *dict* can be inspected.
+
+   If the callback sets an exception, it must return ``-1``; this exception will
+   be printed as an unraisable exception using :c:func:`PyErr_WriteUnraisable`.
+   Otherwise it should return ``0``.
+
+   There may already be a pending exception set on entry to the callback. In
+   this case, the callback should return ``0`` with the same exception still
+   set. This means the callback may not call any other API that can set an
+   exception unless it saves and clears the exception state first, and restores
+   it before returning.
+
+   .. versionadded:: 3.12

@@ -1,27 +1,32 @@
-
 :mod:`resource` --- Resource usage information
 ==============================================
 
 .. module:: resource
    :platform: Unix
    :synopsis: An interface to provide resource usage information on the current process.
+
 .. moduleauthor:: Jeremy Hylton <jeremy@alum.mit.edu>
 .. sectionauthor:: Jeremy Hylton <jeremy@alum.mit.edu>
 
+--------------
 
 This module provides basic mechanisms for measuring and controlling system
 resources utilized by a program.
 
+.. availability:: Unix, not Emscripten, not WASI.
+
 Symbolic constants are used to specify particular system resources and to
 request usage information about either the current process or its children.
 
-A single exception is defined for errors:
+An :exc:`OSError` is raised on syscall failure.
 
 
 .. exception:: error
 
-   The functions described below may raise this error if the underlying system call
-   failures unexpectedly.
+   A deprecated alias of :exc:`OSError`.
+
+   .. versionchanged:: 3.3
+      Following :pep:`3151`, this class was made an alias of :exc:`OSError`.
 
 
 Resource Limits
@@ -72,6 +77,34 @@ this module for those platforms.
 
    ``setrlimit`` may also raise :exc:`error` if the underlying system call
    fails.
+
+   VxWorks only supports setting :data:`RLIMIT_NOFILE`.
+
+   .. audit-event:: resource.setrlimit resource,limits resource.setrlimit
+
+
+.. function:: prlimit(pid, resource[, limits])
+
+   Combines :func:`setrlimit` and :func:`getrlimit` in one function and
+   supports to get and set the resources limits of an arbitrary process. If
+   *pid* is 0, then the call applies to the current process. *resource* and
+   *limits* have the same meaning as in :func:`setrlimit`, except that
+   *limits* is optional.
+
+   When *limits* is not given the function returns the *resource* limit of the
+   process *pid*. When *limits* is given the *resource* limit of the process is
+   set and the former resource limit is returned.
+
+   Raises :exc:`ProcessLookupError` when *pid* can't be found and
+   :exc:`PermissionError` when the user doesn't have ``CAP_SYS_RESOURCE`` for
+   the process.
+
+   .. audit-event:: resource.prlimit pid,resource,limits resource.prlimit
+
+   .. availability:: Linux >= 2.6.36 with glibc >= 2.13.
+
+   .. versionadded:: 3.4
+
 
 These symbols define resources whose consumption can be controlled using the
 :func:`setrlimit` and :func:`getrlimit` functions described below. The values of
@@ -150,6 +183,90 @@ platform.
    The maximum area (in bytes) of address space which may be taken by the process.
 
 
+.. data:: RLIMIT_MSGQUEUE
+
+   The number of bytes that can be allocated for POSIX message queues.
+
+   .. availability:: Linux >= 2.6.8.
+
+   .. versionadded:: 3.4
+
+
+.. data:: RLIMIT_NICE
+
+   The ceiling for the process's nice level (calculated as 20 - rlim_cur).
+
+   .. availability:: Linux >= 2.6.12.
+
+   .. versionadded:: 3.4
+
+
+.. data:: RLIMIT_RTPRIO
+
+   The ceiling of the real-time priority.
+
+   .. availability:: Linux >= 2.6.12.
+
+   .. versionadded:: 3.4
+
+
+.. data:: RLIMIT_RTTIME
+
+   The time limit (in microseconds) on CPU time that a process can spend
+   under real-time scheduling without making a blocking syscall.
+
+   .. availability:: Linux >= 2.6.25.
+
+   .. versionadded:: 3.4
+
+
+.. data:: RLIMIT_SIGPENDING
+
+   The number of signals which the process may queue.
+
+   .. availability:: Linux >= 2.6.8.
+
+   .. versionadded:: 3.4
+
+.. data:: RLIMIT_SBSIZE
+
+   The maximum size (in bytes) of socket buffer usage for this user.
+   This limits the amount of network memory, and hence the amount of mbufs,
+   that this user may hold at any time.
+
+   .. availability:: FreeBSD.
+
+   .. versionadded:: 3.4
+
+.. data:: RLIMIT_SWAP
+
+   The maximum size (in bytes) of the swap space that may be reserved or
+   used by all of this user id's processes.
+   This limit is enforced only if bit 1 of the vm.overcommit sysctl is set.
+   Please see
+   `tuning(7) <https://man.freebsd.org/cgi/man.cgi?query=tuning&sektion=7>`__
+   for a complete description of this sysctl.
+
+   .. availability:: FreeBSD.
+
+   .. versionadded:: 3.4
+
+.. data:: RLIMIT_NPTS
+
+   The maximum number of pseudo-terminals created by this user id.
+
+   .. availability:: FreeBSD.
+
+   .. versionadded:: 3.4
+
+.. data:: RLIMIT_KQUEUES
+
+   The maximum number of kqueues this user id is allowed to create.
+
+   .. availability:: FreeBSD >= 11.
+
+   .. versionadded:: 3.10
+
 Resource Usage
 --------------
 
@@ -160,8 +277,22 @@ These functions are used to retrieve resource usage information:
 
    This function returns an object that describes the resources consumed by either
    the current process or its children, as specified by the *who* parameter.  The
-   *who* parameter should be specified using one of the :const:`RUSAGE_\*`
+   *who* parameter should be specified using one of the :const:`!RUSAGE_\*`
    constants described below.
+
+   A simple example::
+
+      from resource import *
+      import time
+
+      # a non CPU-bound task
+      time.sleep(3)
+      print(getrusage(RUSAGE_SELF))
+
+      # a CPU-bound task
+      for i in range(10 ** 8):
+         _ = 1 + 1
+      print(getrusage(RUSAGE_SELF))
 
    The fields of the return value each describe how a particular system resource
    has been used, e.g. amount of time spent running is user mode or number of times
@@ -177,47 +308,44 @@ These functions are used to retrieve resource usage information:
    remaining values are integers. Consult the :manpage:`getrusage(2)` man page for
    detailed information about these values. A brief summary is presented here:
 
-   +--------+---------------------+-------------------------------+
-   | Index  | Field               | Resource                      |
-   +========+=====================+===============================+
-   | ``0``  | :attr:`ru_utime`    | time in user mode (float)     |
-   +--------+---------------------+-------------------------------+
-   | ``1``  | :attr:`ru_stime`    | time in system mode (float)   |
-   +--------+---------------------+-------------------------------+
-   | ``2``  | :attr:`ru_maxrss`   | maximum resident set size     |
-   +--------+---------------------+-------------------------------+
-   | ``3``  | :attr:`ru_ixrss`    | shared memory size            |
-   +--------+---------------------+-------------------------------+
-   | ``4``  | :attr:`ru_idrss`    | unshared memory size          |
-   +--------+---------------------+-------------------------------+
-   | ``5``  | :attr:`ru_isrss`    | unshared stack size           |
-   +--------+---------------------+-------------------------------+
-   | ``6``  | :attr:`ru_minflt`   | page faults not requiring I/O |
-   +--------+---------------------+-------------------------------+
-   | ``7``  | :attr:`ru_majflt`   | page faults requiring I/O     |
-   +--------+---------------------+-------------------------------+
-   | ``8``  | :attr:`ru_nswap`    | number of swap outs           |
-   +--------+---------------------+-------------------------------+
-   | ``9``  | :attr:`ru_inblock`  | block input operations        |
-   +--------+---------------------+-------------------------------+
-   | ``10`` | :attr:`ru_oublock`  | block output operations       |
-   +--------+---------------------+-------------------------------+
-   | ``11`` | :attr:`ru_msgsnd`   | messages sent                 |
-   +--------+---------------------+-------------------------------+
-   | ``12`` | :attr:`ru_msgrcv`   | messages received             |
-   +--------+---------------------+-------------------------------+
-   | ``13`` | :attr:`ru_nsignals` | signals received              |
-   +--------+---------------------+-------------------------------+
-   | ``14`` | :attr:`ru_nvcsw`    | voluntary context switches    |
-   +--------+---------------------+-------------------------------+
-   | ``15`` | :attr:`ru_nivcsw`   | involuntary context switches  |
-   +--------+---------------------+-------------------------------+
+   +--------+---------------------+---------------------------------------+
+   | Index  | Field               | Resource                              |
+   +========+=====================+=======================================+
+   | ``0``  | :attr:`ru_utime`    | time in user mode (float seconds)     |
+   +--------+---------------------+---------------------------------------+
+   | ``1``  | :attr:`ru_stime`    | time in system mode (float seconds)   |
+   +--------+---------------------+---------------------------------------+
+   | ``2``  | :attr:`ru_maxrss`   | maximum resident set size             |
+   +--------+---------------------+---------------------------------------+
+   | ``3``  | :attr:`ru_ixrss`    | shared memory size                    |
+   +--------+---------------------+---------------------------------------+
+   | ``4``  | :attr:`ru_idrss`    | unshared memory size                  |
+   +--------+---------------------+---------------------------------------+
+   | ``5``  | :attr:`ru_isrss`    | unshared stack size                   |
+   +--------+---------------------+---------------------------------------+
+   | ``6``  | :attr:`ru_minflt`   | page faults not requiring I/O         |
+   +--------+---------------------+---------------------------------------+
+   | ``7``  | :attr:`ru_majflt`   | page faults requiring I/O             |
+   +--------+---------------------+---------------------------------------+
+   | ``8``  | :attr:`ru_nswap`    | number of swap outs                   |
+   +--------+---------------------+---------------------------------------+
+   | ``9``  | :attr:`ru_inblock`  | block input operations                |
+   +--------+---------------------+---------------------------------------+
+   | ``10`` | :attr:`ru_oublock`  | block output operations               |
+   +--------+---------------------+---------------------------------------+
+   | ``11`` | :attr:`ru_msgsnd`   | messages sent                         |
+   +--------+---------------------+---------------------------------------+
+   | ``12`` | :attr:`ru_msgrcv`   | messages received                     |
+   +--------+---------------------+---------------------------------------+
+   | ``13`` | :attr:`ru_nsignals` | signals received                      |
+   +--------+---------------------+---------------------------------------+
+   | ``14`` | :attr:`ru_nvcsw`    | voluntary context switches            |
+   +--------+---------------------+---------------------------------------+
+   | ``15`` | :attr:`ru_nivcsw`   | involuntary context switches          |
+   +--------+---------------------+---------------------------------------+
 
    This function will raise a :exc:`ValueError` if an invalid *who* parameter is
    specified. It may also raise :exc:`error` exception in unusual circumstances.
-
-   .. versionchanged:: 2.3
-      Added access to values as attributes of the returned object.
 
 
 .. function:: getpagesize()
@@ -225,20 +353,20 @@ These functions are used to retrieve resource usage information:
    Returns the number of bytes in a system page. (This need not be the same as the
    hardware page size.)
 
-The following :const:`RUSAGE_\*` symbols are passed to the :func:`getrusage`
+The following :const:`!RUSAGE_\*` symbols are passed to the :func:`getrusage`
 function to specify which processes information should be provided for.
 
 
 .. data:: RUSAGE_SELF
 
-   :const:`RUSAGE_SELF` should be used to request information pertaining only to
-   the process itself.
+   Pass to :func:`getrusage` to request resources consumed by the calling
+   process, which is the sum of resources used by all threads in the process.
 
 
 .. data:: RUSAGE_CHILDREN
 
-   Pass to :func:`getrusage` to request resource information for child processes of
-   the calling process.
+   Pass to :func:`getrusage` to request resources consumed by child processes
+   of the calling process which have been terminated and waited for.
 
 
 .. data:: RUSAGE_BOTH
@@ -246,3 +374,10 @@ function to specify which processes information should be provided for.
    Pass to :func:`getrusage` to request resources consumed by both the current
    process and child processes.  May not be available on all systems.
 
+
+.. data:: RUSAGE_THREAD
+
+   Pass to :func:`getrusage` to request resources consumed by the current
+   thread.  May not be available on all systems.
+
+   .. versionadded:: 3.2

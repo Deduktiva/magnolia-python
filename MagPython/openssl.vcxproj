@@ -43,6 +43,7 @@
       <LibraryFiles Include="$(BuildDir)\libcrypto.lib" />
       <LibraryFiles Include="$(BuildDir)\libssl-$(LibraryFileVersion).dll" />
       <LibraryFiles Include="$(BuildDir)\libssl.lib" />
+      <LibraryFiles Include="$(BuildDir)\ms\applink.c" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)" />
     <Copy SourceFiles="@(LibraryFiles)" DestinationFolder="$(OutDir)" />

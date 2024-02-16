@@ -1,26 +1,26 @@
-
 .. _ipc:
 
 *****************************************
-Interprocess Communication and Networking
+Networking and Interprocess Communication
 *****************************************
 
-The modules described in this chapter provide mechanisms for different processes
-to communicate.
+The modules described in this chapter provide mechanisms for
+networking and inter-processes communication.
 
 Some modules only work for two processes that are on the same machine, e.g.
-:mod:`signal` and :mod:`subprocess`.  Other modules support networking protocols
+:mod:`signal` and :mod:`mmap`.  Other modules support networking protocols
 that two or more processes can use to communicate across machines.
 
 The list of modules described in this chapter is:
 
 
 .. toctree::
+   :maxdepth: 1
 
-   subprocess.rst
+   asyncio.rst
    socket.rst
    ssl.rst
+   select.rst
+   selectors.rst
    signal.rst
-   popen2.rst
-   asyncore.rst
-   asynchat.rst
+   mmap.rst

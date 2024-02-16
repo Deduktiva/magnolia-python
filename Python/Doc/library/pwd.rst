@@ -1,4 +1,3 @@
-
 :mod:`pwd` --- The password database
 ====================================
 
@@ -6,9 +5,12 @@
    :platform: Unix
    :synopsis: The password database (getpwnam() and friends).
 
+--------------
 
 This module provides access to the Unix user account and password database.  It
 is available on all Unix versions.
+
+.. availability:: Unix, not Emscripten, not WASI.
 
 Password database entries are reported as a tuple-like object, whose attributes
 correspond to the members of the ``passwd`` structure (Attribute field below,
@@ -37,7 +39,7 @@ raised if the entry asked for cannot be found.
 
 .. note::
 
-   .. index:: module: crypt
+   .. index:: pair: module; crypt
 
    In traditional Unix the field ``pw_passwd`` usually contains a password
    encrypted with a DES derived algorithm (see module :mod:`crypt`).  However most

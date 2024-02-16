@@ -1,4 +1,3 @@
-
 :mod:`termios` --- POSIX style tty control
 ==========================================
 
@@ -6,19 +5,22 @@
    :platform: Unix
    :synopsis: POSIX style tty control.
 
-
 .. index::
    pair: POSIX; I/O control
    pair: tty; I/O control
 
+--------------
+
 This module provides an interface to the POSIX calls for tty I/O control. For a
-complete description of these calls, see :manpage:`termios(2)` Unix manual
+complete description of these calls, see :manpage:`termios(3)` Unix manual
 page.  It is only available for those Unix versions that support POSIX
 *termios* style tty I/O control configured during installation.
 
+.. availability:: Unix.
+
 All functions in this module take a file descriptor *fd* as their first
 argument.  This can be an integer file descriptor, such as returned by
-``sys.stdin.fileno()``, or a file object, such as ``sys.stdin`` itself.
+``sys.stdin.fileno()``, or a :term:`file object`, such as ``sys.stdin`` itself.
 
 This module also defines all the constants needed to work with the functions
 provided here; these have the same name as their counterparts in C.  Please
@@ -43,16 +45,26 @@ The module defines the following functions:
 
    Set the tty attributes for file descriptor *fd* from the *attributes*, which is
    a list like the one returned by :func:`tcgetattr`.  The *when* argument
-   determines when the attributes are changed: :const:`TCSANOW` to change
-   immediately, :const:`TCSADRAIN` to change after transmitting all queued output,
-   or :const:`TCSAFLUSH` to change after transmitting all queued output and
-   discarding all queued input.
+   determines when the attributes are changed:
+
+   .. data:: TCSANOW
+
+      Change attributes immediately.
+
+   .. data:: TCSADRAIN
+
+      Change attributes after transmitting all queued output.
+
+   .. data:: TCSAFLUSH
+
+      Change attributes after transmitting all queued output and
+      discarding all queued input.
 
 
 .. function:: tcsendbreak(fd, duration)
 
-   Send a break on file descriptor *fd*.  A zero *duration* sends a break for 0.25
-   --0.5 seconds; a nonzero *duration* has a system dependent meaning.
+   Send a break on file descriptor *fd*.  A zero *duration* sends a break for
+   0.25--0.5 seconds; a nonzero *duration* has a system dependent meaning.
 
 
 .. function:: tcdrain(fd)
@@ -74,16 +86,36 @@ The module defines the following functions:
    output, :const:`TCIOFF` to suspend input, or :const:`TCION` to restart input.
 
 
+.. function:: tcgetwinsize(fd)
+
+   Return a tuple ``(ws_row, ws_col)`` containing the tty window size for file
+   descriptor *fd*. Requires :const:`termios.TIOCGWINSZ` or
+   :const:`termios.TIOCGSIZE`.
+
+   .. versionadded:: 3.11
+
+
+.. function:: tcsetwinsize(fd, winsize)
+
+   Set the tty window size for file descriptor *fd* from *winsize*, which is
+   a two-item tuple ``(ws_row, ws_col)`` like the one returned by
+   :func:`tcgetwinsize`. Requires at least one of the pairs
+   (:const:`termios.TIOCGWINSZ`, :const:`termios.TIOCSWINSZ`);
+   (:const:`termios.TIOCGSIZE`, :const:`termios.TIOCSSIZE`) to be defined.
+
+   .. versionadded:: 3.11
+
+
 .. seealso::
 
    Module :mod:`tty`
       Convenience functions for common terminal control operations.
 
 
+.. _termios-example:
+
 Example
 -------
-
-.. _termios-example:
 
 Here's a function that prompts for a password with echoing turned off.  Note the
 technique using a separate :func:`tcgetattr` call and a :keyword:`try` ...
@@ -98,7 +130,7 @@ exactly no matter what happens::
        new[3] = new[3] & ~termios.ECHO          # lflags
        try:
            termios.tcsetattr(fd, termios.TCSADRAIN, new)
-           passwd = raw_input(prompt)
+           passwd = input(prompt)
        finally:
            termios.tcsetattr(fd, termios.TCSADRAIN, old)
        return passwd
