@@ -20,7 +20,7 @@
   <PropertyGroup>
     <TopDir>$(MSBuildProjectDirectory)\..\</TopDir>
     <IntDir>$(MSBuildProjectDirectory)\$(Configuration)-Int-freeze\</IntDir>
-    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)-Int-freeze\</OutDir>
     <PythonSourceDir>$(TopDir)\Python\</PythonSourceDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
