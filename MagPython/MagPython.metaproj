@@ -6,12 +6,19 @@
     <Import Project="common.props"/>
 
     <ItemGroup>
+        <ProjectLibFFI Include="$(SolutionDir)\LibFFI.vcxproj" />
         <ProjectOpenSSL Include="$(SolutionDir)\openssl.vcxproj" />
         <ProjectMagPython Include="$(SolutionDir)\MagPython.vcxproj" />
         <ProjectTest Include="$(SolutionDir)\test.vcxproj" />
     </ItemGroup>
 
     <Target Name="Build" Outputs="@(CollectedBuildOutput)">
+        <MSBuild
+                BuildInParallel="True" StopOnFirstFailure="True"
+                Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
+                Projects="@(ProjectLibFFI)">
+            <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
+        </MSBuild>
         <MSBuild
                 BuildInParallel="True" StopOnFirstFailure="True"
                 Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
