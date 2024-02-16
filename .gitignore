@@ -1,9 +1,4 @@
 ﻿/.idea
-/MagPython/nasm
-/MagPython/nasm.zip
-/MagPython/Release
-/MagPython/Release-test
-/MagPython/Release-Int
 /openssl/**/*.dll
 /openssl/**/*.lib
 /openssl/**/*.obj
@@ -31,3 +26,6 @@
 /openssl/libssl.rc
 /openssl/libssl.res
 /openssl/makefile
+/Python/Python/deepfreeze/deepfreeze.c
+/Python/Python/frozen_modules/*.h
+/Python/Tools/build/__pycache__/
