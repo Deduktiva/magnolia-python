@@ -8,6 +8,7 @@
     <ItemGroup>
         <ProjectLibFFI Include="$(SolutionDir)\LibFFI.vcxproj" />
         <ProjectOpenSSL Include="$(SolutionDir)\openssl.vcxproj" />
+        <ProjectFreezeMagPython Include="$(SolutionDir)\FreezeMagPython.vcxproj" />
         <ProjectMagPython Include="$(SolutionDir)\MagPython.vcxproj" />
         <ProjectTest Include="$(SolutionDir)\test.vcxproj" />
     </ItemGroup>
@@ -23,6 +24,12 @@
                 BuildInParallel="True" StopOnFirstFailure="True"
                 Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
                 Projects="@(ProjectOpenSSL)">
+            <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
+        </MSBuild>
+        <MSBuild
+                BuildInParallel="True" StopOnFirstFailure="True"
+                Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
+                Projects="@(ProjectFreezeMagPython)">
             <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
         </MSBuild>
         <MSBuild
