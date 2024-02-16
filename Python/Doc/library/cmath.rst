@@ -4,22 +4,38 @@
 .. module:: cmath
    :synopsis: Mathematical functions for complex numbers.
 
+--------------
 
-This module is always available.  It provides access to mathematical functions
-for complex numbers.  The functions in this module accept integers,
-floating-point numbers or complex numbers as arguments. They will also accept
-any Python object that has either a :meth:`__complex__` or a :meth:`__float__`
-method: these methods are used to convert the object to a complex or
-floating-point number, respectively, and the function is then applied to the
-result of the conversion.
+This module provides access to mathematical functions for complex numbers.  The
+functions in this module accept integers, floating-point numbers or complex
+numbers as arguments. They will also accept any Python object that has either a
+:meth:`~object.__complex__` or a :meth:`~object.__float__` method: these methods are used to
+convert the object to a complex or floating-point number, respectively, and
+the function is then applied to the result of the conversion.
 
 .. note::
 
-   On platforms with hardware and system-level support for signed
-   zeros, functions involving branch cuts are continuous on *both*
-   sides of the branch cut: the sign of the zero distinguishes one
-   side of the branch cut from the other.  On platforms that do not
-   support signed zeros the continuity is as specified below.
+   For functions involving branch cuts, we have the problem of deciding how to
+   define those functions on the cut itself. Following Kahan's "Branch cuts for
+   complex elementary functions" paper, as well as Annex G of C99 and later C
+   standards, we use the sign of zero to distinguish one side of the branch cut
+   from the other: for a branch cut along (a portion of) the real axis we look
+   at the sign of the imaginary part, while for a branch cut along the
+   imaginary axis we look at the sign of the real part.
+
+   For example, the :func:`cmath.sqrt` function has a branch cut along the
+   negative real axis. An argument of ``complex(-2.0, -0.0)`` is treated as
+   though it lies *below* the branch cut, and so gives a result on the negative
+   imaginary axis::
+
+      >>> cmath.sqrt(complex(-2.0, -0.0))
+      -1.4142135623730951j
+
+   But an argument of ``complex(-2.0, 0.0)`` is treated as though it lies above
+   the branch cut::
+
+      >>> cmath.sqrt(complex(-2.0, 0.0))
+      1.4142135623730951j
 
 
 Conversions to and from polar coordinates
@@ -44,21 +60,16 @@ rectangular coordinates to polar coordinates and back.
 
 .. function:: phase(x)
 
-   Return the phase of *x* (also known as the *argument* of *x*), as a
-   float.  ``phase(x)`` is equivalent to ``math.atan2(x.imag,
-   x.real)``.  The result lies in the range [-π, π], and the branch
-   cut for this operation lies along the negative real axis,
-   continuous from above.  On systems with support for signed zeros
-   (which includes most systems in current use), this means that the
-   sign of the result is the same as the sign of ``x.imag``, even when
-   ``x.imag`` is zero::
+   Return the phase of *x* (also known as the *argument* of *x*), as a float.
+   ``phase(x)`` is equivalent to ``math.atan2(x.imag, x.real)``.  The result
+   lies in the range [-\ *π*, *π*], and the branch cut for this operation lies
+   along the negative real axis.  The sign of the result is the same as the
+   sign of ``x.imag``, even when ``x.imag`` is zero::
 
       >>> phase(complex(-1.0, 0.0))
-      3.1415926535897931
+      3.141592653589793
       >>> phase(complex(-1.0, -0.0))
-      -3.1415926535897931
-
-   .. versionadded:: 2.6
+      -3.141592653589793
 
 
 .. note::
@@ -75,15 +86,11 @@ rectangular coordinates to polar coordinates and back.
    phase of *x*.  ``polar(x)`` is equivalent to ``(abs(x),
    phase(x))``.
 
-   .. versionadded:: 2.6
-
 
 .. function:: rect(r, phi)
 
    Return the complex number *x* with polar coordinates *r* and *phi*.
    Equivalent to ``r * (math.cos(phi) + math.sin(phi)*1j)``.
-
-   .. versionadded:: 2.6
 
 
 Power and logarithmic functions
@@ -91,17 +98,15 @@ Power and logarithmic functions
 
 .. function:: exp(x)
 
-   Return the exponential value ``e**x``.
+   Return *e* raised to the power *x*, where *e* is the base of natural
+   logarithms.
 
 
 .. function:: log(x[, base])
 
    Returns the logarithm of *x* to the given *base*. If the *base* is not
-   specified, returns the natural logarithm of *x*. There is one branch cut, from 0
-   along the negative real axis to -∞, continuous from above.
-
-   .. versionchanged:: 2.4
-      *base* argument added.
+   specified, returns the natural logarithm of *x*. There is one branch cut,
+   from 0 along the negative real axis to -∞.
 
 
 .. function:: log10(x)
@@ -120,9 +125,9 @@ Trigonometric functions
 
 .. function:: acos(x)
 
-   Return the arc cosine of *x*. There are two branch cuts: One extends right from
-   1 along the real axis to ∞, continuous from below. The other extends left from
-   -1 along the real axis to -∞, continuous from above.
+   Return the arc cosine of *x*. There are two branch cuts: One extends right
+   from 1 along the real axis to ∞. The other extends left from -1 along the
+   real axis to -∞.
 
 
 .. function:: asin(x)
@@ -133,12 +138,8 @@ Trigonometric functions
 .. function:: atan(x)
 
    Return the arc tangent of *x*. There are two branch cuts: One extends from
-   ``1j`` along the imaginary axis to ``∞j``, continuous from the right. The
-   other extends from ``-1j`` along the imaginary axis to ``-∞j``, continuous
-   from the left.
-
-   .. versionchanged:: 2.6
-      direction of continuity of upper cut reversed
+   ``1j`` along the imaginary axis to ``∞j``. The other extends from ``-1j``
+   along the imaginary axis to ``-∞j``.
 
 
 .. function:: cos(x)
@@ -162,29 +163,21 @@ Hyperbolic functions
 .. function:: acosh(x)
 
    Return the inverse hyperbolic cosine of *x*. There is one branch cut,
-   extending left from 1 along the real axis to -∞, continuous from above.
+   extending left from 1 along the real axis to -∞.
 
 
 .. function:: asinh(x)
 
    Return the inverse hyperbolic sine of *x*. There are two branch cuts:
-   One extends from ``1j`` along the imaginary axis to ``∞j``,
-   continuous from the right.  The other extends from ``-1j`` along
-   the imaginary axis to ``-∞j``, continuous from the left.
-
-   .. versionchanged:: 2.6
-      branch cuts moved to match those recommended by the C99 standard
+   One extends from ``1j`` along the imaginary axis to ``∞j``.  The other
+   extends from ``-1j`` along the imaginary axis to ``-∞j``.
 
 
 .. function:: atanh(x)
 
    Return the inverse hyperbolic tangent of *x*. There are two branch cuts: One
-   extends from ``1`` along the real axis to ``∞``, continuous from below. The
-   other extends from ``-1`` along the real axis to ``-∞``, continuous from
-   above.
-
-   .. versionchanged:: 2.6
-      direction of continuity of right cut reversed
+   extends from ``1`` along the real axis to ``∞``. The other extends from
+   ``-1`` along the real axis to ``-∞``.
 
 
 .. function:: cosh(x)
@@ -205,24 +198,60 @@ Hyperbolic functions
 Classification functions
 ------------------------
 
+.. function:: isfinite(x)
+
+   Return ``True`` if both the real and imaginary parts of *x* are finite, and
+   ``False`` otherwise.
+
+   .. versionadded:: 3.2
+
+
 .. function:: isinf(x)
 
-   Return ``True`` if the real or the imaginary part of x is positive
-   or negative infinity.
-
-   .. versionadded:: 2.6
+   Return ``True`` if either the real or the imaginary part of *x* is an
+   infinity, and ``False`` otherwise.
 
 
 .. function:: isnan(x)
 
-   Return ``True`` if the real or imaginary part of x is not a number (NaN).
+   Return ``True`` if either the real or the imaginary part of *x* is a NaN,
+   and ``False`` otherwise.
 
-   .. versionadded:: 2.6
+
+.. function:: isclose(a, b, *, rel_tol=1e-09, abs_tol=0.0)
+
+   Return ``True`` if the values *a* and *b* are close to each other and
+   ``False`` otherwise.
+
+   Whether or not two values are considered close is determined according to
+   given absolute and relative tolerances.
+
+   *rel_tol* is the relative tolerance -- it is the maximum allowed difference
+   between *a* and *b*, relative to the larger absolute value of *a* or *b*.
+   For example, to set a tolerance of 5%, pass ``rel_tol=0.05``.  The default
+   tolerance is ``1e-09``, which assures that the two values are the same
+   within about 9 decimal digits.  *rel_tol* must be greater than zero.
+
+   *abs_tol* is the minimum absolute tolerance -- useful for comparisons near
+   zero. *abs_tol* must be at least zero.
+
+   If no errors occur, the result will be:
+   ``abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)``.
+
+   The IEEE 754 special values of ``NaN``, ``inf``, and ``-inf`` will be
+   handled according to IEEE rules.  Specifically, ``NaN`` is not considered
+   close to any other value, including ``NaN``.  ``inf`` and ``-inf`` are only
+   considered close to themselves.
+
+   .. versionadded:: 3.5
+
+   .. seealso::
+
+      :pep:`485` -- A function for testing approximate equality
 
 
 Constants
 ---------
-
 
 .. data:: pi
 
@@ -233,7 +262,46 @@ Constants
 
    The mathematical constant *e*, as a float.
 
-.. index:: module: math
+
+.. data:: tau
+
+   The mathematical constant *τ*, as a float.
+
+   .. versionadded:: 3.6
+
+
+.. data:: inf
+
+   Floating-point positive infinity. Equivalent to ``float('inf')``.
+
+   .. versionadded:: 3.6
+
+
+.. data:: infj
+
+   Complex number with zero real part and positive infinity imaginary
+   part. Equivalent to ``complex(0.0, float('inf'))``.
+
+   .. versionadded:: 3.6
+
+
+.. data:: nan
+
+   A floating-point "not a number" (NaN) value.  Equivalent to
+   ``float('nan')``.
+
+   .. versionadded:: 3.6
+
+
+.. data:: nanj
+
+   Complex number with zero real part and NaN imaginary part. Equivalent to
+   ``complex(0.0, float('nan'))``.
+
+   .. versionadded:: 3.6
+
+
+.. index:: pair: module; math
 
 Note that the selection of functions is similar, but not identical, to that in
 module :mod:`math`.  The reason for having two modules is that some users aren't
@@ -256,5 +324,3 @@ cuts for numerical purposes, a good reference should be the following:
    Kahan, W:  Branch cuts for complex elementary functions; or, Much ado about
    nothing's sign bit.  In Iserles, A., and Powell, M. (eds.), The state of the art
    in numerical analysis. Clarendon Press (1987) pp165--211.
-
-

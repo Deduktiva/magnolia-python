@@ -1,32 +1,32 @@
-import os
-import sys
+# Rename to stackbrowser or possibly consolidate with browser.
+
 import linecache
-import re
-import Tkinter as tk
+import os
 
-from idlelib.TreeWidget import TreeNode, TreeItem, ScrolledCanvas
-from idlelib.ObjectBrowser import ObjectTreeItem, make_objecttreeitem
-from idlelib.PyShell import PyShellFileList
+import tkinter as tk
 
-def StackBrowser(root, flist=None, tb=None, top=None):
+from idlelib.debugobj import ObjectTreeItem, make_objecttreeitem
+from idlelib.tree import TreeNode, TreeItem, ScrolledCanvas
+
+def StackBrowser(root, exc, flist=None, top=None):
+    global sc, item, node  # For testing.
     if top is None:
         top = tk.Toplevel(root)
     sc = ScrolledCanvas(top, bg="white", highlightthickness=0)
     sc.frame.pack(expand=1, fill="both")
-    item = StackTreeItem(flist, tb)
+    item = StackTreeItem(exc, flist)
     node = TreeNode(sc.canvas, None, item)
     node.expand()
 
+
 class StackTreeItem(TreeItem):
 
-    def __init__(self, flist=None, tb=None):
+    def __init__(self, exc, flist=None):
         self.flist = flist
-        self.stack = self.get_stack(tb)
-        self.text = self.get_exception()
+        self.stack = self.get_stack(None if exc is None else exc.__traceback__)
+        self.text = f"{type(exc).__name__}: {str(exc)}"
 
     def get_stack(self, tb):
-        if tb is None:
-            tb = sys.last_traceback
         stack = []
         if tb and tb.tb_frame is None:
             tb = tb.tb_next
@@ -35,17 +35,7 @@ class StackTreeItem(TreeItem):
             tb = tb.tb_next
         return stack
 
-    def get_exception(self):
-        type = sys.last_type
-        value = sys.last_value
-        if hasattr(type, "__name__"):
-            type = type.__name__
-        s = str(type)
-        if value is not None:
-            s = s + ": " + str(value)
-        return s
-
-    def GetText(self):
+    def GetText(self):  # Titlecase names are overrides.
         return self.text
 
     def GetSubList(self):
@@ -54,6 +44,7 @@ class StackTreeItem(TreeItem):
             item = FrameTreeItem(info, self.flist)
             sublist.append(item)
         return sublist
+
 
 class FrameTreeItem(TreeItem):
 
@@ -96,6 +87,7 @@ class FrameTreeItem(TreeItem):
             if os.path.isfile(filename):
                 self.flist.gotofileline(filename, lineno)
 
+
 class VariablesTreeItem(ObjectTreeItem):
 
     def GetText(self):
@@ -109,43 +101,34 @@ class VariablesTreeItem(ObjectTreeItem):
 
     def GetSubList(self):
         sublist = []
-        for key in self.object.keys():
+        for key in self.object.keys():  # self.object not necessarily dict.
             try:
                 value = self.object[key]
             except KeyError:
                 continue
-            def setfunction(value, key=key, object=self.object):
-                object[key] = value
+            def setfunction(value, key=key, object_=self.object):
+                object_[key] = value
             item = make_objecttreeitem(key + " =", value, setfunction)
             sublist.append(item)
         return sublist
 
-    def keys(self):  # unused, left for possible 3rd party use
-        return self.object.keys()
 
-def _stack_viewer(parent):  # htest #
-    root = tk.Tk()
-    root.title("Test StackViewer")
-    width, height, x, y = list(map(int, re.split('[x+]', parent.geometry())))
-    root.geometry("+%d+%d"%(x, y + 150))
-    flist = PyShellFileList(root)
+def _stackbrowser(parent):  # htest #
+    from idlelib.pyshell import PyShellFileList
+    top = tk.Toplevel(parent)
+    top.title("Test StackViewer")
+    x, y = map(int, parent.geometry().split('+')[1:])
+    top.geometry("+%d+%d" % (x + 50, y + 175))
+    flist = PyShellFileList(top)
     try: # to obtain a traceback object
         intentional_name_error
-    except NameError:
-        exc_type, exc_value, exc_tb = sys.exc_info()
+    except NameError as e:
+        StackBrowser(top, e, flist=flist, top=top)
 
-    # inject stack trace to sys
-    sys.last_type = exc_type
-    sys.last_value = exc_value
-    sys.last_traceback = exc_tb
-
-    StackBrowser(root, flist=flist, top=root, tb=exc_tb)
-
-    # restore sys to original state
-    del sys.last_type
-    del sys.last_value
-    del sys.last_traceback
 
 if __name__ == '__main__':
+    from unittest import main
+    main('idlelib.idle_test.test_stackviewer', verbosity=2, exit=False)
+
     from idlelib.idle_test.htest import run
-    run(_stack_viewer)
+    run(_stackbrowser)

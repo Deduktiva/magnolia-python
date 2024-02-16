@@ -11,6 +11,15 @@ with a prompt are output from the interpreter. Note that a secondary prompt on a
 line by itself in an example means you must type a blank line; this is used to
 end a multi-line command.
 
+.. only:: html
+
+   You can toggle the display of prompts and output by clicking on ``>>>``
+   in the upper-right corner of an example box.  If you hide the prompts
+   and output for an example, then you can easily copy and paste the input
+   lines into your interpreter.
+
+.. index:: single: # (hash); comment
+
 Many of the examples in this manual, even those entered at the interactive
 prompt, include comments.  Comments in Python start with the hash character,
 ``#``, and extend to the end of the physical line.  A comment may appear at the
@@ -43,39 +52,35 @@ Numbers
 
 The interpreter acts as a simple calculator: you can type an expression at it
 and it will write the value.  Expression syntax is straightforward: the
-operators ``+``, ``-``, ``*`` and ``/`` work just like in most other languages
-(for example, Pascal or C); parentheses (``()``) can be used for grouping.
+operators ``+``, ``-``, ``*`` and ``/`` can be used to perform
+arithmetic; parentheses (``()``) can be used for grouping.
 For example::
 
    >>> 2 + 2
    4
    >>> 50 - 5*6
    20
-   >>> (50 - 5.0*6) / 4
+   >>> (50 - 5*6) / 4
    5.0
-   >>> 8 / 5.0
+   >>> 8 / 5  # division always returns a floating point number
    1.6
 
 The integer numbers (e.g. ``2``, ``4``, ``20``) have type :class:`int`,
 the ones with a fractional part (e.g. ``5.0``, ``1.6``) have type
 :class:`float`.  We will see more about numeric types later in the tutorial.
 
-The return type of a division (``/``) operation depends on its operands.  If
-both operands are of type :class:`int`, :term:`floor division` is performed
-and an :class:`int` is returned.  If either operand is a :class:`float`,
-classic division is performed and a :class:`float` is returned.  The ``//``
-operator is also provided for doing floor division no matter what the
-operands are.  The remainder can be calculated with the ``%`` operator::
+Division (``/``) always returns a float.  To do :term:`floor division` and
+get an integer result you can use the ``//`` operator; to calculate
+the remainder you can use ``%``::
 
-   >>> 17 / 3  # int / int -> int
-   5
-   >>> 17 / 3.0  # int / float -> float
+   >>> 17 / 3  # classic division returns a float
    5.666666666666667
-   >>> 17 // 3.0  # explicit floor division discards the fractional part
-   5.0
+   >>>
+   >>> 17 // 3  # floor division discards the fractional part
+   5
    >>> 17 % 3  # the % operator returns the remainder of the division
    2
-   >>> 5 * 3 + 2  # result * divisor + remainder
+   >>> 5 * 3 + 2  # floored quotient * divisor + remainder
    17
 
 With Python, it is possible to use the ``**`` operator to calculate powers [#]_::
@@ -104,10 +109,8 @@ give you an error::
 There is full support for floating point; operators with mixed type operands
 convert the integer operand to floating point::
 
-   >>> 3 * 3.75 / 1.5
-   7.5
-   >>> 7.0 / 2
-   3.5
+   >>> 4 * 3.75 - 1
+   14.0
 
 In interactive mode, the last printed expression is assigned to the variable
 ``_``.  This means that when you are using Python as a desk calculator, it is
@@ -135,16 +138,25 @@ and uses the ``j`` or ``J`` suffix to indicate the imaginary part
 
 .. _tut-strings:
 
-Strings
--------
+Text
+----
 
-Besides numbers, Python can also manipulate strings, which can be expressed
-in several ways.  They can be enclosed in single quotes (``'...'``) or
-double quotes (``"..."``) with the same result [#]_.  ``\`` can be used
-to escape quotes::
+Python can manipulate text (represented by type :class:`str`, so-called
+"strings") as well as numbers.  This includes characters "``!``", words
+"``rabbit``", names "``Paris``", sentences "``Got your back.``", etc.
+"``Yay! :)``". They can be enclosed in single quotes (``'...'``) or double
+quotes (``"..."``) with the same result [#]_.
 
    >>> 'spam eggs'  # single quotes
    'spam eggs'
+   >>> "Paris rabbit got your back :)! Yay!"  # double quotes
+   'Paris rabbit got your back :)! Yay!'
+   >>> '1975'  # digits and numerals enclosed in quotes are also strings
+   '1975'
+
+To quote a quote, we need to "escape" it, by preceding it with ``\``.
+Alternatively, we can use the other type of quotation marks::
+
    >>> 'doesn\'t'  # use \' to escape the single quote...
    "doesn't"
    >>> "doesn't"  # ...or use double quotes instead
@@ -156,23 +168,14 @@ to escape quotes::
    >>> '"Isn\'t," they said.'
    '"Isn\'t," they said.'
 
-In the interactive interpreter, the output string is enclosed in quotes and
-special characters are escaped with backslashes.  While this might sometimes
-look different from the input (the enclosing quotes could change), the two
-strings are equivalent.  The string is enclosed in double quotes if
-the string contains a single quote and no double quotes, otherwise it is
-enclosed in single quotes.  The :keyword:`print` statement produces a more
-readable output, by omitting the enclosing quotes and by printing escaped
-and special characters::
+In the Python shell, the string definition and output string can look
+different.  The :func:`print` function produces a more readable output, by
+omitting the enclosing quotes and by printing escaped and special characters::
 
-   >>> '"Isn\'t," they said.'
-   '"Isn\'t," they said.'
-   >>> print '"Isn\'t," they said.'
-   "Isn't," they said.
    >>> s = 'First line.\nSecond line.'  # \n means newline
-   >>> s  # without print, \n is included in the output
+   >>> s  # without print(), special characters are included in the string
    'First line.\nSecond line.'
-   >>> print s  # with print, \n produces a new line
+   >>> print(s)  # with print(), special characters are interpreted, so \n produces new line
    First line.
    Second line.
 
@@ -180,22 +183,27 @@ If you don't want characters prefaced by ``\`` to be interpreted as
 special characters, you can use *raw strings* by adding an ``r`` before
 the first quote::
 
-   >>> print 'C:\some\name'  # here \n means newline!
+   >>> print('C:\some\name')  # here \n means newline!
    C:\some
    ame
-   >>> print r'C:\some\name'  # note the r before the quote
+   >>> print(r'C:\some\name')  # note the r before the quote
    C:\some\name
+
+There is one subtle aspect to raw strings: a raw string may not end in
+an odd number of ``\`` characters; see
+:ref:`the FAQ entry <faq-programming-raw-string-backslash>` for more information
+and workarounds.
 
 String literals can span multiple lines.  One way is using triple-quotes:
 ``"""..."""`` or ``'''...'''``.  End of lines are automatically
 included in the string, but it's possible to prevent this by adding a ``\`` at
 the end of the line.  The following example::
 
-   print """\
+   print("""\
    Usage: thingy [OPTIONS]
         -h                        Display this usage message
         -H hostname               Hostname to connect to
-   """
+   """)
 
 produces the following output (note that the initial newline is not included):
 
@@ -229,10 +237,14 @@ This only works with two literals though, not with variables or expressions::
 
    >>> prefix = 'Py'
    >>> prefix 'thon'  # can't concatenate a variable and a string literal
-     ...
+     File "<stdin>", line 1
+       prefix 'thon'
+              ^^^^^^
    SyntaxError: invalid syntax
    >>> ('un' * 3) 'ium'
-     ...
+     File "<stdin>", line 1
+       ('un' * 3) 'ium'
+                  ^^^^^
    SyntaxError: invalid syntax
 
 If you want to concatenate variables or a variable and a literal, use ``+``::
@@ -269,14 +281,6 @@ to obtain individual characters, *slicing* allows you to obtain a substring::
    >>> word[2:5]  # characters from position 2 (included) to 5 (excluded)
    'tho'
 
-Note how the start is always included, and the end always excluded.  This
-makes sure that ``s[:i] + s[i:]`` is always equal to ``s``::
-
-   >>> word[:2] + word[2:]
-   'Python'
-   >>> word[:4] + word[4:]
-   'Python'
-
 Slice indices have useful defaults; an omitted first index defaults to zero, an
 omitted second index defaults to the size of the string being sliced. ::
 
@@ -286,6 +290,14 @@ omitted second index defaults to the size of the string being sliced. ::
    'on'
    >>> word[-2:]  # characters from the second-last (included) to the end
    'on'
+
+Note how the start is always included, and the end always excluded.  This
+makes sure that ``s[:i] + s[i:]`` is always equal to ``s``::
+
+   >>> word[:2] + word[2:]
+   'Python'
+   >>> word[:4] + word[4:]
+   'Python'
 
 One way to remember how slices work is to think of the indices as pointing
 *between* characters, with the left edge of the first character numbered 0.
@@ -326,10 +338,12 @@ Python strings cannot be changed --- they are :term:`immutable`.
 Therefore, assigning to an indexed position in the string results in an error::
 
    >>> word[0] = 'J'
-     ...
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
    TypeError: 'str' object does not support item assignment
    >>> word[2:] = 'py'
-     ...
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
    TypeError: 'str' object does not support item assignment
 
 If you need a different string, you should create a new one::
@@ -348,119 +362,23 @@ The built-in function :func:`len` returns the length of a string::
 
 .. seealso::
 
-   :ref:`typesseq`
-      Strings, and the Unicode strings described in the next section, are
-      examples of *sequence types*, and support the common operations supported
-      by such types.
+   :ref:`textseq`
+      Strings are examples of *sequence types*, and support the common
+      operations supported by such types.
 
    :ref:`string-methods`
-      Both strings and Unicode strings support a large number of methods for
+      Strings support a large number of methods for
       basic transformations and searching.
+
+   :ref:`f-strings`
+      String literals that have embedded expressions.
 
    :ref:`formatstrings`
       Information about string formatting with :meth:`str.format`.
 
-   :ref:`string-formatting`
-      The old formatting operations invoked when strings and Unicode strings are
+   :ref:`old-string-formatting`
+      The old formatting operations invoked when strings are
       the left operand of the ``%`` operator are described in more detail here.
-
-
-.. _tut-unicodestrings:
-
-Unicode Strings
----------------
-
-.. sectionauthor:: Marc-Andre Lemburg <mal@lemburg.com>
-
-
-Starting with Python 2.0 a new data type for storing text data is available to
-the programmer: the Unicode object. It can be used to store and manipulate
-Unicode data (see http://www.unicode.org/) and integrates well with the existing
-string objects, providing auto-conversions where necessary.
-
-Unicode has the advantage of providing one ordinal for every character in every
-script used in modern and ancient texts. Previously, there were only 256
-possible ordinals for script characters. Texts were typically bound to a code
-page which mapped the ordinals to script characters. This lead to very much
-confusion especially with respect to internationalization (usually written as
-``i18n`` --- ``'i'`` + 18 characters + ``'n'``) of software.  Unicode solves
-these problems by defining one code page for all scripts.
-
-Creating Unicode strings in Python is just as simple as creating normal
-strings::
-
-   >>> u'Hello World !'
-   u'Hello World !'
-
-The small ``'u'`` in front of the quote indicates that a Unicode string is
-supposed to be created. If you want to include special characters in the string,
-you can do so by using the Python *Unicode-Escape* encoding. The following
-example shows how::
-
-   >>> u'Hello\u0020World !'
-   u'Hello World !'
-
-The escape sequence ``\u0020`` indicates to insert the Unicode character with
-the ordinal value 0x0020 (the space character) at the given position.
-
-Other characters are interpreted by using their respective ordinal values
-directly as Unicode ordinals.  If you have literal strings in the standard
-Latin-1 encoding that is used in many Western countries, you will find it
-convenient that the lower 256 characters of Unicode are the same as the 256
-characters of Latin-1.
-
-For experts, there is also a raw mode just like the one for normal strings. You
-have to prefix the opening quote with 'ur' to have Python use the
-*Raw-Unicode-Escape* encoding. It will only apply the above ``\uXXXX``
-conversion if there is an uneven number of backslashes in front of the small
-'u'. ::
-
-   >>> ur'Hello\u0020World !'
-   u'Hello World !'
-   >>> ur'Hello\\u0020World !'
-   u'Hello\\\\u0020World !'
-
-The raw mode is most useful when you have to enter lots of backslashes, as can
-be necessary in regular expressions.
-
-Apart from these standard encodings, Python provides a whole set of other ways
-of creating Unicode strings on the basis of a known encoding.
-
-.. index:: builtin: unicode
-
-The built-in function :func:`unicode` provides access to all registered Unicode
-codecs (COders and DECoders). Some of the more well known encodings which these
-codecs can convert are *Latin-1*, *ASCII*, *UTF-8*, and *UTF-16*. The latter two
-are variable-length encodings that store each Unicode character in one or more
-bytes. The default encoding is normally set to ASCII, which passes through
-characters in the range 0 to 127 and rejects any other characters with an error.
-When a Unicode string is printed, written to a file, or converted with
-:func:`str`, conversion takes place using this default encoding. ::
-
-   >>> u"abc"
-   u'abc'
-   >>> str(u"abc")
-   'abc'
-   >>> u"äöü"
-   u'\xe4\xf6\xfc'
-   >>> str(u"äöü")
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in ?
-   UnicodeEncodeError: 'ascii' codec can't encode characters in position 0-2: ordinal not in range(128)
-
-To convert a Unicode string into an 8-bit string using a specific encoding,
-Unicode objects provide an :func:`encode` method that takes one argument, the
-name of the encoding.  Lowercase names for encodings are preferred. ::
-
-   >>> u"äöü".encode('utf-8')
-   '\xc3\xa4\xc3\xb6\xc3\xbc'
-
-If you have data in a specific encoding and want to produce a corresponding
-Unicode string from it, you can use the :func:`unicode` function with the
-encoding name as the second argument. ::
-
-   >>> unicode('\xc3\xa4\xc3\xb6\xc3\xbc', 'utf-8')
-   u'\xe4\xf6\xfc'
 
 
 .. _tut-lists:
@@ -477,7 +395,7 @@ items of different types, but usually the items all have the same type. ::
    >>> squares
    [1, 4, 9, 16, 25]
 
-Like strings (and all other built-in :term:`sequence` type), lists can be
+Like strings (and all other built-in :term:`sequence` types), lists can be
 indexed and sliced::
 
    >>> squares[0]  # indexing returns the item
@@ -488,12 +406,13 @@ indexed and sliced::
    [9, 16, 25]
 
 All slice operations return a new list containing the requested elements.  This
-means that the following slice returns a new (shallow) copy of the list::
+means that the following slice returns a
+:ref:`shallow copy <shallow_vs_deep_copy>` of the list::
 
    >>> squares[:]
    [1, 4, 9, 16, 25]
 
-Lists also supports operations like concatenation::
+Lists also support operations like concatenation::
 
    >>> squares + [36, 49, 64, 81, 100]
    [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
@@ -509,7 +428,7 @@ type, i.e. it is possible to change their content::
     [1, 8, 27, 64, 125]
 
 You can also add new items at the end of the list, by using
-the :meth:`~list.append` *method* (we will see more about methods later)::
+the :meth:`!list.append` *method* (we will see more about methods later)::
 
    >>> cubes.append(216)  # add the cube of 6
    >>> cubes.append(7 ** 3)  # and the cube of 7
@@ -560,16 +479,18 @@ First Steps Towards Programming
 ===============================
 
 Of course, we can use Python for more complicated tasks than adding two and two
-together.  For instance, we can write an initial sub-sequence of the *Fibonacci*
-series as follows::
+together.  For instance, we can write an initial sub-sequence of the
+`Fibonacci series <https://en.wikipedia.org/wiki/Fibonacci_sequence>`_
+as follows::
 
    >>> # Fibonacci series:
    ... # the sum of two elements defines the next
    ... a, b = 0, 1
-   >>> while b < 10:
-   ...     print b
+   >>> while a < 10:
+   ...     print(a)
    ...     a, b = b, a+b
    ...
+   0
    1
    1
    2
@@ -585,7 +506,7 @@ This example introduces several new features.
   first before any of the assignments take place.  The right-hand side expressions
   are evaluated  from the left to the right.
 
-* The :keyword:`while` loop executes as long as the condition (here: ``b < 10``)
+* The :keyword:`while` loop executes as long as the condition (here: ``a < 10``)
   remains true.  In Python, like in C, any non-zero integer value is true; zero is
   false.  The condition may also be a string or list value, in fact any sequence;
   anything with a non-zero length is true, empty sequences are false.  The test
@@ -603,27 +524,27 @@ This example introduces several new features.
   guess when you have typed the last line).  Note that each line within a basic
   block must be indented by the same amount.
 
-* The :keyword:`print` statement writes the value of the expression(s) it is
-  given.  It differs from just writing the expression you want to write (as we did
-  earlier in the calculator examples) in the way it handles multiple expressions
-  and strings.  Strings are printed without quotes, and a space is inserted
-  between items, so you can format things nicely, like this::
+* The :func:`print` function writes the value of the argument(s) it is given.
+  It differs from just writing the expression you want to write (as we did
+  earlier in the calculator examples) in the way it handles multiple arguments,
+  floating point quantities, and strings.  Strings are printed without quotes,
+  and a space is inserted between items, so you can format things nicely, like
+  this::
 
      >>> i = 256*256
-     >>> print 'The value of i is', i
+     >>> print('The value of i is', i)
      The value of i is 65536
 
-  A trailing comma avoids the newline after the output::
+  The keyword argument *end* can be used to avoid the newline after the output,
+  or end the output with a different string::
 
      >>> a, b = 0, 1
-     >>> while b < 1000:
-     ...     print b,
+     >>> while a < 1000:
+     ...     print(a, end=',')
      ...     a, b = b, a+b
      ...
-     1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
+     0,1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,
 
-  Note that the interpreter inserts a newline before it prints the next prompt if
-  the last line was not completed.
 
 .. rubric:: Footnotes
 

@@ -1,83 +1,106 @@
-.. highlightlang:: c
+.. highlight:: c
 
 .. _mapping:
 
 Mapping Protocol
 ================
 
+See also :c:func:`PyObject_GetItem`, :c:func:`PyObject_SetItem` and
+:c:func:`PyObject_DelItem`.
+
 
 .. c:function:: int PyMapping_Check(PyObject *o)
 
-   Return ``1`` if the object provides mapping protocol, and ``0`` otherwise.  This
-   function always succeeds.
+   Return ``1`` if the object provides the mapping protocol or supports slicing,
+   and ``0`` otherwise.  Note that it returns ``1`` for Python classes with
+   a :meth:`~object.__getitem__` method, since in general it is impossible to
+   determine what type of keys the class supports. This function always succeeds.
 
 
 .. c:function:: Py_ssize_t PyMapping_Size(PyObject *o)
                Py_ssize_t PyMapping_Length(PyObject *o)
 
-   .. index:: builtin: len
+   .. index:: pair: built-in function; len
 
-   Returns the number of keys in object *o* on success, and ``-1`` on failure.  For
-   objects that do not provide mapping protocol, this is equivalent to the Python
-   expression ``len(o)``.
-
-   .. versionchanged:: 2.5
-      These functions returned an :c:type:`int` type. This might require
-      changes in your code for properly supporting 64-bit systems.
+   Returns the number of keys in object *o* on success, and ``-1`` on failure.
+   This is equivalent to the Python expression ``len(o)``.
 
 
-.. c:function:: int PyMapping_DelItemString(PyObject *o, char *key)
+.. c:function:: PyObject* PyMapping_GetItemString(PyObject *o, const char *key)
 
-   Remove the mapping for object *key* from the object *o*. Return ``-1`` on
-   failure.  This is equivalent to the Python statement ``del o[key]``.
+   This is the same as :c:func:`PyObject_GetItem`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
+
+
+.. c:function:: int PyMapping_SetItemString(PyObject *o, const char *key, PyObject *v)
+
+   This is the same as :c:func:`PyObject_SetItem`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
 
 
 .. c:function:: int PyMapping_DelItem(PyObject *o, PyObject *key)
 
-   Remove the mapping for object *key* from the object *o*. Return ``-1`` on
-   failure.  This is equivalent to the Python statement ``del o[key]``.
+   This is an alias of :c:func:`PyObject_DelItem`.
 
 
-.. c:function:: int PyMapping_HasKeyString(PyObject *o, char *key)
+.. c:function:: int PyMapping_DelItemString(PyObject *o, const char *key)
 
-   On success, return ``1`` if the mapping object has the key *key* and ``0``
-   otherwise.  This is equivalent to ``o[key]``, returning ``True`` on success
-   and ``False`` on an exception.  This function always succeeds.
+   This is the same as :c:func:`PyObject_DelItem`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
 
 
 .. c:function:: int PyMapping_HasKey(PyObject *o, PyObject *key)
 
    Return ``1`` if the mapping object has the key *key* and ``0`` otherwise.
-   This is equivalent to ``o[key]``, returning ``True`` on success and ``False``
-   on an exception.  This function always succeeds.
+   This is equivalent to the Python expression ``key in o``.
+   This function always succeeds.
+
+   .. note::
+
+      Exceptions which occur when this calls :meth:`~object.__getitem__`
+      method are silently ignored.
+      For proper error handling, use :c:func:`PyObject_GetItem()` instead.
+
+
+.. c:function:: int PyMapping_HasKeyString(PyObject *o, const char *key)
+
+   This is the same as :c:func:`PyMapping_HasKey`, but *key* is
+   specified as a :c:expr:`const char*` UTF-8 encoded bytes string,
+   rather than a :c:expr:`PyObject*`.
+
+   .. note::
+
+      Exceptions that occur when this calls :meth:`~object.__getitem__`
+      method or while creating the temporary :class:`str`
+      object are silently ignored.
+      For proper error handling, use :c:func:`PyMapping_GetItemString` instead.
 
 
 .. c:function:: PyObject* PyMapping_Keys(PyObject *o)
 
-   On success, return a list of the keys in object *o*.  On failure, return *NULL*.
-   This is equivalent to the Python expression ``o.keys()``.
+   On success, return a list of the keys in object *o*.  On failure, return
+   ``NULL``.
+
+   .. versionchanged:: 3.7
+      Previously, the function returned a list or a tuple.
 
 
 .. c:function:: PyObject* PyMapping_Values(PyObject *o)
 
    On success, return a list of the values in object *o*.  On failure, return
-   *NULL*. This is equivalent to the Python expression ``o.values()``.
+   ``NULL``.
+
+   .. versionchanged:: 3.7
+      Previously, the function returned a list or a tuple.
 
 
 .. c:function:: PyObject* PyMapping_Items(PyObject *o)
 
-   On success, return a list of the items in object *o*, where each item is a tuple
-   containing a key-value pair.  On failure, return *NULL*. This is equivalent to
-   the Python expression ``o.items()``.
+   On success, return a list of the items in object *o*, where each item is a
+   tuple containing a key-value pair.  On failure, return ``NULL``.
 
-
-.. c:function:: PyObject* PyMapping_GetItemString(PyObject *o, char *key)
-
-   Return element of *o* corresponding to the object *key* or *NULL* on failure.
-   This is the equivalent of the Python expression ``o[key]``.
-
-
-.. c:function:: int PyMapping_SetItemString(PyObject *o, char *key, PyObject *v)
-
-   Map the object *key* to the value *v* in object *o*. Returns ``-1`` on failure.
-   This is the equivalent of the Python statement ``o[key] = v``.
+   .. versionchanged:: 3.7
+      Previously, the function returned a list or a tuple.

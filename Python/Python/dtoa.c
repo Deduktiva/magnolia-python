@@ -64,6 +64,9 @@
  *  7. _Py_dg_strtod has been modified so that it doesn't accept strings with
  *     leading whitespace.
  *
+ *  8. A corner case where _Py_dg_dtoa didn't strip trailing zeros has been
+ *     fixed. (bugs.python.org/issue40780)
+ *
  ***************************************************************/
 
 /* Please send bug reports for the original dtoa.c code to David M. Gay (dmg
@@ -115,10 +118,13 @@
 /* Linking of Python's #defines to Gay's #defines starts here. */
 
 #include "Python.h"
+#include "pycore_dtoa.h"          // _PY_SHORT_FLOAT_REPR
+#include "pycore_pystate.h"       // _PyInterpreterState_GET()
+#include <stdlib.h>               // exit()
 
-/* if PY_NO_SHORT_FLOAT_REPR is defined, then don't even try to compile
+/* if _PY_SHORT_FLOAT_REPR == 0, then don't even try to compile
    the following code */
-#ifndef PY_NO_SHORT_FLOAT_REPR
+#if _PY_SHORT_FLOAT_REPR == 1
 
 #include "float.h"
 
@@ -151,18 +157,9 @@
 #endif
 
 
-#if defined(HAVE_UINT32_T) && defined(HAVE_INT32_T)
-typedef PY_UINT32_T ULong;
-typedef PY_INT32_T Long;
-#else
-#error "Failed to find an exact-width 32-bit integer type"
-#endif
-
-#if defined(HAVE_UINT64_T)
-#define ULLong PY_UINT64_T
-#else
-#undef ULLong
-#endif
+// ULong is defined in pycore_dtoa.h.
+typedef int32_t Long;
+typedef uint64_t ULLong;
 
 #undef DEBUG
 #ifdef Py_DEBUG
@@ -174,12 +171,6 @@ typedef PY_INT32_T Long;
 #ifdef DEBUG
 #define Bug(x) {fprintf(stderr, "%s\n", x); exit(1);}
 #endif
-
-#ifndef PRIVATE_MEM
-#define PRIVATE_MEM 2304
-#endif
-#define PRIVATE_mem ((PRIVATE_MEM+sizeof(double)-1)/sizeof(double))
-static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 
 #ifdef __cplusplus
 extern "C" {
@@ -282,6 +273,11 @@ typedef union { double d; ULong L[2]; } U;
 #define Big0 (Frac_mask1 | Exp_msk1*(DBL_MAX_EXP+Bias-1))
 #define Big1 0xffffffff
 
+/* Bits of the representation of positive infinity. */
+
+#define POSINF_WORD0 0x7ff00000
+#define POSINF_WORD1 0
+
 /* struct BCinfo is used to pass information from _Py_dg_strtod to bigcomp */
 
 typedef struct BCinfo BCinfo;
@@ -291,8 +287,6 @@ BCinfo {
 };
 
 #define FFFFFFFF 0xffffffffUL
-
-#define Kmax 7
 
 /* struct Bigint is used to represent arbitrary-precision integers.  These
    integers are stored in sign-magnitude format, with the magnitude stored as
@@ -316,13 +310,7 @@ BCinfo {
        significant (x[0]) to most significant (x[wds-1]).
 */
 
-struct
-Bigint {
-    struct Bigint *next;
-    int k, maxwds, sign, wds;
-    ULong x[1];
-};
-
+// struct Bigint is defined in pycore_dtoa.h.
 typedef struct Bigint Bigint;
 
 #ifndef Py_USING_MEMORY_DEBUGGER
@@ -346,7 +334,9 @@ typedef struct Bigint Bigint;
    Bfree to PyMem_Free.  Investigate whether this has any significant
    performance on impact. */
 
-static Bigint *freelist[Kmax+1];
+#define freelist interp->dtoa.freelist
+#define private_mem interp->dtoa.preallocated
+#define pmem_next interp->dtoa.preallocated_next
 
 /* Allocate space for a Bigint with up to 1<<k digits */
 
@@ -356,14 +346,17 @@ Balloc(int k)
     int x;
     Bigint *rv;
     unsigned int len;
+    PyInterpreterState *interp = _PyInterpreterState_GET();
 
-    if (k <= Kmax && (rv = freelist[k]))
+    if (k <= Bigint_Kmax && (rv = freelist[k]))
         freelist[k] = rv->next;
     else {
         x = 1 << k;
         len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
             /sizeof(double);
-        if (k <= Kmax && pmem_next - private_mem + len <= PRIVATE_mem) {
+        if (k <= Bigint_Kmax &&
+            pmem_next - private_mem + len <= (Py_ssize_t)Bigint_PREALLOC_SIZE
+        ) {
             rv = (Bigint*)pmem_next;
             pmem_next += len;
         }
@@ -385,14 +378,19 @@ static void
 Bfree(Bigint *v)
 {
     if (v) {
-        if (v->k > Kmax)
+        if (v->k > Bigint_Kmax)
             FREE((void*)v);
         else {
+            PyInterpreterState *interp = _PyInterpreterState_GET();
             v->next = freelist[v->k];
             freelist[v->k] = v;
         }
     }
 }
+
+#undef pmem_next
+#undef private_mem
+#undef freelist
 
 #else
 
@@ -447,13 +445,8 @@ static Bigint *
 multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
 {
     int i, wds;
-#ifdef ULLong
     ULong *x;
     ULLong carry, y;
-#else
-    ULong carry, *x, y;
-    ULong xi, z;
-#endif
     Bigint *b1;
 
     wds = b->wds;
@@ -461,17 +454,9 @@ multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
     i = 0;
     carry = a;
     do {
-#ifdef ULLong
         y = *x * (ULLong)m + carry;
         carry = y >> 32;
         *x++ = (ULong)(y & FFFFFFFF);
-#else
-        xi = *x;
-        y = (xi & 0xffff) * m + carry;
-        z = (xi >> 16) * m + (y >> 16);
-        carry = z >> 16;
-        *x++ = (z << 16) + (y & 0xffff);
-#endif
     }
     while(++i < wds);
     if (carry) {
@@ -632,12 +617,7 @@ mult(Bigint *a, Bigint *b)
     int k, wa, wb, wc;
     ULong *x, *xa, *xae, *xb, *xbe, *xc, *xc0;
     ULong y;
-#ifdef ULLong
     ULLong carry, z;
-#else
-    ULong carry, z;
-    ULong z2;
-#endif
 
     if ((!a->x[0] && a->wds == 1) || (!b->x[0] && b->wds == 1)) {
         c = Balloc(0);
@@ -669,7 +649,6 @@ mult(Bigint *a, Bigint *b)
     xb = b->x;
     xbe = xb + wb;
     xc0 = c->x;
-#ifdef ULLong
     for(; xb < xbe; xc0++) {
         if ((y = *xb++)) {
             x = xa;
@@ -684,49 +663,12 @@ mult(Bigint *a, Bigint *b)
             *xc = (ULong)carry;
         }
     }
-#else
-    for(; xb < xbe; xb++, xc0++) {
-        if (y = *xb & 0xffff) {
-            x = xa;
-            xc = xc0;
-            carry = 0;
-            do {
-                z = (*x & 0xffff) * y + (*xc & 0xffff) + carry;
-                carry = z >> 16;
-                z2 = (*x++ >> 16) * y + (*xc >> 16) + carry;
-                carry = z2 >> 16;
-                Storeinc(xc, z2, z);
-            }
-            while(x < xae);
-            *xc = carry;
-        }
-        if (y = *xb >> 16) {
-            x = xa;
-            xc = xc0;
-            carry = 0;
-            z2 = *xc;
-            do {
-                z = (*x & 0xffff) * y + (*xc >> 16) + carry;
-                carry = z >> 16;
-                Storeinc(xc, z, z2);
-                z2 = (*x++ >> 16) * y + (*xc & 0xffff) + carry;
-                carry = z2 >> 16;
-            }
-            while(x < xae);
-            *xc = z2;
-        }
-    }
-#endif
     for(xc0 = c->x, xc = xc0 + wc; wc > 0 && !*--xc; --wc) ;
     c->wds = wc;
     return c;
 }
 
 #ifndef Py_USING_MEMORY_DEBUGGER
-
-/* p5s is a linked list of powers of 5 of the form 5**(2**i), i >= 2 */
-
-static Bigint *p5s;
 
 /* multiply the Bigint b by 5**k.  Returns a pointer to the result, or NULL on
    failure; if the returned pointer is distinct from b then the original
@@ -737,7 +679,7 @@ pow5mult(Bigint *b, int k)
 {
     Bigint *b1, *p5, *p51;
     int i;
-    static int p05[3] = { 5, 25, 125 };
+    static const int p05[3] = { 5, 25, 125 };
 
     if ((i = k & 3)) {
         b = multadd(b, p05[i-1], 0);
@@ -747,7 +689,8 @@ pow5mult(Bigint *b, int k)
 
     if (!(k >>= 2))
         return b;
-    p5 = p5s;
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    p5 = interp->dtoa.p5s;
     if (!p5) {
         /* first time */
         p5 = i2b(625);
@@ -755,7 +698,7 @@ pow5mult(Bigint *b, int k)
             Bfree(b);
             return NULL;
         }
-        p5s = p5;
+        interp->dtoa.p5s = p5;
         p5->next = 0;
     }
     for(;;) {
@@ -793,7 +736,7 @@ pow5mult(Bigint *b, int k)
 {
     Bigint *b1, *p5, *p51;
     int i;
-    static int p05[3] = { 5, 25, 125 };
+    static const int p05[3] = { 5, 25, 125 };
 
     if ((i = k & 3)) {
         b = multadd(b, p05[i-1], 0);
@@ -925,12 +868,7 @@ diff(Bigint *a, Bigint *b)
     Bigint *c;
     int i, wa, wb;
     ULong *xa, *xae, *xb, *xbe, *xc;
-#ifdef ULLong
     ULLong borrow, y;
-#else
-    ULong borrow, y;
-    ULong z;
-#endif
 
     i = cmp(a,b);
     if (!i) {
@@ -961,7 +899,6 @@ diff(Bigint *a, Bigint *b)
     xbe = xb + wb;
     xc = c->x;
     borrow = 0;
-#ifdef ULLong
     do {
         y = (ULLong)*xa++ - *xb++ - borrow;
         borrow = y >> 32 & (ULong)1;
@@ -973,23 +910,6 @@ diff(Bigint *a, Bigint *b)
         borrow = y >> 32 & (ULong)1;
         *xc++ = (ULong)(y & FFFFFFFF);
     }
-#else
-    do {
-        y = (*xa & 0xffff) - (*xb & 0xffff) - borrow;
-        borrow = (y & 0x10000) >> 16;
-        z = (*xa++ >> 16) - (*xb++ >> 16) - borrow;
-        borrow = (z & 0x10000) >> 16;
-        Storeinc(xc, z, y);
-    }
-    while(xb < xbe);
-    while(xa < xae) {
-        y = (*xa & 0xffff) - borrow;
-        borrow = (y & 0x10000) >> 16;
-        z = (*xa++ >> 16) - borrow;
-        borrow = (z & 0x10000) >> 16;
-        Storeinc(xc, z, y);
-    }
-#endif
     while(!*--xc)
         wa--;
     c->wds = wa;
@@ -1077,7 +997,7 @@ sd2b(U *d, int scale, int *e)
     b = Balloc(1);
     if (b == NULL)
         return NULL;
-    
+
     /* First construct b and e assuming that scale == 0. */
     b->wds = 2;
     b->x[0] = word1(d);
@@ -1234,12 +1154,7 @@ quorem(Bigint *b, Bigint *S)
 {
     int n;
     ULong *bx, *bxe, q, *sx, *sxe;
-#ifdef ULLong
     ULLong borrow, carry, y, ys;
-#else
-    ULong borrow, carry, y, ys;
-    ULong si, z, zs;
-#endif
 
     n = S->wds;
 #ifdef DEBUG
@@ -1261,23 +1176,11 @@ quorem(Bigint *b, Bigint *S)
         borrow = 0;
         carry = 0;
         do {
-#ifdef ULLong
             ys = *sx++ * (ULLong)q + carry;
             carry = ys >> 32;
             y = *bx - (ys & FFFFFFFF) - borrow;
             borrow = y >> 32 & (ULong)1;
             *bx++ = (ULong)(y & FFFFFFFF);
-#else
-            si = *sx++;
-            ys = (si & 0xffff) * q + carry;
-            zs = (si >> 16) * q + (ys >> 16);
-            carry = zs >> 16;
-            y = (*bx & 0xffff) - (ys & 0xffff) - borrow;
-            borrow = (y & 0x10000) >> 16;
-            z = (*bx >> 16) - (zs & 0xffff) - borrow;
-            borrow = (z & 0x10000) >> 16;
-            Storeinc(bx, z, y);
-#endif
         }
         while(sx <= sxe);
         if (!*bxe) {
@@ -1294,23 +1197,11 @@ quorem(Bigint *b, Bigint *S)
         bx = b->x;
         sx = S->x;
         do {
-#ifdef ULLong
             ys = *sx++ + carry;
             carry = ys >> 32;
             y = *bx - (ys & FFFFFFFF) - borrow;
             borrow = y >> 32 & (ULong)1;
             *bx++ = (ULong)(y & FFFFFFFF);
-#else
-            si = *sx++;
-            ys = (si & 0xffff) + carry;
-            zs = (si >> 16) + (ys >> 16);
-            carry = zs >> 16;
-            y = (*bx & 0xffff) - (ys & 0xffff) - borrow;
-            borrow = (y & 0x10000) >> 16;
-            z = (*bx >> 16) - (zs & 0xffff) - borrow;
-            borrow = (z & 0x10000) >> 16;
-            Storeinc(bx, z, y);
-#endif
         }
         while(sx <= sxe);
         bx = b->x;
@@ -1503,6 +1394,7 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
     return 0;
 }
 
+
 double
 _Py_dg_strtod(const char *s00, char **se)
 {
@@ -1528,7 +1420,7 @@ _Py_dg_strtod(const char *s00, char **se)
     switch (c) {
     case '-':
         sign = 1;
-        /* no break */
+        /* fall through */
     case '+':
         c = *++s;
     }
@@ -1597,7 +1489,7 @@ _Py_dg_strtod(const char *s00, char **se)
         switch (c) {
         case '-':
             esign = 1;
-            /* no break */
+            /* fall through */
         case '+':
             c = *++s;
         }
@@ -1939,12 +1831,11 @@ _Py_dg_strtod(const char *s00, char **se)
 
         /* Scale bb, bd, bs by the appropriate powers of 2 and 5. */
         if (bb5 > 0) {
-            Bigint *bb1;
             bs = pow5mult(bs, bb5);
             if (bs == NULL) {
                 goto failed_malloc;
             }
-            bb1 = mult(bs, bb);
+            Bigint *bb1 = mult(bs, bb);
             Bfree(bb);
             bb = bb1;
             if (bb == NULL) {
@@ -2055,7 +1946,7 @@ _Py_dg_strtod(const char *s00, char **se)
                         + Exp_msk1
                         ;
                     word1(&rv) = 0;
-                    dsign = 0;
+                    /* dsign = 0; */
                     break;
                 }
             }
@@ -2092,7 +1983,7 @@ _Py_dg_strtod(const char *s00, char **se)
                     goto undfl;
                 }
             }
-            dsign = 1 - dsign;
+            /* dsign = 1 - dsign; */
             break;
         }
         if ((aadj = ratio(delta, bs)) <= 2.) {
@@ -2247,7 +2138,7 @@ rv_alloc(int i)
 }
 
 static char *
-nrv_alloc(char *s, char **rve, int n)
+nrv_alloc(const char *s, char **rve, int n)
 {
     char *rv, *t;
 
@@ -2486,7 +2377,7 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
         break;
     case 2:
         leftright = 0;
-        /* no break */
+        /* fall through */
     case 4:
         if (ndigits <= 0)
             ndigits = 1;
@@ -2494,7 +2385,7 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
         break;
     case 3:
         leftright = 0;
-        /* no break */
+        /* fall through */
     case 5:
         i = ndigits + k + 1;
         ilim = i;
@@ -2635,6 +2526,14 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
                             break;
                         }
                     ++*s++;
+                }
+                else {
+                    /* Strip trailing zeros. This branch was missing from the
+                       original dtoa.c, leading to surplus trailing zeros in
+                       some cases. See bugs.python.org/issue40780. */
+                    while (s > s0 && s[-1] == '0') {
+                        --s;
+                    }
                 }
                 break;
             }
@@ -2918,4 +2817,4 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
 }
 #endif
 
-#endif  /* PY_NO_SHORT_FLOAT_REPR */
+#endif  // _PY_SHORT_FLOAT_REPR == 1

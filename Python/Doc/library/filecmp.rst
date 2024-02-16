@@ -3,6 +3,7 @@
 
 .. module:: filecmp
    :synopsis: Compare files efficiently.
+
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 
 **Source code:** :source:`Lib/filecmp.py`
@@ -16,22 +17,26 @@ see also the :mod:`difflib` module.
 The :mod:`filecmp` module defines the following functions:
 
 
-.. function:: cmp(f1, f2[, shallow])
+.. function:: cmp(f1, f2, shallow=True)
 
    Compare the files named *f1* and *f2*, returning ``True`` if they seem equal,
    ``False`` otherwise.
 
-   Unless *shallow* is given and is false, files with identical :func:`os.stat`
-   signatures are taken to be equal.
+   If *shallow* is true and the :func:`os.stat` signatures (file type, size, and
+   modification time) of both files are identical, the files are taken to be
+   equal.
 
-   Files that were compared using this function will not be compared again unless
-   their :func:`os.stat` signature changes.
+   Otherwise, the files are treated as different if their sizes or contents differ.
 
    Note that no external programs are called from this function, giving it
    portability and efficiency.
 
+   This function uses a cache for past comparisons and the results,
+   with cache entries invalidated if the :func:`os.stat` information for the
+   file changes.  The entire cache may be cleared using :func:`clear_cache`.
 
-.. function:: cmpfiles(dir1, dir2, common[, shallow])
+
+.. function:: cmpfiles(dir1, dir2, common, shallow=True)
 
    Compare the files in the two directories *dir1* and *dir2* whose names are
    given by *common*.
@@ -51,13 +56,13 @@ The :mod:`filecmp` module defines the following functions:
    one of the three returned lists.
 
 
-Example::
+.. function:: clear_cache()
 
-   >>> import filecmp
-   >>> filecmp.cmp('undoc.rst', 'undoc.rst') # doctest: +SKIP
-   True
-   >>> filecmp.cmp('undoc.rst', 'index.rst') # doctest: +SKIP
-   False
+   Clear the filecmp cache. This may be useful if a file is compared so quickly
+   after it is modified that it is within the mtime resolution of
+   the underlying filesystem.
+
+   .. versionadded:: 3.4
 
 
 .. _dircmp-objects:
@@ -65,32 +70,26 @@ Example::
 The :class:`dircmp` class
 -------------------------
 
-:class:`dircmp` instances are built using this constructor:
+.. class:: dircmp(a, b, ignore=None, hide=None)
 
-
-.. class:: dircmp(a, b[, ignore[, hide]])
-
-   Construct a new directory comparison object, to compare the directories *a* and
-   *b*. *ignore* is a list of names to ignore, and defaults to ``['RCS', 'CVS',
-   'tags']``. *hide* is a list of names to hide, and defaults to ``[os.curdir,
-   os.pardir]``.
+   Construct a new directory comparison object, to compare the directories *a*
+   and *b*.  *ignore* is a list of names to ignore, and defaults to
+   :const:`filecmp.DEFAULT_IGNORES`.  *hide* is a list of names to hide, and
+   defaults to ``[os.curdir, os.pardir]``.
 
    The :class:`dircmp` class compares files by doing *shallow* comparisons
    as described for :func:`filecmp.cmp`.
 
    The :class:`dircmp` class provides the following methods:
 
-
    .. method:: report()
 
-      Print (to ``sys.stdout``) a comparison between *a* and *b*.
-
+      Print (to :data:`sys.stdout`) a comparison between *a* and *b*.
 
    .. method:: report_partial_closure()
 
       Print a comparison between *a* and *b* and common immediate
       subdirectories.
-
 
    .. method:: report_full_closure()
 
@@ -101,7 +100,7 @@ The :class:`dircmp` class
    used to get various bits of information about the directory trees being
    compared.
 
-   Note that via :meth:`__getattr__` hooks, all attributes are computed lazily,
+   Note that via :meth:`~object.__getattr__` hooks, all attributes are computed lazily,
    so there is no speed penalty if only those attributes which are lightweight
    to compute are used.
 
@@ -148,7 +147,7 @@ The :class:`dircmp` class
 
    .. attribute:: common_files
 
-      Files in both *a* and *b*
+      Files in both *a* and *b*.
 
 
    .. attribute:: common_funny
@@ -176,7 +175,20 @@ The :class:`dircmp` class
 
    .. attribute:: subdirs
 
-      A dictionary mapping names in :attr:`common_dirs` to :class:`dircmp` objects.
+      A dictionary mapping names in :attr:`common_dirs` to :class:`dircmp`
+      instances (or MyDirCmp instances if this instance is of type MyDirCmp, a
+      subclass of :class:`dircmp`).
+
+      .. versionchanged:: 3.10
+         Previously entries were always :class:`dircmp` instances. Now entries
+         are the same type as *self*, if *self* is a subclass of
+         :class:`dircmp`.
+
+.. attribute:: DEFAULT_IGNORES
+
+   .. versionadded:: 3.4
+
+   List of directories ignored by :class:`dircmp` by default.
 
 
 Here is a simplified example of using the ``subdirs`` attribute to search
@@ -185,8 +197,8 @@ recursively through two directories to show common different files::
     >>> from filecmp import dircmp
     >>> def print_diff_files(dcmp):
     ...     for name in dcmp.diff_files:
-    ...         print "diff_file %s found in %s and %s" % (name, dcmp.left,
-    ...               dcmp.right)
+    ...         print("diff_file %s found in %s and %s" % (name, dcmp.left,
+    ...               dcmp.right))
     ...     for sub_dcmp in dcmp.subdirs.values():
     ...         print_diff_files(sub_dcmp)
     ...

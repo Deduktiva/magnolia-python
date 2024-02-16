@@ -1,4 +1,4 @@
-.. highlightlang:: c
+.. highlight:: c
 
 
 .. _concrete:
@@ -17,8 +17,8 @@ dictionary, use :c:func:`PyDict_Check`.  The chapter is structured like the
 .. warning::
 
    While the functions described in this chapter carefully check the type of the
-   objects which are passed in, many of them do not check for *NULL* being passed
-   instead of a valid object.  Allowing *NULL* to be passed in can cause memory
+   objects which are passed in, many of them do not check for ``NULL`` being passed
+   instead of a valid object.  Allowing ``NULL`` to be passed in can cause memory
    access violations and immediate termination of the interpreter.
 
 
@@ -40,13 +40,12 @@ This section describes Python type objects and the singleton object ``None``.
 Numeric Objects
 ===============
 
-.. index:: object: numeric
+.. index:: pair: object; numeric
 
 .. toctree::
 
-   int.rst
-   bool.rst
    long.rst
+   bool.rst
    float.rst
    complex.rst
 
@@ -56,54 +55,65 @@ Numeric Objects
 Sequence Objects
 ================
 
-.. index:: object: sequence
+.. index:: pair: object; sequence
 
 Generic operations on sequence objects were discussed in the previous chapter;
 this section deals with the specific kinds of sequence objects that are
 intrinsic to the Python language.
 
+.. XXX sort out unicode, str, bytes and bytearray
+
 .. toctree::
 
+   bytes.rst
    bytearray.rst
-   string.rst
    unicode.rst
-   buffer.rst
    tuple.rst
    list.rst
 
 
 .. _mapobjects:
 
-Mapping Objects
-===============
+Container Objects
+=================
 
-.. index:: object: mapping
+.. index:: pair: object; mapping
 
 .. toctree::
 
    dict.rst
+   set.rst
 
 
 .. _otherobjects:
+
+Function Objects
+================
+
+.. toctree::
+
+   function.rst
+   method.rst
+   cell.rst
+   code.rst
+
 
 Other Objects
 =============
 
 .. toctree::
 
-   class.rst
-   function.rst
-   method.rst
    file.rst
    module.rst
    iterator.rst
    descriptor.rst
    slice.rst
+   memoryview.rst
    weakref.rst
    capsule.rst
-   cobject.rst
-   cell.rst
+   frame.rst
    gen.rst
+   coro.rst
+   contextvars.rst
    datetime.rst
-   set.rst
-   code.rst
+   typehints.rst

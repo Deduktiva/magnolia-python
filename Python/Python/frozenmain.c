@@ -1,7 +1,8 @@
-
 /* Python interpreter main program for frozen scripts */
 
 #include "Python.h"
+#include "pycore_runtime.h"  // _PyRuntime_Initialize()
+#include <locale.h>
 
 #ifdef MS_WINDOWS
 extern void PyWinFreeze_ExeInit(void);
@@ -14,56 +15,71 @@ extern int PyInitFrozenExtensions(void);
 int
 Py_FrozenMain(int argc, char **argv)
 {
-    char *p;
-    int n, sts;
+    PyStatus status = _PyRuntime_Initialize();
+    if (PyStatus_Exception(status)) {
+        Py_ExitStatusException(status);
+    }
+
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+    // Suppress errors from getpath.c
+    config.pathconfig_warnings = 0;
+    // Don't parse command line options like -E
+    config.parse_argv = 0;
+
+    status = PyConfig_SetBytesArgv(&config, argc, argv);
+    if (PyStatus_Exception(status)) {
+        PyConfig_Clear(&config);
+        Py_ExitStatusException(status);
+    }
+
+    const char *p;
     int inspect = 0;
-    int unbuffered = 0;
-
-    Py_FrozenFlag = 1; /* Suppress errors from getpath.c */
-
-    if ((p = Py_GETENV("PYTHONINSPECT")) && *p != '\0')
+    if ((p = Py_GETENV("PYTHONINSPECT")) && *p != '\0') {
         inspect = 1;
-    if ((p = Py_GETENV("PYTHONUNBUFFERED")) && *p != '\0')
-        unbuffered = 1;
-
-    if (unbuffered) {
-        setbuf(stdin, (char *)NULL);
-        setbuf(stdout, (char *)NULL);
-        setbuf(stderr, (char *)NULL);
     }
 
 #ifdef MS_WINDOWS
     PyInitFrozenExtensions();
 #endif /* MS_WINDOWS */
-    if (argc >= 1)
-        Py_SetProgramName(argv[0]);
-    Py_Initialize();
+
+    status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status)) {
+        Py_ExitStatusException(status);
+    }
+
 #ifdef MS_WINDOWS
     PyWinFreeze_ExeInit();
 #endif
 
-    if (Py_VerboseFlag)
+    if (_Py_GetConfig()->verbose) {
         fprintf(stderr, "Python %s\n%s\n",
-            Py_GetVersion(), Py_GetCopyright());
+                Py_GetVersion(), Py_GetCopyright());
+    }
 
-    PySys_SetArgv(argc, argv);
-
-    n = PyImport_ImportFrozenModule("__main__");
-    if (n == 0)
-        Py_FatalError("__main__ not frozen");
+    int sts = 1;
+    int n = PyImport_ImportFrozenModule("__main__");
+    if (n == 0) {
+        Py_FatalError("the __main__ module is not frozen");
+    }
     if (n < 0) {
         PyErr_Print();
         sts = 1;
     }
-    else
+    else {
         sts = 0;
+    }
 
-    if (inspect && isatty((int)fileno(stdin)))
+    if (inspect && isatty((int)fileno(stdin))) {
         sts = PyRun_AnyFile(stdin, "<stdin>") != 0;
+    }
 
 #ifdef MS_WINDOWS
     PyWinFreeze_ExeTerm();
 #endif
-    Py_Finalize();
+    if (Py_FinalizeEx() < 0) {
+        sts = 120;
+    }
     return sts;
 }

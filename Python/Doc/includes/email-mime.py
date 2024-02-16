@@ -1,31 +1,26 @@
-# Import smtplib for the actual sending function
+# Import smtplib for the actual sending function.
 import smtplib
 
-# Here are the email package modules we'll need
-from email.mime.image import MIMEImage
-from email.mime.multipart import MIMEMultipart
+# Here are the email package modules we'll need.
+from email.message import EmailMessage
 
-COMMASPACE = ', '
-
-# Create the container (outer) email message.
-msg = MIMEMultipart()
+# Create the container email message.
+msg = EmailMessage()
 msg['Subject'] = 'Our family reunion'
 # me == the sender's email address
 # family = the list of all recipients' email addresses
 msg['From'] = me
-msg['To'] = COMMASPACE.join(family)
-msg.preamble = 'Our family reunion'
+msg['To'] = ', '.join(family)
+msg.preamble = 'You will not see this in a MIME-aware mail reader.\n'
 
-# Assume we know that the image files are all in PNG format
+# Open the files in binary mode.  You can also omit the subtype
+# if you want MIMEImage to guess it.
 for file in pngfiles:
-    # Open the files in binary mode.  Let the MIMEImage class automatically
-    # guess the specific image type.
-    fp = open(file, 'rb')
-    img = MIMEImage(fp.read())
-    fp.close()
-    msg.attach(img)
+    with open(file, 'rb') as fp:
+        img_data = fp.read()
+    msg.add_attachment(img_data, maintype='image',
+                                 subtype='png')
 
 # Send the email via our own SMTP server.
-s = smtplib.SMTP('localhost')
-s.sendmail(me, family, msg.as_string())
-s.quit()
+with smtplib.SMTP('localhost') as s:
+    s.send_message(msg)

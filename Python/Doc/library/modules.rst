@@ -1,4 +1,3 @@
-
 .. _modules:
 
 *****************
@@ -13,10 +12,12 @@ The full list of modules described in this chapter is:
 
 .. toctree::
 
-   imp.rst
-   importlib.rst
-   imputil.rst
    zipimport.rst
    pkgutil.rst
    modulefinder.rst
    runpy.rst
+   importlib.rst
+   importlib.resources.rst
+   importlib.resources.abc.rst
+   importlib.metadata.rst
+   sys_path_init.rst

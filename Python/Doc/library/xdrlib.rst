@@ -3,13 +3,17 @@
 
 .. module:: xdrlib
    :synopsis: Encoders and decoders for the External Data Representation (XDR).
+   :deprecated:
 
+**Source code:** :source:`Lib/xdrlib.py`
 
 .. index::
    single: XDR
    single: External Data Representation
 
-**Source code:** :source:`Lib/xdrlib.py`
+.. deprecated-removed:: 3.11 3.13
+   The :mod:`xdrlib` module is deprecated
+   (see :pep:`PEP 594 <594#xdrlib>` for details).
 
 --------------
 
@@ -275,4 +279,5 @@ Here is an example of how you would catch one of these exceptions::
    try:
        p.pack_double(8.01)
    except xdrlib.ConversionError as instance:
-       print 'packing the double failed:', instance.msg
+       print('packing the double failed:', instance.msg)
+

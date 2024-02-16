@@ -27,15 +27,16 @@ as a collection of packages, so it may be necessary to use the packaging
 tools provided with the operating system to obtain some or all of the
 optional components.
 
-In addition to the standard library, there is a growing collection of
-several thousand components (from individual programs and modules to
+In addition to the standard library, there is an active collection of
+hundreds of thousands of components (from individual programs and modules to
 packages and entire application development frameworks), available from
 the `Python Package Index <https://pypi.org>`_.
 
-
+.. We don't use :numbered: option for the TOC below as it enforces
+   numbered sections for the entire stdlib docs.  If desired,
+   :numbered: can be enabled on a per-module basis.
 .. toctree::
    :maxdepth: 2
-   :numbered:
 
    intro.rst
    functions.rst
@@ -43,16 +44,18 @@ the `Python Package Index <https://pypi.org>`_.
    stdtypes.rst
    exceptions.rst
 
-   strings.rst
+   text.rst
+   binary.rst
    datatypes.rst
    numeric.rst
+   functional.rst
    filesys.rst
    persistence.rst
    archiving.rst
    fileformats.rst
    crypto.rst
    allos.rst
-   someos.rst
+   concurrency.rst
    ipc.rst
    netdata.rst
    markup.rst
@@ -66,15 +69,10 @@ the `Python Package Index <https://pypi.org>`_.
    distribution.rst
    python.rst
    custominterp.rst
-   restricted.rst
    modules.rst
    language.rst
-   compiler.rst
-   misc.rst
    windows.rst
    unix.rst
-   mac.rst
-   macosa.rst
-   sgi.rst
-   sun.rst
-   undoc.rst
+   cmdline.rst
+   superseded.rst
+   security_warnings.rst

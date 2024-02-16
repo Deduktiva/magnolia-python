@@ -3,17 +3,13 @@
 
 .. module:: atexit
    :synopsis: Register and execute cleanup functions.
-.. moduleauthor:: Skip Montanaro <skip@pobox.com>
-.. sectionauthor:: Skip Montanaro <skip@pobox.com>
 
-
-.. versionadded:: 2.0
-
-**Source code:** :source:`Lib/atexit.py`
+.. moduleauthor:: Skip Montanaro <skip.montanaro@gmail.com>
+.. sectionauthor:: Skip Montanaro <skip.montanaro@gmail.com>
 
 --------------
 
-The :mod:`atexit` module defines a single function to register cleanup
+The :mod:`atexit` module defines functions to register and unregister cleanup
 functions.  Functions thus registered are automatically executed upon normal
 interpreter termination.  :mod:`atexit` runs these functions in the *reverse*
 order in which they were registered; if you register ``A``, ``B``, and ``C``,
@@ -24,20 +20,14 @@ at interpreter termination time they will be run in the order ``C``, ``B``,
 program is killed by a signal not handled by Python, when a Python fatal
 internal error is detected, or when :func:`os._exit` is called.
 
-.. index:: single: exitfunc (in sys)
+**Note:** The effect of registering or unregistering functions from within
+a cleanup function is undefined.
 
-This is an alternate interface to the functionality provided by the
-:func:`sys.exitfunc` variable.
+.. versionchanged:: 3.7
+    When used with C-API subinterpreters, registered functions
+    are local to the interpreter they were registered in.
 
-Note: This module is unlikely to work correctly when used with other code that
-sets ``sys.exitfunc``.  In particular, other core Python modules are free to use
-:mod:`atexit` without the programmer's knowledge.  Authors who use
-``sys.exitfunc`` should convert their code to use :mod:`atexit` instead.  The
-simplest way to convert code that sets ``sys.exitfunc`` is to import
-:mod:`atexit` and register the function that had been bound to ``sys.exitfunc``.
-
-
-.. function:: register(func[, *args[, **kwargs]])
+.. function:: register(func, *args, **kwargs)
 
    Register *func* as a function to be executed at termination.  Any optional
    arguments that are to be passed to *func* must be passed as arguments to
@@ -52,18 +42,38 @@ simplest way to convert code that sets ``sys.exitfunc`` is to import
 
    If an exception is raised during execution of the exit handlers, a traceback is
    printed (unless :exc:`SystemExit` is raised) and the exception information is
-   saved.  After all exit handlers have had a chance to run the last exception to
+   saved.  After all exit handlers have had a chance to run, the last exception to
    be raised is re-raised.
 
-   .. versionchanged:: 2.6
-      This function now returns *func*, which makes it possible to use it as a
-      decorator.
+   This function returns *func*, which makes it possible to use it as a
+   decorator.
+
+   .. warning::
+       Starting new threads or calling :func:`os.fork` from a registered
+       function can lead to race condition between the main Python
+       runtime thread freeing thread states while internal :mod:`threading`
+       routines or the new process try to use that state. This can lead to
+       crashes rather than clean shutdown.
+
+   .. versionchanged:: 3.12
+       Attempts to start a new thread or :func:`os.fork` a new process
+       in a registered function now leads to :exc:`RuntimeError`.
+
+.. function:: unregister(func)
+
+   Remove *func* from the list of functions to be run at interpreter shutdown.
+   :func:`unregister` silently does nothing if *func* was not previously
+   registered.  If *func* has been registered more than once, every occurrence
+   of that function in the :mod:`atexit` call stack will be removed.  Equality
+   comparisons (``==``) are used internally during unregistration, so function
+   references do not need to have matching identities.
 
 
 .. seealso::
 
    Module :mod:`readline`
-      Useful example of :mod:`atexit` to read and write :mod:`readline` history files.
+      Useful example of :mod:`atexit` to read and write :mod:`readline` history
+      files.
 
 
 .. _atexit-example:
@@ -77,8 +87,9 @@ automatically when the program terminates without relying on the application
 making an explicit call into this module at termination. ::
 
    try:
-       _count = int(open("counter").read())
-   except IOError:
+       with open('counterfile') as infile:
+           _count = int(infile.read())
+   except FileNotFoundError:
        _count = 0
 
    def incrcounter(n):
@@ -86,20 +97,22 @@ making an explicit call into this module at termination. ::
        _count = _count + n
 
    def savecounter():
-       open("counter", "w").write("%d" % _count)
+       with open('counterfile', 'w') as outfile:
+           outfile.write('%d' % _count)
 
    import atexit
+
    atexit.register(savecounter)
 
 Positional and keyword arguments may also be passed to :func:`register` to be
 passed along to the registered function when it is called::
 
    def goodbye(name, adjective):
-       print 'Goodbye, %s, it was %s to meet you.' % (name, adjective)
+       print('Goodbye %s, it was %s to meet you.' % (name, adjective))
 
    import atexit
-   atexit.register(goodbye, 'Donny', 'nice')
 
+   atexit.register(goodbye, 'Donny', 'nice')
    # or:
    atexit.register(goodbye, adjective='nice', name='Donny')
 
@@ -109,6 +122,6 @@ Usage as a :term:`decorator`::
 
    @atexit.register
    def goodbye():
-       print "You are now leaving the Python sector."
+       print('You are now leaving the Python sector.')
 
 This only works with functions that can be called without arguments.

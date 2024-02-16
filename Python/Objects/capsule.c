@@ -50,7 +50,7 @@ PyCapsule_New(void *pointer, const char *name, PyCapsule_Destructor destructor)
         return NULL;
     }
 
-    capsule = PyObject_NEW(PyCapsule, &PyCapsule_Type);
+    capsule = PyObject_New(PyCapsule, &PyCapsule_Type);
     if (capsule == NULL) {
         return NULL;
     }
@@ -198,10 +198,10 @@ PyCapsule_Import(const char *name, int no_block)
     void *return_value = NULL;
     char *trace;
     size_t name_length = (strlen(name) + 1) * sizeof(char);
-    char *name_dup = (char *)PyMem_MALLOC(name_length);
+    char *name_dup = (char *)PyMem_Malloc(name_length);
 
     if (!name_dup) {
-        return NULL;
+        return PyErr_NoMemory();
     }
 
     memcpy(name_dup, name, name_length);
@@ -214,18 +214,13 @@ PyCapsule_Import(const char *name, int no_block)
         }
 
         if (object == NULL) {
-            if (no_block) {
-                object = PyImport_ImportModuleNoBlock(trace);
-            } else {
-                object = PyImport_ImportModule(trace);
-                if (!object) {
-                    PyErr_Format(PyExc_ImportError, "PyCapsule_Import could not import module \"%s\"", trace);
-                }
+            object = PyImport_ImportModule(trace);
+            if (!object) {
+                PyErr_Format(PyExc_ImportError, "PyCapsule_Import could not import module \"%s\"", trace);
             }
         } else {
             PyObject *object2 = PyObject_GetAttrString(object, trace);
-            Py_DECREF(object);
-            object = object2;
+            Py_SETREF(object, object2);
         }
         if (!object) {
             goto EXIT;
@@ -247,7 +242,7 @@ PyCapsule_Import(const char *name, int no_block)
 EXIT:
     Py_XDECREF(object);
     if (name_dup) {
-        PyMem_FREE(name_dup);
+        PyMem_Free(name_dup);
     }
     return return_value;
 }
@@ -260,7 +255,7 @@ capsule_dealloc(PyObject *o)
     if (capsule->destructor) {
         capsule->destructor(o);
     }
-    PyObject_DEL(o);
+    PyObject_Free(o);
 }
 
 
@@ -279,7 +274,7 @@ capsule_repr(PyObject *o)
         name = "NULL";
     }
 
-    return PyString_FromFormat("<capsule object %s%s%s at %p>",
+    return PyUnicode_FromFormat("<capsule object %s%s%s at %p>",
         quote, name, quote, capsule);
 }
 
@@ -298,27 +293,27 @@ Python import mechanism to link to one another.\n\
 
 PyTypeObject PyCapsule_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    "PyCapsule",		/*tp_name*/
-    sizeof(PyCapsule),		/*tp_basicsize*/
-    0,				/*tp_itemsize*/
+    "PyCapsule",                /*tp_name*/
+    sizeof(PyCapsule),          /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
     /* methods */
     capsule_dealloc, /*tp_dealloc*/
-    0,				/*tp_print*/
-    0,				/*tp_getattr*/
-    0,				/*tp_setattr*/
-    0,				/*tp_reserved*/
+    0,                          /*tp_vectorcall_offset*/
+    0,                          /*tp_getattr*/
+    0,                          /*tp_setattr*/
+    0,                          /*tp_as_async*/
     capsule_repr, /*tp_repr*/
-    0,				/*tp_as_number*/
-    0,				/*tp_as_sequence*/
-    0,				/*tp_as_mapping*/
-    0,				/*tp_hash*/
-    0,				/*tp_call*/
-    0,				/*tp_str*/
-    0,				/*tp_getattro*/
-    0,				/*tp_setattro*/
-    0,				/*tp_as_buffer*/
-    0,				/*tp_flags*/
-    PyCapsule_Type__doc__	/*tp_doc*/
+    0,                          /*tp_as_number*/
+    0,                          /*tp_as_sequence*/
+    0,                          /*tp_as_mapping*/
+    0,                          /*tp_hash*/
+    0,                          /*tp_call*/
+    0,                          /*tp_str*/
+    0,                          /*tp_getattro*/
+    0,                          /*tp_setattro*/
+    0,                          /*tp_as_buffer*/
+    0,                          /*tp_flags*/
+    PyCapsule_Type__doc__       /*tp_doc*/
 };
 
 
