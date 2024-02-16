@@ -20,7 +20,7 @@ jobs:
           arch: x86
       - run: '& msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj'
       - run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython.zip MagPython'
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: build-artifacts
