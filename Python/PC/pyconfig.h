@@ -308,11 +308,11 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
                         file in their Makefile (other compilers are
                         generally taken care of by distutils.) */
 #                       if defined(_DEBUG)
-#                               pragma comment(lib,"python312_d.lib")
+#                               pragma comment(lib,"MagPython_d.lib")
 #                       elif defined(Py_LIMITED_API)
-#                               pragma comment(lib,"python3.lib")
+#                               pragma comment(lib,"MagPython.lib")
 #                       else
-#                               pragma comment(lib,"python312.lib")
+#                               pragma comment(lib,"MagPython.lib")
 #                       endif /* _DEBUG */
 #               endif /* _MSC_VER */
 #       endif /* Py_BUILD_CORE */
@@ -518,7 +518,7 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* #define HAVE_CLOCK */
 
 /* Define when any dynamic module loading is enabled */
-#define HAVE_DYNAMIC_LOADING
+/* #define HAVE_DYNAMIC_LOADING */
 
 /* Define if you have ftime.  */
 #define HAVE_FTIME
