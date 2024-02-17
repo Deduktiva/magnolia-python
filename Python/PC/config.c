@@ -81,6 +81,7 @@ extern PyObject* PyInit__ctypes(void);
 extern PyObject* PyInit__ssl(void);
 extern PyObject* PyInit__hashlib(void);
 extern PyObject* PyInit__socket(void);
+extern PyObject* PyInit_select(void);
 extern PyObject* PyInit_unicodedata(void);
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
@@ -186,6 +187,7 @@ struct _inittab _PyImport_Inittab[] = {
     {"_ssl", PyInit__ssl},
     {"_hashlib", PyInit__hashlib},
     {"_socket", PyInit__socket},
+    {"select", PyInit_select},
     {"unicodedata", PyInit_unicodedata},
 
     /* Sentinel */
