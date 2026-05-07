@@ -146,21 +146,48 @@ macOS as well as Linux). What it does:
    shows no changes).
 4. Reports drift between `MagPython/openssl-makefile-faster` and the new
    source tree:
-   - **GONE** files (files referenced by the faster makefile that no longer
-     exist in the tree) are always reported and must be fixed — they will
+   - **GONE** files (referenced by the faster makefile but missing from
+     the new tree) are always reported and must be fixed — they will
      break the build.
-   - **NEW** files are reported only for directories where the makefile
-     covers ≥50% of the tree's `.c` files (the faster makefile is
-     deliberately selective at the `crypto/` top level, so we don't flag
-     files there). These are usually intentional exclusions (assembly-
-     replaced variants, `no-mdc2`/`no-idea`, alt implementations) — review
-     each one and either add it to the matching `MY_*` list or confirm it
-     is supposed to stay out.
+   - **NEW** files: the script snapshots the previous tree's set of
+     "in covered dirs but not listed" files before replacing, then
+     subtracts that baseline from the post-replace report. So only files
+     added *by this upgrade* in directories the makefile covers (≥50%
+     coverage) surface; the standing exclusions (assembly-replaced
+     variants, `no-mdc2`/`no-idea`, alt implementations like
+     `crypto/sha/keccak1600.c`) stay quiet.
 
-After the script finishes, update the OpenSSL version line in the table at
-the top of this README and in `LICENSE` references, run the full Windows
-build to confirm the new tree compiles, then commit with a message like
+### What else changes on an OpenSSL bump?
+
+For a patch-level bump *within* the 1.1.1 branch (the only kind of bump
+this script supports), the **Windows build projects need no changes** —
+they all key off the soname `1_1`, which is stable for the entire 1.1.x
+line. Concretely:
+
+- `MagPython/openssl.vcxproj` — `<LibraryFileVersion>1_1</LibraryFileVersion>`
+  drives the `libcrypto-1_1.dll` / `libssl-1_1.dll` paths and stays as-is.
+- `MagPython/MagPython.vcxproj` — links `libcrypto.lib` / `libssl.lib`
+  (import-lib names stable).
+- `MagPython/MagPython.metaproj`, `.github/workflows/Build All.yml`,
+  `.gitignore` — contain no version-specific references.
+- The `perl Configure VC-WIN32-ONECORE no-idea no-mdc2` invocation and
+  the `MY_*` file lists in `MagPython/openssl-makefile-faster` are valid
+  for any 1.1.1 release (the script verifies the latter on every run).
+
+The only places that need a manual edit on a patch bump are the two
+human-readable version strings in this file:
+
+- The vendored-libraries table (`Vendored OpenSSL 1.1.1<letter> source.`)
+- The Licensing section (`OpenSSL 1.1.1<letter> — dual …`)
+
+After updating those two lines, run the full Windows build to confirm
+the new tree compiles, then commit with a message like
 `Import unpacked OpenSSL 1.1.1w`.
+
+(A major version change — e.g. moving to OpenSSL 3.x — would also
+require updating `<LibraryFileVersion>`, the `Configure` flags, and
+likely the entire `openssl-makefile-faster` layout. The script refuses
+non-1.1.1 versions for exactly this reason.)
 
 ## Continuous integration
 
