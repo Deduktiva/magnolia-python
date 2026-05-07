@@ -70,6 +70,72 @@ download() {
     return 1
 }
 
+# Extract the makefile's referenced .c files once — it doesn't change between
+# the pre-replace baseline pass and the post-replace check.
+LIST_MAKEFILE="$TMP/from-makefile.txt"
+LIST_DIRS="$TMP/covered-dirs.txt"
+grep -oE '(crypto|ssl)\\[A-Za-z0-9_\\]+\.c' "$MAKEFILE_FASTER" \
+    | tr '\\' '/' \
+    | sort -u > "$LIST_MAKEFILE"
+sed 's:/[^/]*$::' "$LIST_MAKEFILE" | sort -u > "$LIST_DIRS"
+
+# Count .c files at depth 1 of <dir> (no further slash after the prefix).
+count_in_dir() {
+    awk -v d="$1/" 'index($0, d)==1 && index(substr($0, length(d)+1), "/") == 0' "$2" \
+        | wc -l | tr -d ' '
+}
+
+# Compute the set of .c files in <openssl-tree> that live in directories
+# openssl-makefile-faster mostly covers (>=50%) but are not themselves
+# listed. Output goes to <out-file>, sorted/unique. Used twice: once on
+# the existing tree (to record the intentional-exclusion baseline) and
+# once on the freshly imported tree (to find truly new drift).
+unlisted_in_covered_dirs() {
+    local tree="$1"
+    local out="$2"
+    local tag="$3"          # short suffix for tmp filenames
+
+    if [ ! -d "$tree/crypto" ] || [ ! -d "$tree/ssl" ]; then
+        : > "$out"
+        return 0
+    fi
+
+    local all="$TMP/tree-all-$tag.txt"
+    local keep="$TMP/dirs-keep-$tag.txt"
+    local covered="$TMP/tree-covered-$tag.txt"
+
+    (
+        cd "$tree"
+        find crypto -maxdepth 2 -name '*.c' -print
+        find ssl    -maxdepth 2 -name '*.c' -print
+    ) | sort -u > "$all"
+
+    : > "$keep"
+    while IFS= read -r d; do
+        local mfn treen
+        mfn=$(count_in_dir "$d" "$LIST_MAKEFILE")
+        treen=$(count_in_dir "$d" "$all")
+        if [ "$treen" -gt 0 ] && [ "$((mfn * 2))" -ge "$treen" ]; then
+            echo "$d" >> "$keep"
+        fi
+    done < "$LIST_DIRS"
+
+    : > "$covered"
+    while IFS= read -r path; do
+        local parent="${path%/*}"
+        if grep -qx "$parent" "$keep"; then
+            echo "$path" >> "$covered"
+        fi
+    done < "$all"
+    sort -u "$covered" > "$out"
+}
+
+# Snapshot the existing tree's "intentionally excluded" baseline before we
+# replace it. Files already excluded in the previous version stay excluded
+# in the new one without being re-flagged on every run.
+BASELINE_UNLISTED="$TMP/baseline-unlisted.txt"
+unlisted_in_covered_dirs "$OPENSSL_DIR" "$BASELINE_UNLISTED" "old"
+
 echo "Downloading $TARBALL ..."
 download "$TMP/$TARBALL"        "$URL_PRIMARY"        "$URL_FALLBACK"
 download "$TMP/$TARBALL.sha256" "$URL_PRIMARY.sha256" "$URL_FALLBACK.sha256"
@@ -106,77 +172,40 @@ mkdir -p "$OPENSSL_DIR"
 # openssl-makefile-faster hardcodes the .c files compiled per crypto/<dir>
 # and ssl/[record|statem]. Patch releases on the 1.1.1 branch rarely touch
 # this layout, but a missing or added file would silently break the build,
-# so we flag any drift inside the directories the faster makefile already
-# covers. Directories not represented at all in the makefile (e.g.
-# crypto/blake2/, crypto/aria/) are deliberately left to nmake's default
-# rules in the included makefile, so we ignore them here.
+# so we flag any drift inside the directories the faster makefile mostly
+# covers. We also subtract the baseline of files that were already
+# excluded in the previous tree, so each run only surfaces drift
+# introduced by *this* upgrade.
 # ---------------------------------------------------------------------------
 echo ""
 echo "Checking MagPython/openssl-makefile-faster file lists ..."
 
-LIST_MAKEFILE="$TMP/from-makefile.txt"
-LIST_TREE_ALL="$TMP/from-tree-all.txt"
-LIST_TREE_COVERED="$TMP/from-tree-covered.txt"
-LIST_DIRS="$TMP/covered-dirs.txt"
+POST_UNLISTED="$TMP/post-unlisted.txt"
+unlisted_in_covered_dirs "$OPENSSL_DIR" "$POST_UNLISTED" "new"
 
-# Extract all crypto\... and ssl\... .c references from the makefile.
-grep -oE '(crypto|ssl)\\[A-Za-z0-9_\\]+\.c' "$MAKEFILE_FASTER" \
-    | tr '\\' '/' \
-    | sort -u > "$LIST_MAKEFILE"
-
-# Directories the faster makefile already cares about (parent of every
-# referenced file, e.g. "crypto", "crypto/aes", "ssl", "ssl/record").
-sed 's:/[^/]*$::' "$LIST_MAKEFILE" | sort -u > "$LIST_DIRS"
-
-# All candidate .c files in the new tree under crypto/ and ssl/.
+# All .c files in the freshly imported tree (for the GONE comparison).
+TREE_NEW_ALL="$TMP/tree-all-new.txt"
 (
     cd "$OPENSSL_DIR"
     find crypto -maxdepth 2 -name '*.c' -print
     find ssl    -maxdepth 2 -name '*.c' -print
-) | sort -u > "$LIST_TREE_ALL"
+) | sort -u > "$TREE_NEW_ALL"
 
-# Count files in <dir> at depth 1 (no further slash after the prefix).
-count_in_dir() {
-    awk -v d="$1/" 'index($0, d)==1 && index(substr($0, length(d)+1), "/") == 0' "$2" \
-        | wc -l | tr -d ' '
-}
-
-# Keep only directories where the makefile covers >=50% of the tree's files.
-# Below that threshold the makefile is intentionally selective (e.g. the
-# top-level crypto/ where only threads_*.c is batched, with everything else
-# left to nmake's default rules), and flagging new files would be noise.
-LIST_DIRS_KEEP="$TMP/covered-dirs-keep.txt"
-: > "$LIST_DIRS_KEEP"
-while IFS= read -r d; do
-    mfn=$(count_in_dir "$d" "$LIST_MAKEFILE")
-    treen=$(count_in_dir "$d" "$LIST_TREE_ALL")
-    if [ "$treen" -gt 0 ] && [ "$((mfn * 2))" -ge "$treen" ]; then
-        echo "$d" >> "$LIST_DIRS_KEEP"
-    fi
-done < "$LIST_DIRS"
-
-# Filter to only files whose parent directory passes the threshold.
-: > "$LIST_TREE_COVERED"
-while IFS= read -r path; do
-    parent="${path%/*}"
-    if grep -qx "$parent" "$LIST_DIRS_KEEP"; then
-        echo "$path" >> "$LIST_TREE_COVERED"
-    fi
-done < "$LIST_TREE_ALL"
-sort -u -o "$LIST_TREE_COVERED" "$LIST_TREE_COVERED"
-
-# NEW: files in the tree (filtered to mostly-covered dirs) the makefile lacks.
-# GONE: any file the makefile references that is missing from the full tree —
-# always check against the unfiltered tree, since a missing file breaks the
-# build regardless of which directory it sits in.
-NEW_FILES="$(comm -23 "$LIST_TREE_COVERED" "$LIST_MAKEFILE" || true)"
-GONE_FILES="$(comm -13 "$LIST_TREE_ALL"     "$LIST_MAKEFILE" || true)"
+# NEW: files unlisted in the new tree but NOT already unlisted in the old
+# tree (i.e. genuinely new exclusions introduced by this upgrade).
+# GONE: any file the makefile references that is missing from the full new
+# tree — always check against the unfiltered tree, since a missing file
+# breaks the build regardless of which directory it sits in.
+NEW_FILES="$(comm -23 "$POST_UNLISTED" "$BASELINE_UNLISTED" || true)"
+GONE_FILES="$(comm -13 "$TREE_NEW_ALL" "$LIST_MAKEFILE"     || true)"
 
 if [ -n "$NEW_FILES" ]; then
     echo ""
-    echo "  New .c files in directories openssl-makefile-faster covers but"
-    echo "  the file itself is not listed (review and add, or confirm it is"
-    echo "  intentionally excluded — e.g. no-idea / no-mdc2 / non-Windows):"
+    echo "  New .c files (added by this upgrade) in directories"
+    echo "  openssl-makefile-faster covers, but the file itself is not"
+    echo "  listed. Review each — add to the matching MY_* list, or"
+    echo "  confirm it should stay excluded (no-idea / no-mdc2 / asm-"
+    echo "  replaced / non-Windows-only):"
     echo "$NEW_FILES" | sed 's/^/    /'
 fi
 if [ -n "$GONE_FILES" ]; then
@@ -187,7 +216,7 @@ if [ -n "$GONE_FILES" ]; then
     echo "$GONE_FILES" | sed 's/^/    /'
 fi
 if [ -z "$NEW_FILES" ] && [ -z "$GONE_FILES" ]; then
-    echo "  No drift detected in directories the faster makefile covers."
+    echo "  No new drift relative to the previous tree."
 fi
 
 echo ""
