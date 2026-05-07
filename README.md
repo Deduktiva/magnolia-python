@@ -11,7 +11,7 @@ standalone Python distribution.
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
-| `openssl/` | Vendored OpenSSL 1.1.1j source. |
+| `openssl/` | Vendored OpenSSL 1.1.1w source. |
 | `zlib/` | Vendored zlib 1.3.1 source. |
 | `libffi/` | Vendored libffi 3.4.5 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.45.1 amalgamation (`sqlite3.c` + headers). |
@@ -209,7 +209,7 @@ monthly cadence.
 The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
-- OpenSSL 1.1.1j — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
+- OpenSSL 1.1.1w — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
 - zlib — zlib license (`zlib/README`)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain
