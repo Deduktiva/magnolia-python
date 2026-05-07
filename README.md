@@ -117,6 +117,51 @@ msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj
 This is exactly what the CI invokes. The shipped artifact is built by then
 renaming `MagPython\Release` to `MagPython\MagPython` and zipping it.
 
+## Updating vendored OpenSSL
+
+This project intentionally stays on the OpenSSL 1.1.1 branch (the API/ABI
+matters for `_ssl` / `_hashopenssl` against this CPython, and the Windows
+build glue under `MagPython/` is wired up for `libcrypto-1_1.dll` /
+`libssl-1_1.dll`). The script `MagPython/update-openssl.sh` automates a
+patch-level bump within that branch:
+
+```sh
+MagPython/update-openssl.sh 1.1.1w
+```
+
+It is a portable bash script (no bashisms beyond bash 3.2, so it works on
+macOS as well as Linux). What it does:
+
+1. Refuses any version that is not on the `1.1.1` branch — keeps us on the
+   line where the build glue is known to work.
+2. Downloads `openssl-<version>.tar.gz` and its `.sha256` from the GitHub
+   release for the matching `OpenSSL_1_1_1<letter>` tag (with openssl.org's
+   `/source/old/1.1.1/` as a fallback). Verifies the SHA-256 with `shasum`
+   or `sha256sum`.
+3. Replaces the contents of `openssl/` in place with the extracted tree.
+   The OpenSSL tree has no project-local patches — all build customisation
+   lives in `MagPython/openssl.vcxproj` and `MagPython/openssl-makefile-faster`
+   — so a clean replacement is the correct strategy. Re-importing the
+   currently-vendored version produces a byte-identical tree (`git status`
+   shows no changes).
+4. Reports drift between `MagPython/openssl-makefile-faster` and the new
+   source tree:
+   - **GONE** files (files referenced by the faster makefile that no longer
+     exist in the tree) are always reported and must be fixed — they will
+     break the build.
+   - **NEW** files are reported only for directories where the makefile
+     covers ≥50% of the tree's `.c` files (the faster makefile is
+     deliberately selective at the `crypto/` top level, so we don't flag
+     files there). These are usually intentional exclusions (assembly-
+     replaced variants, `no-mdc2`/`no-idea`, alt implementations) — review
+     each one and either add it to the matching `MY_*` list or confirm it
+     is supposed to stay out.
+
+After the script finishes, update the OpenSSL version line in the table at
+the top of this README and in `LICENSE` references, run the full Windows
+build to confirm the new tree compiles, then commit with a message like
+`Import unpacked OpenSSL 1.1.1w`.
+
 ## Continuous integration
 
 `.github/workflows/Build All.yml` runs on `windows-2022`:
