@@ -235,6 +235,58 @@ So a patch bump only touches:
 The `<zlibDir>` property and CI workflow have no version-specific
 references and stay as-is.
 
+## Updating vendored SQLite
+
+`MagPython/update-sqlite.sh` is the analogous helper for the SQLite
+amalgamation:
+
+```sh
+MagPython/update-sqlite.sh 3.45.1 2024
+```
+
+The second argument is the **calendar year** the release was
+published — sqlite.org's download URLs embed the year and there is no
+reliable way to derive it from the version alone. Look it up on
+<https://sqlite.org/chronology.html> or in the release announcement.
+
+What the script does, in the same shape as the OpenSSL/zlib helpers:
+
+1. Refuses anything off the SQLite **3.x** line.
+2. Downloads `sqlite-amalgamation-<NNNNNNN>.zip` from
+   `https://sqlite.org/<year>/`, where `<NNNNNNN>` is the version
+   encoded as `<major>*1000000 + <minor>*10000 + <patch>*100`
+   (e.g. 3.45.1 → `3450100`). SQLite does not publish `.sha256`
+   sidecars; the script trusts HTTPS to sqlite.org and prints the
+   downloaded zip's SHA-256 for the record. The unpacked
+   `sqlite3.h`'s embedded `SQLITE_VERSION` is also cross-checked
+   against the requested version as a sanity guard.
+3. Replaces the contents of `sqlite/` in place. The vendored tree is
+   the upstream amalgamation as-is — four files: `sqlite3.c`,
+   `sqlite3.h`, `sqlite3ext.h`, and `shell.c` (the SQLite CLI, which
+   the build deliberately does not compile).
+4. Reports drift between `MagPython/MagPython.vcxproj`'s
+   `$(sqlite3Dir)\<name>.c|h` references and the new tree, with the
+   previous tree's intentional exclusions (just `shell.c`) subtracted
+   so each run only surfaces drift introduced by *this* upgrade.
+   GONE entries (referenced files missing from the new tree) are
+   always reported.
+
+### What else changes on a SQLite bump?
+
+SQLite is statically linked into `MagPython.dll` (not shipped as its
+own DLL), so a patch bump only touches:
+
+- `MagPython/MagPython.vcxproj` — the `<ClCompile>`/`<ClInclude>`
+  lists, *if and only if* the drift detector reports new files.
+- The version string in the vendored-libraries table at the top of
+  this README. (The licensing line says "SQLite — public domain" and
+  carries no version.)
+
+`MagPython/sqlite3.vcxproj` exists in the tree but is not referenced
+from `MagPython.metaproj` — the actual build pulls `sqlite3.c`
+directly into `MagPython.vcxproj` via `$(sqlite3Dir)`. Either way,
+neither file has a version-specific reference.
+
 ## Continuous integration
 
 `.github/workflows/Build All.yml` runs on `windows-2022`:
