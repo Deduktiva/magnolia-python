@@ -78,6 +78,16 @@ ssl_libdir="$BUILD/openssl-out/lib"
 [ -d "$ssl_libdir" ] || ssl_libdir="$BUILD/openssl-out/lib64"
 cp -P "$ssl_libdir"/libcrypto.so* "$STAGE/"
 cp -P "$ssl_libdir"/libssl.so*    "$STAGE/"
+# OpenSSL's link rules embed DT_RUNPATH=<install-prefix>/lib into the
+# shared libs. That path is only valid on the build machine, and while
+# libMagPython.so usually loads libssl/libcrypto first (so the soname
+# lookup hits the already-mapped libs), anything that dlopens libssl
+# directly would resolve libcrypto via that stale RUNPATH and fail.
+# Reset both to $ORIGIN so they find each other as siblings, matching
+# what libMagPython.so already does.
+for f in "$STAGE"/libcrypto.so.1.1 "$STAGE"/libssl.so.1.1; do
+    patchelf --set-rpath '$ORIGIN' "$f"
+done
 
 log "Stripping debug symbols from shared libs"
 # CPython builds with -g -O3 by default; the embedded debug info adds
