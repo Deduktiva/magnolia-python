@@ -2,15 +2,15 @@
 #include <stdio.h>
 
 static int try_import(const char *module) {
-    char buf[256];
-    snprintf(buf, sizeof(buf),
-             "import %s; print('  %s OK:', %s)",
-             module, module, module);
-    int rc = PyRun_SimpleString(buf);
-    if (rc != 0) {
+    PyObject *m = PyImport_ImportModule(module);
+    if (m == NULL) {
+        PyErr_Print();
         fprintf(stderr, "  %s FAILED\n", module);
+        return -1;
     }
-    return rc;
+    printf("  %s OK\n", module);
+    Py_DECREF(m);
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
