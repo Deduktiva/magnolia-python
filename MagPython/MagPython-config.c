@@ -10,7 +10,8 @@
    `import _ssl`, `import _ctypes`, etc. find them — without these,
    builtin lookup misses and the import machinery falls through to
    dynamic loading, which the project deliberately disables (see
-   /* #define HAVE_DYNAMIC_LOADING */ in PC/pyconfig.h.in).
+   the HAVE_DYNAMIC_LOADING comment-out applied to PC/pyconfig.h.in
+   by GenerateMagPythonConfigH in magpython-pyconfig-h.targets).
 
    We compile this file in lieu of $(PythonSourceDir)\PC\config.c
    (see MagPython.vcxproj) so the imported Python tree stays
