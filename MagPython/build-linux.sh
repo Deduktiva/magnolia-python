@@ -17,8 +17,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=build-common.sh
 source "$SCRIPT_DIR/build-common.sh"
 
-# manylinux2014 ships several CPython interpreters under /opt/python.
-# Use cp312 if available; otherwise fall back to whatever python3 is on PATH.
+# manylinux_2_28 ships every actively-supported CPython under
+# /opt/python/<tag>-<abitag>/bin/python3 (PEP 425 naming). Use the
+# version matching the imported Python tree so regen-frozen runs the
+# same interpreter the build will produce; fall back to whatever
+# python3 is on PATH if the per-version slot is missing (e.g. when
+# this script runs outside the manylinux container).
 HOST_PYTHON="/opt/python/cp313-cp313/bin/python3"
 [ -x "$HOST_PYTHON" ] || HOST_PYTHON="$(command -v python3)"
 
