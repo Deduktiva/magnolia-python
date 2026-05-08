@@ -1,8 +1,7 @@
-:mod:`tkinter.messagebox` --- Tkinter message prompts
-=====================================================
+:mod:`!tkinter.messagebox` --- Tkinter message prompts
+======================================================
 
 .. module:: tkinter.messagebox
-   :platform: Tk
    :synopsis: Various types of alert dialogs
 
 **Source code:** :source:`Lib/tkinter/messagebox.py`

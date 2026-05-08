@@ -9,8 +9,7 @@
    You will probably want to delete all references to 'x_attr' and add
    your own types of attributes instead.  Maybe you want to name your
    local variables other than 'self'.  If your object type is needed in
-   other files, you'll have to create a file "foobarobject.h"; see
-   floatobject.h for an example. */
+   other files, you'll have to create a separate header file for it. */
 
 /* Xxo objects */
 
@@ -384,6 +383,7 @@ xx_exec(PyObject *m)
 static struct PyModuleDef_Slot xx_slots[] = {
     {Py_mod_exec, xx_exec},
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL},
 };
 

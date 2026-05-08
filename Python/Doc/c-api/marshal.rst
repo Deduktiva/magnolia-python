@@ -15,7 +15,7 @@ Numeric values are stored with the least significant byte first.
 
 The module supports two versions of the data format: version 0 is the
 historical version, version 1 shares interned strings in the file, and upon
-unmarshalling.  Version 2 uses a binary format for floating point numbers.
+unmarshalling.  Version 2 uses a binary format for floating-point numbers.
 ``Py_MARSHAL_VERSION`` indicates the current file format (currently 2).
 
 
@@ -81,7 +81,7 @@ The following functions allow marshalled values to be read back in.
    assumes that no further objects will be read from the file, allowing it to
    aggressively load file data into memory so that the de-serialization can
    operate from data in memory rather than reading a byte at a time from the
-   file.  Only use these variant if you are certain that you won't be reading
+   file.  Only use this variant if you are certain that you won't be reading
    anything else from the file.
 
    On error, sets the appropriate exception (:exc:`EOFError`, :exc:`ValueError`

@@ -49,7 +49,7 @@ You can then step through the code following this statement, and continue
 running without the debugger using the :pdbcmd:`continue` command.
 
 .. versionchanged:: 3.7
-   The built-in :func:`breakpoint()`, when called with defaults, can be used
+   The built-in :func:`breakpoint`, when called with defaults, can be used
    instead of ``import pdb; pdb.set_trace()``.
 
 ::
@@ -62,8 +62,8 @@ running without the debugger using the :pdbcmd:`continue` command.
 
 The debugger's prompt is ``(Pdb)``, which is the indicator that you are in debug mode::
 
-   > ...(3)double()
-   -> return x * 2
+   > ...(2)double()
+   -> breakpoint()
    (Pdb) p x
    3
    (Pdb) continue
@@ -75,10 +75,17 @@ The debugger's prompt is ``(Pdb)``, which is the indicator that you are in debug
    arguments of the ``p`` command.
 
 
+.. _pdb-cli:
+
+Command-line interface
+----------------------
+
+.. program:: pdb
+
 You can also invoke :mod:`pdb` from the command line to debug other scripts.  For
 example::
 
-   python -m pdb myscript.py
+   python -m pdb [-c command] (-m module | pyfile) [args ...]
 
 When invoked as a module, pdb will automatically enter post-mortem debugging if
 the program being debugged exits abnormally.  After post-mortem debugging (or
@@ -86,14 +93,21 @@ after normal exit of the program), pdb will restart the program.  Automatic
 restarting preserves pdb's state (such as breakpoints) and in most cases is more
 useful than quitting the debugger upon program's exit.
 
-.. versionchanged:: 3.2
-   Added the ``-c`` option to execute commands as if given
-   in a :file:`.pdbrc` file; see :ref:`debugger-commands`.
+.. option:: -c, --command <command>
 
-.. versionchanged:: 3.7
-   Added the ``-m`` option to execute modules similar to the way
-   ``python -m`` does. As with a script, the debugger will pause execution just
-   before the first line of the module.
+   To execute commands as if given in a :file:`.pdbrc` file; see
+   :ref:`debugger-commands`.
+
+   .. versionchanged:: 3.2
+      Added the ``-c`` option.
+
+.. option:: -m <module>
+
+   To execute modules similar to the way ``python -m`` does. As with a script,
+   the debugger will pause execution just before the first line of the module.
+
+   .. versionchanged:: 3.7
+      Added the ``-m`` option.
 
 Typical usage to execute a statement under control of the debugger is::
 
@@ -122,6 +136,11 @@ The typical usage to inspect a crashed program is::
    (Pdb) p x
    0
    (Pdb)
+
+.. versionchanged:: 3.13
+   The implementation of :pep:`667` means that name assignments made via ``pdb``
+   will immediately affect the active scope, even when running inside an
+   :term:`optimized scope`.
 
 
 The module defines the following functions; each enters the debugger in a
@@ -164,19 +183,24 @@ slightly different way:
    .. versionchanged:: 3.7
       The keyword-only argument *header*.
 
+   .. versionchanged:: 3.13
+      :func:`set_trace` will enter the debugger immediately, rather than
+      on the next line of code to be executed.
 
-.. function:: post_mortem(traceback=None)
+.. function:: post_mortem(t=None)
 
-   Enter post-mortem debugging of the given *traceback* object.  If no
-   *traceback* is given, it uses the one of the exception that is currently
-   being handled (an exception must be being handled if the default is to be
-   used).
+   Enter post-mortem debugging of the given exception or
+   :ref:`traceback object <traceback-objects>`. If no value is given, it uses
+   the exception that is currently being handled, or raises ``ValueError`` if
+   there isn’t one.
 
+   .. versionchanged:: 3.13
+      Support for exception objects was added.
 
 .. function:: pm()
 
-   Enter post-mortem debugging of the traceback found in
-   :data:`sys.last_traceback`.
+   Enter post-mortem debugging of the exception found in
+   :data:`sys.last_exc`.
 
 
 The ``run*`` functions and :func:`set_trace` are aliases for instantiating the
@@ -229,7 +253,7 @@ access further features, you have to do this yourself:
 
 .. _debugger-commands:
 
-Debugger Commands
+Debugger commands
 -----------------
 
 The commands recognized by the debugger are listed below.  Most commands can be
@@ -251,6 +275,10 @@ powerful way to inspect the program being debugged; it is even possible to
 change a variable or call a function.  When an exception occurs in such a
 statement, the exception name is printed but the debugger's state is not
 changed.
+
+.. versionchanged:: 3.13
+   Expressions/Statements whose prefix is a pdb command are now correctly
+   identified and executed.
 
 The debugger supports :ref:`aliases <debugger-aliases>`.  Aliases can have
 parameters which allows one a certain level of adaptability to the context under
@@ -278,24 +306,27 @@ There are three preset *convenience variables*:
 
 .. versionadded:: 3.12
 
+   Added the *convenience variable* feature.
+
 .. index::
    pair: .pdbrc; file
    triple: debugger; configuration; file
 
 If a file :file:`.pdbrc` exists in the user's home directory or in the current
 directory, it is read with ``'utf-8'`` encoding and executed as if it had been
-typed at the debugger prompt.  This is particularly useful for aliases.  If both
+typed at the debugger prompt, with the exception that empty lines and lines
+starting with ``#`` are ignored.  This is particularly useful for aliases.  If both
 files exist, the one in the home directory is read first and aliases defined there
 can be overridden by the local file.
-
-.. versionchanged:: 3.11
-   :file:`.pdbrc` is now read with ``'utf-8'`` encoding. Previously, it was read
-   with the system locale encoding.
 
 .. versionchanged:: 3.2
    :file:`.pdbrc` can now contain commands that continue debugging, such as
    :pdbcmd:`continue` or :pdbcmd:`next`.  Previously, these commands had no
    effect.
+
+.. versionchanged:: 3.11
+   :file:`.pdbrc` is now read with ``'utf-8'`` encoding. Previously, it was read
+   with the system locale encoding.
 
 
 .. pdbcommand:: h(elp) [command]
@@ -323,12 +354,16 @@ can be overridden by the local file.
 
 .. pdbcommand:: b(reak) [([filename:]lineno | function) [, condition]]
 
-   With a *lineno* argument, set a break there in the current file.  With a
-   *function* argument, set a break at the first executable statement within
-   that function.  The line number may be prefixed with a filename and a colon,
-   to specify a breakpoint in another file (probably one that hasn't been loaded
-   yet).  The file is searched on :data:`sys.path`.  Note that each breakpoint
-   is assigned a number to which all the other breakpoint commands refer.
+   With a *lineno* argument, set a break at line *lineno* in the current file.
+   The line number may be prefixed with a *filename* and a colon,
+   to specify a breakpoint in another file (possibly one that hasn't been loaded
+   yet).  The file is searched on :data:`sys.path`.  Accepatable forms of *filename*
+   are ``/abspath/to/file.py``, ``relpath/file.py``, ``module`` and
+   ``package.module``.
+
+   With a *function* argument, set a break at the first executable statement within
+   that function. *function* can be any expression that evaluates to a function
+   in the current namespace.
 
    If a second argument is present, it is an expression which must evaluate to
    true before the breakpoint is honored.
@@ -336,6 +371,9 @@ can be overridden by the local file.
    Without argument, list all breaks, including for each breakpoint, the number
    of times that breakpoint has been hit, the current ignore count, and the
    associated condition if any.
+
+   Each breakpoint is assigned a number to which all the other
+   breakpoint commands refer.
 
 .. pdbcommand:: tbreak [([filename:]lineno | function) [, condition]]
 
@@ -564,11 +602,27 @@ can be overridden by the local file.
 
 .. pdbcommand:: interact
 
-   Start an interactive interpreter (using the :mod:`code` module) whose global
-   namespace contains all the (global and local) names found in the current
-   scope.
+   Start an interactive interpreter (using the :mod:`code` module) in a new
+   global namespace initialised from the local and global namespaces for the
+   current scope. Use ``exit()`` or ``quit()`` to exit the interpreter and
+   return to the debugger.
+
+   .. note::
+
+      As ``interact`` creates a new dedicated namespace for code execution,
+      assignments to variables will not affect the original namespaces.
+      However, modifications to any referenced mutable objects will be reflected
+      in the original namespaces as usual.
 
    .. versionadded:: 3.2
+
+   .. versionchanged:: 3.13
+      ``exit()`` and ``quit()`` can be used to exit the :pdbcmd:`interact`
+      command.
+
+   .. versionchanged:: 3.13
+      :pdbcmd:`interact` directs its output to the debugger's
+      output channel rather than :data:`sys.stderr`.
 
 .. _debugger-aliases:
 
@@ -576,7 +630,7 @@ can be overridden by the local file.
 
    Create an alias called *name* that executes *command*.  The *command* must
    *not* be enclosed in quotes.  Replaceable parameters can be indicated by
-   ``%1``, ``%2``, and so on, while ``%*`` is replaced by all the parameters.
+   ``%1``, ``%2``, ... and ``%9``, while ``%*`` is replaced by all the parameters.
    If *command* is omitted, the current alias for *name* is shown. If no
    arguments are given, all aliases are listed.
 
@@ -638,6 +692,55 @@ can be overridden by the local file.
 .. pdbcommand:: retval
 
    Print the return value for the last return of the current function.
+
+.. pdbcommand:: exceptions [excnumber]
+
+   List or jump between chained exceptions.
+
+   When using ``pdb.pm()``  or ``Pdb.post_mortem(...)`` with a chained exception
+   instead of a traceback, it allows the user to move between the
+   chained exceptions using ``exceptions`` command to list exceptions, and
+   ``exceptions <number>`` to switch to that exception.
+
+
+   Example::
+
+        def out():
+            try:
+                middle()
+            except Exception as e:
+                raise ValueError("reraise middle() error") from e
+
+        def middle():
+            try:
+                return inner(0)
+            except Exception as e:
+                raise ValueError("Middle fail")
+
+        def inner(x):
+            1 / x
+
+         out()
+
+   calling ``pdb.pm()`` will allow to move between exceptions::
+
+    > example.py(5)out()
+    -> raise ValueError("reraise middle() error") from e
+
+    (Pdb) exceptions
+      0 ZeroDivisionError('division by zero')
+      1 ValueError('Middle fail')
+    > 2 ValueError('reraise middle() error')
+
+    (Pdb) exceptions 0
+    > example.py(16)inner()
+    -> 1 / x
+
+    (Pdb) up
+    > example.py(10)middle()
+    -> return inner(0)
+
+   .. versionadded:: 3.13
 
 .. rubric:: Footnotes
 

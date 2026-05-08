@@ -115,19 +115,6 @@ function as with any other callable.
 :c:func:`PyObject_Vectorcall` will usually be most efficient.
 
 
-.. note::
-
-   In CPython 3.8, the vectorcall API and related functions were available
-   provisionally under names with a leading underscore:
-   ``_PyObject_Vectorcall``, ``_Py_TPFLAGS_HAVE_VECTORCALL``,
-   ``_PyObject_VectorcallMethod``, ``_PyVectorcall_Function``,
-   ``_PyObject_CallOneArg``, ``_PyObject_CallMethodNoArgs``,
-   ``_PyObject_CallMethodOneArg``.
-   Additionally, ``PyObject_VectorcallDict`` was available as
-   ``_PyObject_FastCallDict``.
-   The old names are still defined as aliases of the new, non-underscored names.
-
-
 Recursion Control
 .................
 
@@ -360,6 +347,8 @@ please see individual documentation for details.
 
    .. versionadded:: 3.9
 
+.. c:function:: PyObject* _PyObject_Vectorcall(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames)
+   :no-typesetting:
 
 .. c:function:: PyObject* PyObject_Vectorcall(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames)
 
@@ -371,7 +360,12 @@ please see individual documentation for details.
    Return the result of the call on success, or raise an exception and return
    *NULL* on failure.
 
-   .. versionadded:: 3.9
+   .. versionadded:: 3.8 as ``_PyObject_Vectorcall``
+
+   .. versionchanged:: 3.9
+
+      Renamed to the current name, without the leading underscore.
+      The old provisional name is :term:`soft deprecated`.
 
 .. c:function:: PyObject* PyObject_VectorcallDict(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwdict)
 

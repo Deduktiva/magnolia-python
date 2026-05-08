@@ -1,5 +1,9 @@
-:mod:`struct` --- Interpret bytes as packed binary data
-=======================================================
+:mod:`!struct` --- Interpret bytes as packed binary data
+========================================================
+
+.. testsetup:: *
+
+   from struct import *
 
 .. module:: struct
    :synopsis: Interpret bytes as packed binary data.
@@ -156,6 +160,21 @@ following table:
 
 If the first character is not one of these, ``'@'`` is assumed.
 
+.. note::
+
+   The number 1023 (``0x3ff`` in hexadecimal) has the following byte representations:
+
+   * ``03 ff`` in big-endian (``>``)
+   * ``ff 03`` in little-endian (``<``)
+
+   Python example:
+
+       >>> import struct
+       >>> struct.pack('>h', 1023)
+       b'\x03\xff'
+       >>> struct.pack('<h', 1023)
+       b'\xff\x03'
+
 Native byte order is big-endian or little-endian, depending on the
 host system. For example, Intel x86, AMD64 (x86-64), and Apple M1 are
 little-endian; IBM z and many legacy architectures are big-endian.
@@ -235,7 +254,7 @@ platform-dependent.
 +--------+--------------------------+--------------------+----------------+------------+
 | ``N``  | :c:type:`size_t`         | integer            |                | \(3)       |
 +--------+--------------------------+--------------------+----------------+------------+
-| ``e``  | \(6)                     | float              | 2              | \(4)       |
+| ``e``  | :c:expr:`_Float16`       | float              | 2              | \(4), \(6) |
 +--------+--------------------------+--------------------+----------------+------------+
 | ``f``  | :c:expr:`float`          | float              | 4              | \(4)       |
 +--------+--------------------------+--------------------+----------------+------------+
@@ -260,9 +279,9 @@ Notes:
 (1)
    .. index:: single: ? (question mark); in struct format strings
 
-   The ``'?'`` conversion code corresponds to the :c:expr:`_Bool` type defined by
-   C99. If this type is not available, it is simulated using a :c:expr:`char`. In
-   standard mode, it is always represented by one byte.
+   The ``'?'`` conversion code corresponds to the :c:expr:`_Bool` type
+   defined by C standards since C99.  In standard mode, it is
+   represented by one byte.
 
 (2)
    When attempting to pack a non-integer using any of the integer conversion
@@ -296,7 +315,9 @@ Notes:
    revision of the `IEEE 754 standard <ieee 754 standard_>`_. It has a sign
    bit, a 5-bit exponent and 11-bit precision (with 10 bits explicitly stored),
    and can represent numbers between approximately ``6.1e-05`` and ``6.5e+04``
-   at full precision. This type is not widely supported by C compilers: on a
+   at full precision. This type is not widely supported by C compilers:
+   it's available as :c:expr:`_Float16` type, if the compiler supports the Annex H
+   of the C23 standard.  On a
    typical machine, an unsigned short can be used for storage, but not for math
    operations. See the Wikipedia page on the `half-precision floating-point
    format <half precision format_>`_ for more information.
@@ -597,6 +618,11 @@ The :mod:`struct` module also defines the following type:
       The calculated size of the struct (and hence of the bytes object produced
       by the :meth:`pack` method) corresponding to :attr:`format`.
 
+   .. versionchanged:: 3.13 The *repr()* of structs has changed.  It
+      is now:
+
+         >>> Struct('i')
+         Struct('i')
 
 .. _half precision format: https://en.wikipedia.org/wiki/Half-precision_floating-point_format
 

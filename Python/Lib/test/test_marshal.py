@@ -1,5 +1,5 @@
 from test import support
-from test.support import os_helper, requires_debug_ranges
+from test.support import is_apple_mobile, os_helper, requires_debug_ranges
 from test.support.script_helper import assert_python_ok
 import array
 import io
@@ -34,6 +34,11 @@ class IntTestCase(unittest.TestCase, HelperMixin):
         n = sys.maxsize ** 2
         while n:
             for expected in (-n, n):
+                self.helper(expected)
+            n = n >> 1
+        n = 1 << 100
+        while n:
+            for expected in (-n, -n+1, n-1, n):
                 self.helper(expected)
             n = n >> 1
 
@@ -118,7 +123,7 @@ class CodeTestCase(unittest.TestCase):
     def test_many_codeobjects(self):
         # Issue2957: bad recursion count on code objects
         # more than MAX_MARSHAL_STACK_DEPTH
-        count = support.EXCEEDS_RECURSION_LIMIT
+        count = support.exceeds_recursion_limit()
         codes = (ExceptionTestCase.test_exceptions.__code__,) * count
         marshal.loads(marshal.dumps(codes))
 
@@ -128,6 +133,32 @@ class CodeTestCase(unittest.TestCase):
         co1, co2 = marshal.loads(marshal.dumps((co1, co2)))
         self.assertEqual(co1.co_filename, "f1")
         self.assertEqual(co2.co_filename, "f2")
+
+    def test_no_allow_code(self):
+        data = {'a': [({0},)]}
+        dump = marshal.dumps(data, allow_code=False)
+        self.assertEqual(marshal.loads(dump, allow_code=False), data)
+
+        f = io.BytesIO()
+        marshal.dump(data, f, allow_code=False)
+        f.seek(0)
+        self.assertEqual(marshal.load(f, allow_code=False), data)
+
+        co = ExceptionTestCase.test_exceptions.__code__
+        data = {'a': [({co, 0},)]}
+        dump = marshal.dumps(data, allow_code=True)
+        self.assertEqual(marshal.loads(dump, allow_code=True), data)
+        with self.assertRaises(ValueError):
+            marshal.dumps(data, allow_code=False)
+        with self.assertRaises(ValueError):
+            marshal.loads(dump, allow_code=False)
+
+        marshal.dump(data, io.BytesIO(), allow_code=True)
+        self.assertEqual(marshal.load(io.BytesIO(dump), allow_code=True), data)
+        with self.assertRaises(ValueError):
+            marshal.dump(data, io.BytesIO(), allow_code=False)
+        with self.assertRaises(ValueError):
+            marshal.load(io.BytesIO(dump), allow_code=False)
 
     @requires_debug_ranges()
     def test_minimal_linetable_with_no_debug_ranges(self):
@@ -260,7 +291,7 @@ class BugsTestCase(unittest.TestCase):
         #if os.name == 'nt' and support.Py_DEBUG:
         if os.name == 'nt':
             MAX_MARSHAL_STACK_DEPTH = 1000
-        elif sys.platform == 'wasi':
+        elif sys.platform == 'wasi' or is_apple_mobile:
             MAX_MARSHAL_STACK_DEPTH = 1500
         else:
             MAX_MARSHAL_STACK_DEPTH = 2000
@@ -374,6 +405,26 @@ class BugsTestCase(unittest.TestCase):
                     _, dump_0, _ = assert_python_ok(*args, PYTHONHASHSEED="0")
                     _, dump_1, _ = assert_python_ok(*args, PYTHONHASHSEED="1")
                     self.assertEqual(dump_0, dump_1)
+
+    def test_unmarshallable(self):
+        # Check no crash after encountering unmarshallable objects.
+        # See https://github.com/python/cpython/issues/106287.
+        fset = frozenset([int])
+        code = compile("a = 1", "<string>", "exec")
+        code = code.replace(co_consts=(1, fset, None))
+        cases = (('tuple', (fset,)),
+                 ('list', [fset]),
+                 ('set', fset),
+                 ('dict key', {fset: 'x'}),
+                 ('dict value', {'x': fset}),
+                 ('dict key & value', {fset: fset}),
+                 ('slice', slice(fset, fset)),
+                 ('code', code))
+        for name, arg in cases:
+            with self.subTest(name, arg=arg):
+                with self.assertRaisesRegex(ValueError, "unmarshallable object"):
+                    marshal.dumps((arg, memoryview(b'')))
+
 
 LARGE_SIZE = 2**31
 pointer_size = 8 if sys.maxsize > 0xFFFFFFFF else 4

@@ -1,5 +1,5 @@
-:mod:`concurrent.futures` --- Launching parallel tasks
-======================================================
+:mod:`!concurrent.futures` --- Launching parallel tasks
+=======================================================
 
 .. module:: concurrent.futures
    :synopsis: Execute computations concurrently using threads or processes.
@@ -18,6 +18,11 @@ The asynchronous execution can be performed with threads, using
 :class:`ThreadPoolExecutor`, or separate processes, using
 :class:`ProcessPoolExecutor`.  Both implement the same interface, which is
 defined by the abstract :class:`Executor` class.
+
+:class:`concurrent.futures.Future` must not be confused with
+:class:`asyncio.Future`, which is designed for use with :mod:`asyncio`
+tasks and coroutines. See the :doc:`asyncio's Future <asyncio-future>`
+documentation for a detailed comparison of the two.
 
 .. include:: ../includes/wasm-notavail.rst
 
@@ -92,10 +97,10 @@ Executor Objects
       executor has started running will be completed prior to this method
       returning. The remaining futures are cancelled.
 
-      You can avoid having to call this method explicitly if you use the
-      :keyword:`with` statement, which will shutdown the :class:`Executor`
-      (waiting as if :meth:`Executor.shutdown` were called with *wait* set to
-      ``True``)::
+      You can avoid having to call this method explicitly if you use the executor
+      as a :term:`context manager` via the  :keyword:`with` statement, which
+      will shutdown the :class:`Executor` (waiting as if :meth:`Executor.shutdown`
+      were called with *wait* set to ``True``)::
 
          import shutil
          with ThreadPoolExecutor(max_workers=4) as e:
@@ -142,7 +147,9 @@ And::
        print(f.result())
 
    executor = ThreadPoolExecutor(max_workers=1)
-   executor.submit(wait_on_future)
+   future = executor.submit(wait_on_future)
+   # Note: calling future.result() would also cause a deadlock because
+   # the single worker thread is already waiting for wait_on_future().
 
 
 .. class:: ThreadPoolExecutor(max_workers=None, thread_name_prefix='', initializer=None, initargs=())
@@ -188,6 +195,10 @@ And::
       ThreadPoolExecutor now reuses idle worker threads before starting
       *max_workers* worker threads too.
 
+   .. versionchanged:: 3.13
+      Default value of *max_workers* is changed to
+      ``min(32, (os.process_cpu_count() or 1) + 4)``.
+
 
 .. _threadpoolexecutor-example:
 
@@ -202,7 +213,7 @@ ThreadPoolExecutor Example
            'http://www.cnn.com/',
            'http://europe.wsj.com/',
            'http://www.bbc.co.uk/',
-           'http://nonexistant-subdomain.python.org/']
+           'http://nonexistent-subdomain.python.org/']
 
    # Retrieve a single page and report the URL and contents
    def load_url(url, timeout):
@@ -239,11 +250,16 @@ that :class:`ProcessPoolExecutor` will not work in the interactive interpreter.
 Calling :class:`Executor` or :class:`Future` methods from a callable submitted
 to a :class:`ProcessPoolExecutor` will result in deadlock.
 
+Note that the restrictions on functions and arguments needing to picklable as
+per :class:`multiprocessing.Process` apply when using :meth:`~Executor.submit`
+and :meth:`~Executor.map` on a :class:`ProcessPoolExecutor`. A function defined
+in a REPL or a lambda should not be expected to work.
+
 .. class:: ProcessPoolExecutor(max_workers=None, mp_context=None, initializer=None, initargs=(), max_tasks_per_child=None)
 
    An :class:`Executor` subclass that executes calls asynchronously using a pool
    of at most *max_workers* processes.  If *max_workers* is ``None`` or not
-   given, it will default to the number of processors on the machine.
+   given, it will default to :func:`os.process_cpu_count`.
    If *max_workers* is less than or equal to ``0``, then a :exc:`ValueError`
    will be raised.
    On Windows, *max_workers* must be less than or equal to ``61``. If it is not
@@ -268,6 +284,11 @@ to a :class:`ProcessPoolExecutor` will result in deadlock.
    a max is specified, the "spawn" multiprocessing start method will be used by
    default in absence of a *mp_context* parameter. This feature is incompatible
    with the "fork" start method.
+
+   .. note::
+      Bugs have been reported when using the *max_tasks_per_child* feature that
+      can result in the :class:`ProcessPoolExecutor` hanging in some
+      circumstances. Follow its eventual resolution in :gh:`115634`.
 
    .. versionchanged:: 3.3
       When one of the worker processes terminates abruptly, a
@@ -301,6 +322,10 @@ to a :class:`ProcessPoolExecutor` will result in deadlock.
       :exc:`DeprecationWarning`. Pass a *mp_context* configured to use a
       different start method. See the :func:`os.fork` documentation for
       further explanation.
+
+   .. versionchanged:: 3.13
+      *max_workers* uses :func:`os.process_cpu_count` by default, instead of
+      :func:`os.cpu_count`.
 
 .. _processpoolexecutor-example:
 

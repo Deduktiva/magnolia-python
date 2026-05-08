@@ -62,8 +62,11 @@
           pass
    */
 
-// Need limited C API version 3.12 for Py_MOD_PER_INTERPRETER_GIL_SUPPORTED
-#define Py_LIMITED_API 0x030c0000
+// Need limited C API version 3.13 for Py_mod_gil
+#include "pyconfig.h"   // Py_GIL_DISABLED
+#ifndef Py_GIL_DISABLED
+#  define Py_LIMITED_API 0x030d0000
+#endif
 
 #include "Python.h"
 #include <string.h>
@@ -392,6 +395,7 @@ xx_modexec(PyObject *m)
 static PyModuleDef_Slot xx_slots[] = {
     {Py_mod_exec, xx_modexec},
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL}
 };
 
@@ -413,6 +417,13 @@ xx_clear(PyObject *module)
     return 0;
 }
 
+static void
+xx_free(void *module)
+{
+    // allow xx_modexec to omit calling xx_clear on error
+    (void)xx_clear((PyObject *)module);
+}
+
 static struct PyModuleDef xxmodule = {
     PyModuleDef_HEAD_INIT,
     .m_name = "xxlimited",
@@ -422,9 +433,7 @@ static struct PyModuleDef xxmodule = {
     .m_slots = xx_slots,
     .m_traverse = xx_traverse,
     .m_clear = xx_clear,
-    /* m_free is not necessary here: xx_clear clears all references,
-     * and the module state is deallocated along with the module.
-     */
+    .m_free = xx_free,
 };
 
 

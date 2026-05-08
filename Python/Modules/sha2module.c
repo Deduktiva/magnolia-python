@@ -25,7 +25,7 @@
 #include "pycore_moduleobject.h"  // _PyModule_GetState()
 #include "pycore_typeobject.h"    // _PyType_GetModuleState()
 #include "pycore_strhex.h"        // _Py_strhex()
-#include "structmember.h"         // PyMemberDef
+
 #include "hashlib.h"
 
 /*[clinic input]
@@ -53,18 +53,18 @@ typedef struct {
     PyObject_HEAD
     int digestsize;
     // Prevents undefined behavior via multiple threads entering the C API.
-    // The lock will be NULL before threaded access has been enabled.
-    PyThread_type_lock lock;
-    Hacl_Streaming_SHA2_state_sha2_256 *state;
+    bool use_mutex;
+    PyMutex mutex;
+    Hacl_Hash_SHA2_state_t_256 *state;
 } SHA256object;
 
 typedef struct {
     PyObject_HEAD
     int digestsize;
     // Prevents undefined behavior via multiple threads entering the C API.
-    // The lock will be NULL before threaded access has been enabled.
-    PyThread_type_lock lock;
-    Hacl_Streaming_SHA2_state_sha2_512 *state;
+    bool use_mutex;
+    PyMutex mutex;
+    Hacl_Hash_SHA2_state_t_512 *state;
 } SHA512object;
 
 #include "clinic/sha2module.c.h"
@@ -89,13 +89,13 @@ sha2_get_state(PyObject *module)
 static void SHA256copy(SHA256object *src, SHA256object *dest)
 {
     dest->digestsize = src->digestsize;
-    dest->state = Hacl_Streaming_SHA2_copy_256(src->state);
+    dest->state = Hacl_Hash_SHA2_copy_256(src->state);
 }
 
 static void SHA512copy(SHA512object *src, SHA512object *dest)
 {
     dest->digestsize = src->digestsize;
-    dest->state = Hacl_Streaming_SHA2_copy_512(src->state);
+    dest->state = Hacl_Hash_SHA2_copy_512(src->state);
 }
 
 static SHA256object *
@@ -106,7 +106,8 @@ newSHA224object(sha2_state *state)
     if (!sha) {
         return NULL;
     }
-    sha->lock = NULL;
+    HASHLIB_INIT_MUTEX(sha);
+
     PyObject_GC_Track(sha);
     return sha;
 }
@@ -119,7 +120,8 @@ newSHA256object(sha2_state *state)
     if (!sha) {
         return NULL;
     }
-    sha->lock = NULL;
+    HASHLIB_INIT_MUTEX(sha);
+
     PyObject_GC_Track(sha);
     return sha;
 }
@@ -132,7 +134,8 @@ newSHA384object(sha2_state *state)
     if (!sha) {
         return NULL;
     }
-    sha->lock = NULL;
+    HASHLIB_INIT_MUTEX(sha);
+
     PyObject_GC_Track(sha);
     return sha;
 }
@@ -145,7 +148,8 @@ newSHA512object(sha2_state *state)
     if (!sha) {
         return NULL;
     }
-    sha->lock = NULL;
+    HASHLIB_INIT_MUTEX(sha);
+
     PyObject_GC_Track(sha);
     return sha;
 }
@@ -162,10 +166,7 @@ SHA2_traverse(PyObject *ptr, visitproc visit, void *arg)
 static void
 SHA256_dealloc(SHA256object *ptr)
 {
-    Hacl_Streaming_SHA2_free_256(ptr->state);
-    if (ptr->lock != NULL) {
-        PyThread_free_lock(ptr->lock);
-    }
+    Hacl_Hash_SHA2_free_256(ptr->state);
     PyTypeObject *tp = Py_TYPE(ptr);
     PyObject_GC_UnTrack(ptr);
     PyObject_GC_Del(ptr);
@@ -175,10 +176,7 @@ SHA256_dealloc(SHA256object *ptr)
 static void
 SHA512_dealloc(SHA512object *ptr)
 {
-    Hacl_Streaming_SHA2_free_512(ptr->state);
-    if (ptr->lock != NULL) {
-        PyThread_free_lock(ptr->lock);
-    }
+    Hacl_Hash_SHA2_free_512(ptr->state);
     PyTypeObject *tp = Py_TYPE(ptr);
     PyObject_GC_UnTrack(ptr);
     PyObject_GC_Del(ptr);
@@ -188,34 +186,34 @@ SHA512_dealloc(SHA512object *ptr)
 /* HACL* takes a uint32_t for the length of its parameter, but Py_ssize_t can be
  * 64 bits so we loop in <4gig chunks when needed. */
 
-static void update_256(Hacl_Streaming_SHA2_state_sha2_256 *state, uint8_t *buf, Py_ssize_t len) {
+static void update_256(Hacl_Hash_SHA2_state_t_256 *state, uint8_t *buf, Py_ssize_t len) {
   /* Note: we explicitly ignore the error code on the basis that it would take >
    * 1 billion years to overflow the maximum admissible length for SHA2-256
    * (namely, 2^61-1 bytes). */
 #if PY_SSIZE_T_MAX > UINT32_MAX
   while (len > UINT32_MAX) {
-    Hacl_Streaming_SHA2_update_256(state, buf, UINT32_MAX);
+    Hacl_Hash_SHA2_update_256(state, buf, UINT32_MAX);
     len -= UINT32_MAX;
     buf += UINT32_MAX;
   }
 #endif
   /* Cast to uint32_t is safe: len <= UINT32_MAX at this point. */
-  Hacl_Streaming_SHA2_update_256(state, buf, (uint32_t) len);
+  Hacl_Hash_SHA2_update_256(state, buf, (uint32_t) len);
 }
 
-static void update_512(Hacl_Streaming_SHA2_state_sha2_512 *state, uint8_t *buf, Py_ssize_t len) {
+static void update_512(Hacl_Hash_SHA2_state_t_512 *state, uint8_t *buf, Py_ssize_t len) {
   /* Note: we explicitly ignore the error code on the basis that it would take >
    * 1 billion years to overflow the maximum admissible length for this API
    * (namely, 2^64-1 bytes). */
 #if PY_SSIZE_T_MAX > UINT32_MAX
   while (len > UINT32_MAX) {
-    Hacl_Streaming_SHA2_update_512(state, buf, UINT32_MAX);
+    Hacl_Hash_SHA2_update_512(state, buf, UINT32_MAX);
     len -= UINT32_MAX;
     buf += UINT32_MAX;
   }
 #endif
   /* Cast to uint32_t is safe: len <= UINT32_MAX at this point. */
-  Hacl_Streaming_SHA2_update_512(state, buf, (uint32_t) len);
+  Hacl_Hash_SHA2_update_512(state, buf, (uint32_t) len);
 }
 
 
@@ -298,7 +296,7 @@ SHA256Type_digest_impl(SHA256object *self)
     ENTER_HASHLIB(self);
     // HACL* performs copies under the hood so that self->state remains valid
     // after this call.
-    Hacl_Streaming_SHA2_finish_256(self->state, digest);
+    Hacl_Hash_SHA2_digest_256(self->state, digest);
     LEAVE_HASHLIB(self);
     return PyBytes_FromStringAndSize((const char *)digest, self->digestsize);
 }
@@ -318,7 +316,7 @@ SHA512Type_digest_impl(SHA512object *self)
     ENTER_HASHLIB(self);
     // HACL* performs copies under the hood so that self->state remains valid
     // after this call.
-    Hacl_Streaming_SHA2_finish_512(self->state, digest);
+    Hacl_Hash_SHA2_digest_512(self->state, digest);
     LEAVE_HASHLIB(self);
     return PyBytes_FromStringAndSize((const char *)digest, self->digestsize);
 }
@@ -336,7 +334,7 @@ SHA256Type_hexdigest_impl(SHA256object *self)
     uint8_t digest[SHA256_DIGESTSIZE];
     assert(self->digestsize <= SHA256_DIGESTSIZE);
     ENTER_HASHLIB(self);
-    Hacl_Streaming_SHA2_finish_256(self->state, digest);
+    Hacl_Hash_SHA2_digest_256(self->state, digest);
     LEAVE_HASHLIB(self);
     return _Py_strhex((const char *)digest, self->digestsize);
 }
@@ -354,7 +352,7 @@ SHA512Type_hexdigest_impl(SHA512object *self)
     uint8_t digest[SHA512_DIGESTSIZE];
     assert(self->digestsize <= SHA512_DIGESTSIZE);
     ENTER_HASHLIB(self);
-    Hacl_Streaming_SHA2_finish_512(self->state, digest);
+    Hacl_Hash_SHA2_digest_512(self->state, digest);
     LEAVE_HASHLIB(self);
     return _Py_strhex((const char *)digest, self->digestsize);
 }
@@ -376,14 +374,14 @@ SHA256Type_update(SHA256object *self, PyObject *obj)
 
     GET_BUFFER_VIEW_OR_ERROUT(obj, &buf);
 
-    if (self->lock == NULL && buf.len >= HASHLIB_GIL_MINSIZE) {
-        self->lock = PyThread_allocate_lock();
+    if (!self->use_mutex && buf.len >= HASHLIB_GIL_MINSIZE) {
+        self->use_mutex = true;
     }
-    if (self->lock != NULL) {
+    if (self->use_mutex) {
         Py_BEGIN_ALLOW_THREADS
-        PyThread_acquire_lock(self->lock, 1);
+        PyMutex_Lock(&self->mutex);
         update_256(self->state, buf.buf, buf.len);
-        PyThread_release_lock(self->lock);
+        PyMutex_Unlock(&self->mutex);
         Py_END_ALLOW_THREADS
     } else {
         update_256(self->state, buf.buf, buf.len);
@@ -410,14 +408,14 @@ SHA512Type_update(SHA512object *self, PyObject *obj)
 
     GET_BUFFER_VIEW_OR_ERROUT(obj, &buf);
 
-    if (self->lock == NULL && buf.len >= HASHLIB_GIL_MINSIZE) {
-        self->lock = PyThread_allocate_lock();
+    if (!self->use_mutex && buf.len >= HASHLIB_GIL_MINSIZE) {
+        self->use_mutex = true;
     }
-    if (self->lock != NULL) {
+    if (self->use_mutex) {
         Py_BEGIN_ALLOW_THREADS
-        PyThread_acquire_lock(self->lock, 1);
+        PyMutex_Lock(&self->mutex);
         update_512(self->state, buf.buf, buf.len);
-        PyThread_release_lock(self->lock);
+        PyMutex_Unlock(&self->mutex);
         Py_END_ALLOW_THREADS
     } else {
         update_512(self->state, buf.buf, buf.len);
@@ -572,18 +570,24 @@ static PyType_Spec sha512_type_spec = {
 /*[clinic input]
 _sha2.sha256
 
-    string: object(c_default="NULL") = b''
+    data: object(c_default="NULL") = b''
     *
     usedforsecurity: bool = True
+    string as string_obj: object(c_default="NULL") = None
 
 Return a new SHA-256 hash object; optionally initialized with a string.
 [clinic start generated code]*/
 
 static PyObject *
-_sha2_sha256_impl(PyObject *module, PyObject *string, int usedforsecurity)
-/*[clinic end generated code: output=243c9dd289931f87 input=6249da1de607280a]*/
+_sha2_sha256_impl(PyObject *module, PyObject *data, int usedforsecurity,
+                  PyObject *string_obj)
+/*[clinic end generated code: output=49828a7bcd418f45 input=9ce1d70e669abc14]*/
 {
     Py_buffer buf;
+    PyObject *string;
+    if (_Py_hashlib_data_argument(&string, data, string_obj) < 0) {
+        return NULL;
+    }
 
     if (string) {
         GET_BUFFER_VIEW_OR_ERROUT(string, &buf);
@@ -599,7 +603,7 @@ _sha2_sha256_impl(PyObject *module, PyObject *string, int usedforsecurity)
         return NULL;
     }
 
-    new->state = Hacl_Streaming_SHA2_create_in_256();
+    new->state = Hacl_Hash_SHA2_malloc_256();
     new->digestsize = 32;
 
     if (PyErr_Occurred()) {
@@ -628,18 +632,25 @@ _sha2_sha256_impl(PyObject *module, PyObject *string, int usedforsecurity)
 /*[clinic input]
 _sha2.sha224
 
-    string: object(c_default="NULL") = b''
+    data: object(c_default="NULL") = b''
     *
     usedforsecurity: bool = True
+    string as string_obj: object(c_default="NULL") = None
 
 Return a new SHA-224 hash object; optionally initialized with a string.
 [clinic start generated code]*/
 
 static PyObject *
-_sha2_sha224_impl(PyObject *module, PyObject *string, int usedforsecurity)
-/*[clinic end generated code: output=68191f232e4a3843 input=c42bcba47fd7d2b7]*/
+_sha2_sha224_impl(PyObject *module, PyObject *data, int usedforsecurity,
+                  PyObject *string_obj)
+/*[clinic end generated code: output=2163cb03b6cf6157 input=612f7682a889bc2a]*/
 {
     Py_buffer buf;
+    PyObject *string;
+    if (_Py_hashlib_data_argument(&string, data, string_obj) < 0) {
+        return NULL;
+    }
+
     if (string) {
         GET_BUFFER_VIEW_OR_ERROUT(string, &buf);
     }
@@ -653,7 +664,7 @@ _sha2_sha224_impl(PyObject *module, PyObject *string, int usedforsecurity)
         return NULL;
     }
 
-    new->state = Hacl_Streaming_SHA2_create_in_224();
+    new->state = Hacl_Hash_SHA2_malloc_224();
     new->digestsize = 28;
 
     if (PyErr_Occurred()) {
@@ -682,19 +693,25 @@ _sha2_sha224_impl(PyObject *module, PyObject *string, int usedforsecurity)
 /*[clinic input]
 _sha2.sha512
 
-    string: object(c_default="NULL") = b''
+    data: object(c_default="NULL") = b''
     *
     usedforsecurity: bool = True
+    string as string_obj: object(c_default="NULL") = None
 
 Return a new SHA-512 hash object; optionally initialized with a string.
 [clinic start generated code]*/
 
 static PyObject *
-_sha2_sha512_impl(PyObject *module, PyObject *string, int usedforsecurity)
-/*[clinic end generated code: output=d55c8996eca214d7 input=0576ae2a6ebfad25]*/
+_sha2_sha512_impl(PyObject *module, PyObject *data, int usedforsecurity,
+                  PyObject *string_obj)
+/*[clinic end generated code: output=cc3fcfce001a4538 input=19c9f2c06d59563a]*/
 {
     SHA512object *new;
     Py_buffer buf;
+    PyObject *string;
+    if (_Py_hashlib_data_argument(&string, data, string_obj) < 0) {
+        return NULL;
+    }
 
     sha2_state *state = sha2_get_state(module);
 
@@ -707,7 +724,7 @@ _sha2_sha512_impl(PyObject *module, PyObject *string, int usedforsecurity)
         return NULL;
     }
 
-    new->state = Hacl_Streaming_SHA2_create_in_512();
+    new->state = Hacl_Hash_SHA2_malloc_512();
     new->digestsize = 64;
 
     if (PyErr_Occurred()) {
@@ -735,19 +752,25 @@ _sha2_sha512_impl(PyObject *module, PyObject *string, int usedforsecurity)
 /*[clinic input]
 _sha2.sha384
 
-    string: object(c_default="NULL") = b''
+    data: object(c_default="NULL") = b''
     *
     usedforsecurity: bool = True
+    string as string_obj: object(c_default="NULL") = None
 
 Return a new SHA-384 hash object; optionally initialized with a string.
 [clinic start generated code]*/
 
 static PyObject *
-_sha2_sha384_impl(PyObject *module, PyObject *string, int usedforsecurity)
-/*[clinic end generated code: output=b29a0d81d51d1368 input=4e9199d8de0d2f9b]*/
+_sha2_sha384_impl(PyObject *module, PyObject *data, int usedforsecurity,
+                  PyObject *string_obj)
+/*[clinic end generated code: output=b6e3db593b5a0330 input=9fd50c942ad9e0bf]*/
 {
     SHA512object *new;
     Py_buffer buf;
+    PyObject *string;
+    if (_Py_hashlib_data_argument(&string, data, string_obj) < 0) {
+        return NULL;
+    }
 
     sha2_state *state = sha2_get_state(module);
 
@@ -760,7 +783,7 @@ _sha2_sha384_impl(PyObject *module, PyObject *string, int usedforsecurity)
         return NULL;
     }
 
-    new->state = Hacl_Streaming_SHA2_create_in_384();
+    new->state = Hacl_Hash_SHA2_malloc_384();
     new->digestsize = 48;
 
     if (PyErr_Occurred()) {
@@ -868,6 +891,7 @@ static int sha2_exec(PyObject *module)
 static PyModuleDef_Slot _sha2_slots[] = {
     {Py_mod_exec, sha2_exec},
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL}
 };
 

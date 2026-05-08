@@ -1,5 +1,5 @@
-:mod:`functools` --- Higher-order functions and operations on callable objects
-==============================================================================
+:mod:`!functools` --- Higher-order functions and operations on callable objects
+===============================================================================
 
 .. module:: functools
    :synopsis: Higher-order functions and operations on callable objects.
@@ -34,7 +34,7 @@ The :mod:`functools` module defines the following functions:
    Returns the same as ``lru_cache(maxsize=None)``, creating a thin
    wrapper around a dictionary lookup for the function arguments.  Because it
    never needs to evict old values, this is smaller and faster than
-   :func:`lru_cache()` with a size limit.
+   :func:`lru_cache` with a size limit.
 
    For example::
 
@@ -42,11 +42,11 @@ The :mod:`functools` module defines the following functions:
         def factorial(n):
             return n * factorial(n-1) if n else 1
 
-        >>> factorial(10)      # no previously cached result, makes 11 recursive calls
+        >>> factorial(10)   # no previously cached result, makes 11 recursive calls
         3628800
-        >>> factorial(5)       # just looks up cached value result
+        >>> factorial(5)    # no new calls, just returns the cached result
         120
-        >>> factorial(12)      # makes two new recursive calls, the other 10 are cached
+        >>> factorial(12)   # two new recursive calls, factorial(10) is cached
         479001600
 
    The cache is threadsafe so that the wrapped function can be used in
@@ -190,7 +190,7 @@ The :mod:`functools` module defines the following functions:
 
    Note, type specificity applies only to the function's immediate arguments
    rather than their contents.  The scalar arguments, ``Decimal(42)`` and
-   ``Fraction(42)`` are be treated as distinct calls with distinct results.
+   ``Fraction(42)`` are treated as distinct calls with distinct results.
    In contrast, the tuple arguments ``('answer', Decimal(42))`` and
    ``('answer', Fraction(42))`` are treated as equivalent.
 
@@ -199,12 +199,18 @@ The :mod:`functools` module defines the following functions:
    and *typed*.  This is for information purposes only.  Mutating the values
    has no effect.
 
+   .. method:: lru_cache.cache_info()
+      :no-typesetting:
+
    To help measure the effectiveness of the cache and tune the *maxsize*
-   parameter, the wrapped function is instrumented with a :func:`cache_info`
+   parameter, the wrapped function is instrumented with a :func:`!cache_info`
    function that returns a :term:`named tuple` showing *hits*, *misses*,
    *maxsize* and *currsize*.
 
-   The decorator also provides a :func:`cache_clear` function for clearing or
+   .. method:: lru_cache.cache_clear()
+      :no-typesetting:
+
+   The decorator also provides a :func:`!cache_clear` function for clearing or
    invalidating the cache.
 
    The original underlying function is accessible through the
@@ -218,7 +224,7 @@ The :mod:`functools` module defines the following functions:
    cache.  See :ref:`faq-cache-method-calls`
 
    An `LRU (least recently used) cache
-   <https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)>`_
+   <https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_(LRU)>`_
    works best when the most recent calls are the best predictors of upcoming
    calls (for example, the most popular articles on a news server tend to
    change each day).  The cache's size limit assures that the cache does not
@@ -284,9 +290,9 @@ The :mod:`functools` module defines the following functions:
    class decorator supplies the rest.  This simplifies the effort involved
    in specifying all of the possible rich comparison operations:
 
-   The class must define one of :meth:`__lt__`, :meth:`__le__`,
-   :meth:`__gt__`, or :meth:`__ge__`.
-   In addition, the class should supply an :meth:`__eq__` method.
+   The class must define one of :meth:`~object.__lt__`, :meth:`~object.__le__`,
+   :meth:`~object.__gt__`, or :meth:`~object.__ge__`.
+   In addition, the class should supply an :meth:`~object.__eq__` method.
 
    For example::
 
@@ -325,7 +331,7 @@ The :mod:`functools` module defines the following functions:
    .. versionadded:: 3.2
 
    .. versionchanged:: 3.4
-      Returning NotImplemented from the underlying comparison function for
+      Returning ``NotImplemented`` from the underlying comparison function for
       unrecognised types is now supported.
 
 .. function:: partial(func, /, *args, **keywords)
@@ -369,7 +375,7 @@ The :mod:`functools` module defines the following functions:
    like normal functions, are handled as descriptors).
 
    When *func* is a descriptor (such as a normal Python function,
-   :func:`classmethod`, :func:`staticmethod`, :func:`abstractmethod` or
+   :func:`classmethod`, :func:`staticmethod`, :func:`~abc.abstractmethod` or
    another instance of :class:`partialmethod`), calls to ``__get__`` are
    delegated to the underlying descriptor, and an appropriate
    :ref:`partial object<partial-objects>` returned as the result.
@@ -403,25 +409,27 @@ The :mod:`functools` module defines the following functions:
    .. versionadded:: 3.4
 
 
-.. function:: reduce(function, iterable[, initializer])
+.. function:: reduce(function, iterable[, initial], /)
 
    Apply *function* of two arguments cumulatively to the items of *iterable*, from
    left to right, so as to reduce the iterable to a single value.  For example,
    ``reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])`` calculates ``((((1+2)+3)+4)+5)``.
    The left argument, *x*, is the accumulated value and the right argument, *y*, is
-   the update value from the *iterable*.  If the optional *initializer* is present,
+   the update value from the *iterable*.  If the optional *initial* is present,
    it is placed before the items of the iterable in the calculation, and serves as
-   a default when the iterable is empty.  If *initializer* is not given and
+   a default when the iterable is empty.  If *initial* is not given and
    *iterable* contains only one item, the first item is returned.
 
    Roughly equivalent to::
 
-      def reduce(function, iterable, initializer=None):
+      initial_missing = object()
+
+      def reduce(function, iterable, initial=initial_missing, /):
           it = iter(iterable)
-          if initializer is None:
+          if initial is initial_missing:
               value = next(it)
           else:
-              value = initializer
+              value = initial
           for element in it:
               value = function(value, element)
           return value
@@ -445,7 +453,10 @@ The :mod:`functools` module defines the following functions:
      ...         print("Let me just say,", end=" ")
      ...     print(arg)
 
-   To add overloaded implementations to the function, use the :func:`register`
+   .. method:: singledispatch.register()
+      :no-typesetting:
+
+   To add overloaded implementations to the function, use the :func:`!register`
    attribute of the generic function, which can be used as a decorator.  For
    functions annotated with types, the decorator will infer the type of the
    first argument automatically::
@@ -490,16 +501,35 @@ The :mod:`functools` module defines the following functions:
      ...     print(arg.real, arg.imag)
      ...
 
+   For code that dispatches on a collections type (e.g., ``list``), but wants
+   to typehint the items of the collection (e.g., ``list[int]``), the
+   dispatch type should be passed explicitly to the decorator itself with the
+   typehint going into the function definition::
+
+     >>> @fun.register(list)
+     ... def _(arg: list[int], verbose=False):
+     ...     if verbose:
+     ...         print("Enumerate this:")
+     ...     for i, elem in enumerate(arg):
+     ...         print(i, elem)
+
+   .. note::
+
+      At runtime the function will dispatch on an instance of a list regardless
+      of the type contained within the list i.e. ``[1,2,3]`` will be
+      dispatched the same as ``["foo", "bar", "baz"]``. The annotation
+      provided in this example is for static type checkers only and has no
+      runtime impact.
 
    To enable registering :term:`lambdas<lambda>` and pre-existing functions,
-   the :func:`register` attribute can also be used in a functional form::
+   the :func:`~singledispatch.register` attribute can also be used in a functional form::
 
      >>> def nothing(arg, verbose=False):
      ...     print("Nothing.")
      ...
      >>> fun.register(type(None), nothing)
 
-   The :func:`register` attribute returns the undecorated function. This
+   The :func:`~singledispatch.register` attribute returns the undecorated function. This
    enables decorator stacking, :mod:`pickling<pickle>`, and the creation
    of unit tests for each variant independently::
 
@@ -577,10 +607,10 @@ The :mod:`functools` module defines the following functions:
    .. versionadded:: 3.4
 
    .. versionchanged:: 3.7
-      The :func:`register` attribute now supports using type annotations.
+      The :func:`~singledispatch.register` attribute now supports using type annotations.
 
    .. versionchanged:: 3.11
-      The :func:`register` attribute now supports :data:`types.UnionType`
+      The :func:`~singledispatch.register` attribute now supports :data:`types.UnionType`
       and :data:`typing.Union` as type annotations.
 
 
@@ -590,7 +620,7 @@ The :mod:`functools` module defines the following functions:
    dispatch>` :term:`generic function`.
 
    To define a generic method, decorate it with the ``@singledispatchmethod``
-   decorator. When defining a function using ``@singledispatchmethod``, note
+   decorator. When defining a method using ``@singledispatchmethod``, note
    that the dispatch happens on the type of the first non-*self* or non-*cls*
    argument::
 
@@ -608,7 +638,7 @@ The :mod:`functools` module defines the following functions:
             return not arg
 
    ``@singledispatchmethod`` supports nesting with other decorators such as
-   :func:`@classmethod<classmethod>`. Note that to allow for
+   :deco:`classmethod`. Note that to allow for
    ``dispatcher.register``, ``singledispatchmethod`` must be the *outer most*
    decorator. Here is the ``Negator`` class with the ``neg`` methods bound to
    the class, rather than an instance of the class::
@@ -630,8 +660,7 @@ The :mod:`functools` module defines the following functions:
             return not arg
 
    The same pattern can be used for other similar decorators:
-   :func:`@staticmethod<staticmethod>`,
-   :func:`@abstractmethod<abc.abstractmethod>`, and others.
+   :deco:`staticmethod`, :deco:`~abc.abstractmethod`, and others.
 
    .. versionadded:: 3.8
 
@@ -644,9 +673,11 @@ The :mod:`functools` module defines the following functions:
    attributes of the wrapper function are updated with the corresponding attributes
    from the original function. The default values for these arguments are the
    module level constants ``WRAPPER_ASSIGNMENTS`` (which assigns to the wrapper
-   function's ``__module__``, ``__name__``, ``__qualname__``, ``__annotations__``
-   and ``__doc__``, the documentation string) and ``WRAPPER_UPDATES`` (which
-   updates the wrapper function's ``__dict__``, i.e. the instance dictionary).
+   function's :attr:`~function.__module__`, :attr:`~function.__name__`,
+   :attr:`~function.__qualname__`, :attr:`~function.__annotations__`,
+   :attr:`~function.__type_params__`, and :attr:`~function.__doc__`, the
+   documentation string) and ``WRAPPER_UPDATES`` (which updates the wrapper
+   function's :attr:`~function.__dict__`, i.e. the instance dictionary).
 
    To allow access to the original function for introspection and other purposes
    (e.g. bypassing a caching decorator such as :func:`lru_cache`), this function
@@ -665,19 +696,18 @@ The :mod:`functools` module defines the following functions:
    on the wrapper function). :exc:`AttributeError` is still raised if the
    wrapper function itself is missing any attributes named in *updated*.
 
-   .. versionadded:: 3.2
-      Automatic addition of the ``__wrapped__`` attribute.
-
-   .. versionadded:: 3.2
-      Copying of the ``__annotations__`` attribute by default.
-
    .. versionchanged:: 3.2
+      The ``__wrapped__`` attribute is now automatically added.
+      The :attr:`~function.__annotations__` attribute is now copied by default.
       Missing attributes no longer trigger an :exc:`AttributeError`.
 
    .. versionchanged:: 3.4
       The ``__wrapped__`` attribute now always refers to the wrapped
       function, even if that function defined a ``__wrapped__`` attribute.
       (see :issue:`17482`)
+
+   .. versionchanged:: 3.12
+      The :attr:`~function.__type_params__` attribute is now copied by default.
 
 
 .. decorator:: wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)
@@ -709,7 +739,7 @@ The :mod:`functools` module defines the following functions:
       'Docstring'
 
    Without the use of this decorator factory, the name of the example function
-   would have been ``'wrapper'``, and the docstring of the original :func:`example`
+   would have been ``'wrapper'``, and the docstring of the original :func:`!example`
    would have been lost.
 
 
@@ -739,9 +769,10 @@ have three read-only attributes:
    The keyword arguments that will be supplied when the :class:`partial` object is
    called.
 
-:class:`partial` objects are like :class:`function` objects in that they are
-callable, weak referenceable, and can have attributes.  There are some important
-differences.  For instance, the :attr:`~definition.__name__` and :attr:`__doc__` attributes
+:class:`partial` objects are like :ref:`function objects <user-defined-funcs>`
+in that they are callable, weak referenceable, and can have attributes.
+There are some important differences.  For instance, the
+:attr:`~function.__name__` and :attr:`function.__doc__` attributes
 are not created automatically.  Also, :class:`partial` objects defined in
 classes behave like static methods and do not transform into bound methods
 during instance attribute look-up.

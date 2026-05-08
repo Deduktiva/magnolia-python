@@ -136,7 +136,7 @@ __version__ = '%d.%d' % sys.version_info[:2]
 
 _opener = None
 def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
-            *, cafile=None, capath=None, cadefault=False, context=None):
+            *, context=None):
     '''Open the URL url, which can be either a string or a Request object.
 
     *data* must be an object specifying additional data to be sent to
@@ -153,14 +153,6 @@ def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
 
     If *context* is specified, it must be a ssl.SSLContext instance describing
     the various SSL options. See HTTPSConnection for more details.
-
-    The optional *cafile* and *capath* parameters specify a set of trusted CA
-    certificates for HTTPS requests. cafile should point to a single file
-    containing a bundle of CA certificates, whereas capath should point to a
-    directory of hashed certificate files. More information can be found in
-    ssl.SSLContext.load_verify_locations().
-
-    The *cadefault* parameter is ignored.
 
 
     This function always returns an object which can work as a
@@ -187,25 +179,7 @@ def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
 
     '''
     global _opener
-    if cafile or capath or cadefault:
-        import warnings
-        warnings.warn("cafile, capath and cadefault are deprecated, use a "
-                      "custom context instead.", DeprecationWarning, 2)
-        if context is not None:
-            raise ValueError(
-                "You can't pass both context and any of cafile, capath, and "
-                "cadefault"
-            )
-        if not _have_ssl:
-            raise ValueError('SSL support not available')
-        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH,
-                                             cafile=cafile,
-                                             capath=capath)
-        # send ALPN extension to indicate HTTP/1.1 protocol
-        context.set_alpn_protocols(['http/1.1'])
-        https_handler = HTTPSHandler(context=context)
-        opener = build_opener(https_handler)
-    elif context:
+    if context:
         https_handler = HTTPSHandler(context=context)
         opener = build_opener(https_handler)
     elif _opener is None:
@@ -676,6 +650,7 @@ class HTTPRedirectHandler(BaseHandler):
         newheaders = {k: v for k, v in req.headers.items()
                       if k.lower() not in CONTENT_HEADERS}
         return Request(newurl,
+                       method="HEAD" if m == "HEAD" else "GET",
                        headers=newheaders,
                        origin_req_host=req.origin_req_host,
                        unverifiable=True)
@@ -903,9 +878,9 @@ class HTTPPasswordMgrWithDefaultRealm(HTTPPasswordMgr):
 
 class HTTPPasswordMgrWithPriorAuth(HTTPPasswordMgrWithDefaultRealm):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         self.authenticated = {}
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
     def add_password(self, realm, uri, user, passwd, is_authenticated=False):
         self.update_authenticated(uri, is_authenticated)
@@ -1562,6 +1537,7 @@ class FTPHandler(BaseHandler):
         dirs, file = dirs[:-1], dirs[-1]
         if dirs and not dirs[0]:
             dirs = dirs[1:]
+        fw = None
         try:
             fw = self.connect_ftp(user, passwd, host, port, dirs, req.timeout)
             type = file and 'I' or 'D'
@@ -1579,8 +1555,12 @@ class FTPHandler(BaseHandler):
                 headers += "Content-length: %d\n" % retrlen
             headers = email.message_from_string(headers)
             return addinfourl(fp, headers, req.full_url)
-        except ftplib.all_errors as exp:
-            raise URLError(exp) from exp
+        except Exception as exp:
+            if fw is not None and not fw.keepalive:
+                fw.close()
+            if isinstance(exp, ftplib.all_errors):
+                raise URLError(exp) from exp
+            raise
 
     def connect_ftp(self, user, passwd, host, port, dirs, timeout):
         return ftpwrapper(user, passwd, host, port, dirs, timeout,
@@ -1604,14 +1584,15 @@ class CacheFTPHandler(FTPHandler):
 
     def connect_ftp(self, user, passwd, host, port, dirs, timeout):
         key = user, host, port, '/'.join(dirs), timeout
-        if key in self.cache:
-            self.timeout[key] = time.time() + self.delay
-        else:
-            self.cache[key] = ftpwrapper(user, passwd, host, port,
-                                         dirs, timeout)
-            self.timeout[key] = time.time() + self.delay
+        conn = self.cache.get(key)
+        if conn is None or not conn.keepalive:
+            if conn is not None:
+                conn.close()
+            conn = self.cache[key] = ftpwrapper(user, passwd, host, port,
+                                                dirs, timeout)
+        self.timeout[key] = time.time() + self.delay
         self.check_cache()
-        return self.cache[key]
+        return conn
 
     def check_cache(self):
         # first check for old ones
@@ -1655,6 +1636,11 @@ class DataHandler(BaseHandler):
         scheme, data = url.split(":",1)
         mediatype, data = data.split(",",1)
 
+        # Disallow control characters within mediatype.
+        if re.search(r"[\x00-\x1F\x7F]", mediatype):
+            raise ValueError(
+                "Control characters not allowed in data: mediatype")
+
         # even base64 encoded data URLs might be quoted so unquote in any case:
         data = unquote_to_bytes(data)
         if mediatype.endswith(";base64"):
@@ -1681,12 +1667,27 @@ else:
     def url2pathname(pathname):
         """OS-specific conversion from a relative URL of the 'file' scheme
         to a file system path; not recommended for general use."""
-        return unquote(pathname)
+        if pathname[:3] == '///':
+            # URL has an empty authority section, so the path begins on the
+            # third character.
+            pathname = pathname[2:]
+        elif pathname[:12] == '//localhost/':
+            # Skip past 'localhost' authority.
+            pathname = pathname[11:]
+        encoding = sys.getfilesystemencoding()
+        errors = sys.getfilesystemencodeerrors()
+        return unquote(pathname, encoding=encoding, errors=errors)
 
     def pathname2url(pathname):
         """OS-specific conversion from a file system path to a relative URL
         of the 'file' scheme; not recommended for general use."""
-        return quote(pathname)
+        if pathname[:2] == '//':
+            # Add explicitly empty authority to avoid interpreting the path
+            # as authority.
+            pathname = '//' + pathname
+        encoding = sys.getfilesystemencoding()
+        errors = sys.getfilesystemencodeerrors()
+        return quote(pathname, encoding=encoding, errors=errors)
 
 
 ftpcache = {}
@@ -2516,7 +2517,7 @@ def getproxies_environment():
     # select only environment variables which end in (after making lowercase) _proxy
     proxies = {}
     environment = []
-    for name in os.environ.keys():
+    for name in os.environ:
         # fast screen underscore position before more expensive case-folding
         if len(name) > 5 and name[-6] == "_" and name[-5:].lower() == "proxy":
             value = os.environ[name]
@@ -2589,6 +2590,7 @@ def _proxy_bypass_macosx_sysconf(host, proxy_settings):
     }
     """
     from fnmatch import fnmatch
+    from ipaddress import AddressValueError, IPv4Address
 
     hostonly, port = _splitport(host)
 
@@ -2605,20 +2607,17 @@ def _proxy_bypass_macosx_sysconf(host, proxy_settings):
             return True
 
     hostIP = None
+    try:
+        hostIP = int(IPv4Address(hostonly))
+    except AddressValueError:
+        pass
 
     for value in proxy_settings.get('exceptions', ()):
         # Items in the list are strings like these: *.local, 169.254/16
         if not value: continue
 
         m = re.match(r"(\d+(?:\.\d+)*)(/\d+)?", value)
-        if m is not None:
-            if hostIP is None:
-                try:
-                    hostIP = socket.gethostbyname(hostonly)
-                    hostIP = ip2num(hostIP)
-                except OSError:
-                    continue
-
+        if m is not None and hostIP is not None:
             base = ip2num(m.group(1))
             mask = m.group(2)
             if mask is None:
@@ -2638,6 +2637,31 @@ def _proxy_bypass_macosx_sysconf(host, proxy_settings):
         elif fnmatch(host, value):
             return True
 
+    return False
+
+
+# Same as _proxy_bypass_macosx_sysconf, testable on all platforms
+def _proxy_bypass_winreg_override(host, override):
+    """Return True if the host should bypass the proxy server.
+
+    The proxy override list is obtained from the Windows
+    Internet settings proxy override registry value.
+
+    An example of a proxy override value is:
+    "www.example.com;*.example.net; 192.168.0.1"
+    """
+    from fnmatch import fnmatch
+
+    host, _ = _splitport(host)
+    proxy_override = override.split(';')
+    for test in proxy_override:
+        test = test.strip()
+        # "<local>" should bypass the proxy server for all intranet addresses
+        if test == '<local>':
+            if '.' not in host:
+                return True
+        elif fnmatch(host, test):
+            return True
     return False
 
 
@@ -2739,7 +2763,7 @@ elif os.name == 'nt':
             import winreg
         except ImportError:
             # Std modules, so should be around - but you never know!
-            return 0
+            return False
         try:
             internetSettings = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
                 r'Software\Microsoft\Windows\CurrentVersion\Internet Settings')
@@ -2749,40 +2773,10 @@ elif os.name == 'nt':
                                                      'ProxyOverride')[0])
             # ^^^^ Returned as Unicode but problems if not converted to ASCII
         except OSError:
-            return 0
+            return False
         if not proxyEnable or not proxyOverride:
-            return 0
-        # try to make a host list from name and IP address.
-        rawHost, port = _splitport(host)
-        host = [rawHost]
-        try:
-            addr = socket.gethostbyname(rawHost)
-            if addr != rawHost:
-                host.append(addr)
-        except OSError:
-            pass
-        try:
-            fqdn = socket.getfqdn(rawHost)
-            if fqdn != rawHost:
-                host.append(fqdn)
-        except OSError:
-            pass
-        # make a check value list from the registry entry: replace the
-        # '<local>' string by the localhost entry and the corresponding
-        # canonical entry.
-        proxyOverride = proxyOverride.split(';')
-        # now check if we match one of the registry values.
-        for test in proxyOverride:
-            if test == '<local>':
-                if '.' not in rawHost:
-                    return 1
-            test = test.replace(".", r"\.")     # mask dots
-            test = test.replace("*", r".*")     # change glob sequence
-            test = test.replace("?", r".")      # change glob char
-            for val in host:
-                if re.match(test, val, re.I):
-                    return 1
-        return 0
+            return False
+        return _proxy_bypass_winreg_override(host, proxyOverride)
 
     def proxy_bypass(host):
         """Return True, if host should be bypassed.

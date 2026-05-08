@@ -1,5 +1,5 @@
-:mod:`tkinter` --- Python interface to Tcl/Tk
-=============================================
+:mod:`!tkinter` --- Python interface to Tcl/Tk
+==============================================
 
 .. module:: tkinter
    :synopsis: Interface to Tcl/Tk for graphical user interfaces
@@ -58,7 +58,7 @@ details that are unchanged.
    * `Modern Tkinter for Busy Python Developers <https://tkdocs.com/book.html>`_
       By Mark Roseman. (ISBN 978-1999149567)
 
-   * `Python GUI programming with Tkinter <https://www.packtpub.com/product/python-gui-programming-with-tkinter/9781788835886>`_
+   * `Python GUI programming with Tkinter <https://www.packtpub.com/en-us/product/python-gui-programming-with-tkinter-9781788835886>`_
       By Alan D. Moore. (ISBN 978-1788835886)
 
    * `Programming Python <https://learning-python.com/about-pp4e.html>`_
@@ -175,12 +175,12 @@ the modern themed widget set and API::
    .. attribute:: master
 
       The widget object that contains this widget.  For :class:`Tk`, the
-      *master* is :const:`None` because it is the main window.  The terms
+      :attr:`!master` is :const:`None` because it is the main window.  The terms
       *master* and *parent* are similar and sometimes used interchangeably
       as argument names; however, calling :meth:`winfo_parent` returns a
-      string of the widget name whereas :attr:`master` returns the object.
+      string of the widget name whereas :attr:`!master` returns the object.
       *parent*/*child* reflects the tree-like relationship while
-      *master*/*slave* reflects the container structure.
+      *master* (or *container*)/*content* reflects the container structure.
 
    .. attribute:: children
 
@@ -254,10 +254,6 @@ Additional modules:
 :mod:`tkinter.dnd`
    (experimental) Drag-and-drop support for :mod:`tkinter`. This will
    become deprecated when it is replaced with the Tk DND.
-
-:mod:`tkinter.tix`
-   (deprecated) An older third-party Tcl/Tk package that adds several new
-   widgets. Better alternatives for most can be found in :mod:`tkinter.ttk`.
 
 :mod:`turtle`
    Turtle graphics in a Tk window.
@@ -396,7 +392,7 @@ by spaces. Without getting into too many details, notice the following:
 * Operations which are implemented as separate *commands* in Tcl (like
   ``grid`` or ``destroy``) are represented as *methods* on Tkinter widget
   objects. As you'll see shortly, at other times Tcl uses what appear to be
-  method calls on widget objects, which more closely mirror what would is
+  method calls on widget objects, which more closely mirror what is
   used in Tkinter.
 
 
@@ -640,15 +636,15 @@ The Packer
 .. index:: single: packing (widgets)
 
 The packer is one of Tk's geometry-management mechanisms.    Geometry managers
-are used to specify the relative positioning of widgets within their container -
-their mutual *master*.  In contrast to the more cumbersome *placer* (which is
+are used to specify the relative positioning of widgets within their container.
+In contrast to the more cumbersome *placer* (which is
 used less commonly, and we do not cover here), the packer takes qualitative
 relationship specification - *above*, *to the left of*, *filling*, etc - and
 works everything out to determine the exact placement coordinates for you.
 
-The size of any *master* widget is determined by the size of the "slave widgets"
-inside.  The packer is used to control where slave widgets appear inside the
-master into which they are packed.  You can pack widgets into frames, and frames
+The size of any container widget is determined by the size of the "content widgets"
+inside.  The packer is used to control where content widgets appear inside the
+container into which they are packed.  You can pack widgets into frames, and frames
 into other frames, in order to achieve the kind of layout you desire.
 Additionally, the arrangement is dynamically adjusted to accommodate incremental
 changes to the configuration, once it is packed.
@@ -675,7 +671,7 @@ For more extensive information on the packer and the options that it can take,
 see the man pages and page 183 of John Ousterhout's book.
 
 anchor
-   Anchor type.  Denotes where the packer is to place each slave in its parcel.
+   Anchor type.  Denotes where the packer is to place each content in its parcel.
 
 expand
    Boolean, ``0`` or ``1``.
@@ -684,10 +680,10 @@ fill
    Legal values: ``'x'``, ``'y'``, ``'both'``, ``'none'``.
 
 ipadx and ipady
-   A distance - designating internal padding on each side of the slave widget.
+   A distance - designating internal padding on each side of the content.
 
 padx and pady
-   A distance - designating external padding on each side of the slave widget.
+   A distance - designating external padding on each side of the content.
 
 side
    Legal values are: ``'left'``, ``'right'``, ``'top'``, ``'bottom'``.
@@ -760,8 +756,8 @@ subclassed from the :class:`Wm` class, and so can call the :class:`Wm` methods
 directly.
 
 To get at the toplevel window that contains a given widget, you can often just
-refer to the widget's master.  Of course if the widget has been packed inside of
-a frame, the master won't represent a toplevel window.  To get at the toplevel
+refer to the widget's :attr:`master`.  Of course if the widget has been packed inside of
+a frame, the :attr:`!master` won't represent a toplevel window.  To get at the toplevel
 window that contains an arbitrary widget, you can call the :meth:`_root` method.
 This method begins with an underscore to denote the fact that this function is
 part of the implementation, and not an interface to Tk functionality.
@@ -843,8 +839,7 @@ geometry
    For example: ``fred["geometry"] = "200x100"``.
 
 justify
-   Legal values are the strings: ``"left"``, ``"center"``, ``"right"``, and
-   ``"fill"``.
+   Legal values are the strings: ``"left"``, ``"center"``, and ``"right"``.
 
 region
    This is a string with four space-delimited elements, each of which is a legal
@@ -982,6 +977,15 @@ of :class:`tkinter.Image`:
 
 Either type of image is created through either the ``file`` or the ``data``
 option (other options are available as well).
+
+.. versionchanged:: 3.13
+   Added the :class:`!PhotoImage` method :meth:`!copy_replace` to copy a region
+   from one image to other image, possibly with pixel zooming and/or
+   subsampling.
+   Add *from_coords* parameter to :class:`!PhotoImage` methods :meth:`!copy`,
+   :meth:`!zoom` and :meth:`!subsample`.
+   Add *zoom* and *subsample* parameters to :class:`!PhotoImage` method
+   :meth:`!copy`.
 
 The image object can then be used wherever an ``image`` option is supported by
 some widget (e.g. labels, buttons, menus). In these cases, Tk will not keep a

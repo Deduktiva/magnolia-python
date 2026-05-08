@@ -6,7 +6,6 @@ import io
 import multiprocessing
 from multiprocessing.util import _cleanup_tests as multiprocessing_cleanup_tests
 import os
-import pathlib
 import signal
 import socket
 import stat
@@ -304,20 +303,20 @@ class SelectorEventLoopUnixSocketTests(test_utils.TestCase):
             self.loop.run_until_complete(srv.wait_closed())
 
     @socket_helper.skip_unless_bind_unix_socket
-    def test_create_unix_server_pathlib(self):
+    def test_create_unix_server_pathlike(self):
         with test_utils.unix_socket_path() as path:
-            path = pathlib.Path(path)
+            path = os_helper.FakePath(path)
             srv_coro = self.loop.create_unix_server(lambda: None, path)
             srv = self.loop.run_until_complete(srv_coro)
             srv.close()
             self.loop.run_until_complete(srv.wait_closed())
 
-    def test_create_unix_connection_pathlib(self):
+    def test_create_unix_connection_pathlike(self):
         with test_utils.unix_socket_path() as path:
-            path = pathlib.Path(path)
+            path = os_helper.FakePath(path)
             coro = self.loop.create_unix_connection(lambda: None, path)
             with self.assertRaises(FileNotFoundError):
-                # If pathlib.Path wasn't supported, the exception would be
+                # If path-like object weren't supported, the exception would be
                 # different.
                 self.loop.run_until_complete(coro)
 
@@ -1874,7 +1873,7 @@ class TestFunctional(unittest.TestCase):
             wsock.close()
 
 
-@unittest.skipUnless(hasattr(os, 'fork'), 'requires os.fork()')
+@support.requires_fork()
 class TestFork(unittest.IsolatedAsyncioTestCase):
 
     async def test_fork_not_share_event_loop(self):
@@ -1904,6 +1903,7 @@ class TestFork(unittest.IsolatedAsyncioTestCase):
             wait_process(pid, exitcode=0)
 
     @hashlib_helper.requires_hashdigest('md5')
+    @support.skip_if_sanitizer("TSAN doesn't support threads after fork", thread=True)
     def test_fork_signal_handling(self):
         self.addCleanup(multiprocessing_cleanup_tests)
 
@@ -1950,6 +1950,7 @@ class TestFork(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(child_handled.is_set())
 
     @hashlib_helper.requires_hashdigest('md5')
+    @support.skip_if_sanitizer("TSAN doesn't support threads after fork", thread=True)
     def test_fork_asyncio_run(self):
         self.addCleanup(multiprocessing_cleanup_tests)
 
@@ -1969,6 +1970,7 @@ class TestFork(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.value, 42)
 
     @hashlib_helper.requires_hashdigest('md5')
+    @support.skip_if_sanitizer("TSAN doesn't support threads after fork", thread=True)
     def test_fork_asyncio_subprocess(self):
         self.addCleanup(multiprocessing_cleanup_tests)
 

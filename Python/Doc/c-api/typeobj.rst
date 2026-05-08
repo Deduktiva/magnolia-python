@@ -2,8 +2,8 @@
 
 .. _type-structs:
 
-Type Objects
-============
+Type Object Structures
+======================
 
 Perhaps one of the most important structures of the Python object system is the
 structure that defines a new type: the :c:type:`PyTypeObject` structure.  Type
@@ -79,7 +79,7 @@ Quick Reference
    | :c:member:`~PyTypeObject.tp_setattro`          | :c:type:`setattrofunc`            | __setattr__,      | X | X |   | G |
    |                                                |                                   | __delattr__       |   |   |   |   |
    +------------------------------------------------+-----------------------------------+-------------------+---+---+---+---+
-   | :c:member:`~PyTypeObject.tp_as_buffer`         | :c:type:`PyBufferProcs` *         |                   |   |   |   | % |
+   | :c:member:`~PyTypeObject.tp_as_buffer`         | :c:type:`PyBufferProcs` *         | :ref:`sub-slots`  |   |   |   | % |
    +------------------------------------------------+-----------------------------------+-------------------+---+---+---+---+
    | :c:member:`~PyTypeObject.tp_flags`             | unsigned long                     |                   | X | X |   | ? |
    +------------------------------------------------+-----------------------------------+-------------------+---+---+---+---+
@@ -325,9 +325,10 @@ sub-slots
    +---------------------------------------------------------+-----------------------------------+---------------+
    |                                                                                                             |
    +---------------------------------------------------------+-----------------------------------+---------------+
-   | :c:member:`~PyBufferProcs.bf_getbuffer`                 | :c:func:`getbufferproc`           |               |
+   | :c:member:`~PyBufferProcs.bf_getbuffer`                 | :c:func:`getbufferproc`           | __buffer__    |
    +---------------------------------------------------------+-----------------------------------+---------------+
-   | :c:member:`~PyBufferProcs.bf_releasebuffer`             | :c:func:`releasebufferproc`       |               |
+   | :c:member:`~PyBufferProcs.bf_releasebuffer`             | :c:func:`releasebufferproc`       | __release_\   |
+   |                                                         |                                   | buffer\__     |
    +---------------------------------------------------------+-----------------------------------+---------------+
 
 .. _slot-typedefs-table:
@@ -355,7 +356,7 @@ slot typedefs
 +-----------------------------+-----------------------------+----------------------+
 | :c:type:`newfunc`           | .. line-block::             | :c:type:`PyObject` * |
 |                             |                             |                      |
-|                             |    :c:type:`PyObject` *     |                      |
+|                             |    :c:type:`PyTypeObject` * |                      |
 |                             |    :c:type:`PyObject` *     |                      |
 |                             |    :c:type:`PyObject` *     |                      |
 +-----------------------------+-----------------------------+----------------------+
@@ -473,7 +474,7 @@ PyTypeObject Definition
 -----------------------
 
 The structure definition for :c:type:`PyTypeObject` can be found in
-:file:`Include/object.h`.  For convenience of reference, this repeats the
+:file:`Include/cpython/object.h`.  For convenience of reference, this repeats the
 definition found there:
 
 .. XXX Drop this?
@@ -528,28 +529,6 @@ type objects) *must* have the :c:member:`~PyVarObject.ob_size` field.
    This field is inherited by subtypes.
 
 
-.. c:member:: PyObject* PyObject._ob_next
-             PyObject* PyObject._ob_prev
-
-   These fields are only present when the macro ``Py_TRACE_REFS`` is defined
-   (see the :option:`configure --with-trace-refs option <--with-trace-refs>`).
-
-   Their initialization to ``NULL`` is taken care of by the
-   ``PyObject_HEAD_INIT`` macro.  For :ref:`statically allocated objects
-   <static-types>`, these fields always remain ``NULL``.  For :ref:`dynamically
-   allocated objects <heap-types>`, these two fields are used to link the
-   object into a doubly linked list of *all* live objects on the heap.
-
-   This could be used for various debugging purposes; currently the only uses
-   are the :func:`sys.getobjects` function and to print the objects that are
-   still alive at the end of a run when the environment variable
-   :envvar:`PYTHONDUMPREFS` is set.
-
-   **Inheritance:**
-
-   These fields are not inherited by subtypes.
-
-
 PyVarObject Slots
 -----------------
 
@@ -558,6 +537,9 @@ PyVarObject Slots
    For :ref:`statically allocated type objects <static-types>`, this should be
    initialized to zero. For :ref:`dynamically allocated type objects
    <heap-types>`, this field has a special internal meaning.
+
+   This field should be accessed using the :c:func:`Py_SIZE()` and
+   :c:func:`Py_SET_SIZE()` macros.
 
    **Inheritance:**
 
@@ -589,12 +571,12 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
    For :ref:`statically allocated type objects <static-types>`,
    the *tp_name* field should contain a dot.
-   Everything before the last dot is made accessible as the :attr:`__module__`
+   Everything before the last dot is made accessible as the :attr:`~type.__module__`
    attribute, and everything after the last dot is made accessible as the
-   :attr:`~definition.__name__` attribute.
+   :attr:`~type.__name__` attribute.
 
    If no dot is present, the entire :c:member:`~PyTypeObject.tp_name` field is made accessible as the
-   :attr:`~definition.__name__` attribute, and the :attr:`__module__` attribute is undefined
+   :attr:`~type.__name__` attribute, and the :attr:`~type.__module__` attribute is undefined
    (unless explicitly set in the dictionary, as explained above).  This means your
    type will be impossible to pickle.  Additionally, it will not be listed in
    module documentations created with pydoc.
@@ -609,52 +591,93 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: Py_ssize_t PyTypeObject.tp_basicsize
-             Py_ssize_t PyTypeObject.tp_itemsize
+              Py_ssize_t PyTypeObject.tp_itemsize
 
    These fields allow calculating the size in bytes of instances of the type.
 
    There are two kinds of types: types with fixed-length instances have a zero
-   :c:member:`~PyTypeObject.tp_itemsize` field, types with variable-length instances have a non-zero
-   :c:member:`~PyTypeObject.tp_itemsize` field.  For a type with fixed-length instances, all
-   instances have the same size, given in :c:member:`~PyTypeObject.tp_basicsize`.
+   :c:member:`!tp_itemsize` field, types with variable-length instances have a non-zero
+   :c:member:`!tp_itemsize` field.  For a type with fixed-length instances, all
+   instances have the same size, given in :c:member:`!tp_basicsize`.
+   (Exceptions to this rule can be made using
+   :c:func:`PyUnstable_Object_GC_NewWithExtraData`.)
 
    For a type with variable-length instances, the instances must have an
-   :c:member:`~PyVarObject.ob_size` field, and the instance size is :c:member:`~PyTypeObject.tp_basicsize` plus N
-   times :c:member:`~PyTypeObject.tp_itemsize`, where N is the "length" of the object.  The value of
-   N is typically stored in the instance's :c:member:`~PyVarObject.ob_size` field.  There are
-   exceptions:  for example, ints use a negative :c:member:`~PyVarObject.ob_size` to indicate a
-   negative number, and N is ``abs(ob_size)`` there.  Also, the presence of an
-   :c:member:`~PyVarObject.ob_size` field in the instance layout doesn't mean that the instance
-   structure is variable-length (for example, the structure for the list type has
-   fixed-length instances, yet those instances have a meaningful :c:member:`~PyVarObject.ob_size`
-   field).
+   :c:member:`~PyVarObject.ob_size` field, and the instance size is
+   :c:member:`!tp_basicsize` plus N times :c:member:`!tp_itemsize`,
+   where N is the "length" of the object.
 
-   The basic size includes the fields in the instance declared by the macro
-   :c:macro:`PyObject_HEAD` or :c:macro:`PyObject_VAR_HEAD` (whichever is used to
-   declare the instance struct) and this in turn includes the  :c:member:`~PyObject._ob_prev` and
-   :c:member:`~PyObject._ob_next` fields if they are present.  This means that the only correct
-   way to get an initializer for the :c:member:`~PyTypeObject.tp_basicsize` is to use the
+   Functions like :c:func:`PyObject_NewVar` will take the value of N as an
+   argument, and store in the instance's :c:member:`~PyVarObject.ob_size` field.
+   Note that the :c:member:`~PyVarObject.ob_size` field may later be used for
+   other purposes. For example, :py:type:`int` instances use the bits of
+   :c:member:`~PyVarObject.ob_size` in an implementation-defined
+   way; the underlying storage and its size should be accessed using
+   :c:func:`PyLong_Export`.
+
+   .. note::
+
+      The :c:member:`~PyVarObject.ob_size` field should be accessed using
+      the :c:func:`Py_SIZE()` and :c:func:`Py_SET_SIZE()` macros.
+
+   Also, the presence of an :c:member:`~PyVarObject.ob_size` field in the
+   instance layout doesn't mean that the instance structure is variable-length.
+   For example, the :py:type:`list` type has fixed-length instances, yet those
+   instances have a :c:member:`~PyVarObject.ob_size` field.
+   (As with :py:type:`int`, avoid reading lists' :c:member:`!ob_size` directly.
+   Call :c:func:`PyList_Size` instead.)
+
+   The :c:member:`!tp_basicsize` includes size needed for data of the type's
+   :c:member:`~PyTypeObject.tp_base`, plus any extra data needed
+   by each instance.
+
+   The  correct way to set :c:member:`!tp_basicsize` is to use the
    ``sizeof`` operator on the struct used to declare the instance layout.
-   The basic size does not include the GC header size.
+   This struct must include the struct used to declare the base type.
+   In other words, :c:member:`!tp_basicsize` must be greater than or equal
+   to the base's :c:member:`!tp_basicsize`.
 
-   A note about alignment: if the variable items require a particular alignment,
-   this should be taken care of by the value of :c:member:`~PyTypeObject.tp_basicsize`.  Example:
-   suppose a type implements an array of ``double``. :c:member:`~PyTypeObject.tp_itemsize` is
-   ``sizeof(double)``. It is the programmer's responsibility that
-   :c:member:`~PyTypeObject.tp_basicsize` is a multiple of ``sizeof(double)`` (assuming this is the
-   alignment requirement for ``double``).
+   Since every type is a subtype of :py:type:`object`, this struct must
+   include :c:type:`PyObject` or :c:type:`PyVarObject` (depending on
+   whether :c:member:`~PyVarObject.ob_size` should be included). These are
+   usually defined by the macro :c:macro:`PyObject_HEAD` or
+   :c:macro:`PyObject_VAR_HEAD`, respectively.
 
-   For any type with variable-length instances, this field must not be ``NULL``.
+   The basic size does not include the GC header size, as that header is not
+   part of :c:macro:`PyObject_HEAD`.
+
+   For cases where struct used to declare the base type is unknown,
+   see :c:member:`PyType_Spec.basicsize` and :c:func:`PyType_FromMetaclass`.
+
+   Notes about alignment:
+
+   - :c:member:`!tp_basicsize` must be a multiple of ``_Alignof(PyObject)``.
+     When using ``sizeof`` on a ``struct`` that includes
+     :c:macro:`PyObject_HEAD`, as recommended, the compiler ensures this.
+     When not using a C ``struct``, or when using compiler
+     extensions like ``__attribute__((packed))``, it is up to you.
+   - If the variable items require a particular alignment,
+     :c:member:`!tp_basicsize` and :c:member:`!tp_itemsize` must each be a
+     multiple of that alignment.
+     For example, if a type's variable part stores a ``double``, it is
+     your responsibility that both fields are a multiple of
+     ``_Alignof(double)``.
 
    **Inheritance:**
 
-   These fields are inherited separately by subtypes.  If the base type has a
-   non-zero :c:member:`~PyTypeObject.tp_itemsize`, it is generally not safe to set
+   These fields are inherited separately by subtypes.
+   (That is, if the field is set to zero, :c:func:`PyType_Ready` will copy
+   the value from the base type, indicating that the instances do not
+   need additional storage.)
+
+   If the base type has a non-zero :c:member:`~PyTypeObject.tp_itemsize`, it is generally not safe to set
    :c:member:`~PyTypeObject.tp_itemsize` to a different non-zero value in a subtype (though this
    depends on the implementation of the base type).
 
 
 .. c:member:: destructor PyTypeObject.tp_dealloc
+
+   .. corresponding-type-slot:: Py_tp_dealloc
 
    A pointer to the instance destructor function.  This function must be defined
    unless the type guarantees that its instances will never be deallocated (as is
@@ -703,6 +726,19 @@ and :c:data:`PyType_Type` effectively act as defaults.)
          tp->tp_free(self);
          Py_DECREF(tp);
      }
+
+   .. warning::
+
+      In a garbage collected Python, :c:member:`!tp_dealloc` may be called from
+      any Python thread, not just the thread which created the object (if the
+      object becomes part of a refcount cycle, that cycle might be collected by
+      a garbage collection on any thread).  This is not a problem for Python
+      API calls, since the thread on which :c:member:`!tp_dealloc` is called
+      will own the Global Interpreter Lock (GIL).  However, if the object being
+      destroyed in turn destroys objects from some other C or C++ library, care
+      should be taken to ensure that destroying those objects on the thread
+      which called :c:member:`!tp_dealloc` will not violate any assumptions of
+      the library.
 
 
    **Inheritance:**
@@ -757,6 +793,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: getattrfunc PyTypeObject.tp_getattr
 
+   .. corresponding-type-slot:: Py_tp_getattr
+
    An optional pointer to the get-attribute-string function.
 
    This field is deprecated.  When it is defined, it should point to a function
@@ -773,6 +811,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: setattrfunc PyTypeObject.tp_setattr
+
+   .. corresponding-type-slot:: Py_tp_setattr
 
    An optional pointer to the function for setting and deleting attributes.
 
@@ -805,6 +845,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: reprfunc PyTypeObject.tp_repr
+
+   .. corresponding-type-slot:: Py_tp_repr
 
    .. index:: pair: built-in function; repr
 
@@ -871,6 +913,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: hashfunc PyTypeObject.tp_hash
 
+   .. corresponding-type-slot:: Py_tp_hash
+
    .. index:: pair: built-in function; hash
 
    An optional pointer to a function that implements the built-in function
@@ -905,8 +949,14 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    :c:member:`~PyTypeObject.tp_richcompare` and :c:member:`~PyTypeObject.tp_hash`, when the subtype's
    :c:member:`~PyTypeObject.tp_richcompare` and :c:member:`~PyTypeObject.tp_hash` are both ``NULL``.
 
+   **Default:**
+
+   :c:data:`PyBaseObject_Type` uses :c:func:`PyObject_GenericHash`.
+
 
 .. c:member:: ternaryfunc PyTypeObject.tp_call
+
+   .. corresponding-type-slot:: Py_tp_call
 
    An optional pointer to a function that implements calling the object.  This
    should be ``NULL`` if the object is not callable.  The signature is the same as
@@ -920,6 +970,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: reprfunc PyTypeObject.tp_str
+
+   .. corresponding-type-slot:: Py_tp_str
 
    An optional pointer to a function that implements the built-in operation
    :func:`str`.  (Note that :class:`str` is a type now, and :func:`str` calls the
@@ -946,6 +998,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: getattrofunc PyTypeObject.tp_getattro
 
+   .. corresponding-type-slot:: Py_tp_getattro
+
    An optional pointer to the get-attribute function.
 
    The signature is the same as for :c:func:`PyObject_GetAttr`::
@@ -969,6 +1023,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: setattrofunc PyTypeObject.tp_setattro
+
+   .. corresponding-type-slot:: Py_tp_setattro
 
    An optional pointer to the function for setting and deleting attributes.
 
@@ -1052,7 +1108,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
       the type, and the type object is INCREF'ed when a new instance is created, and
       DECREF'ed when an instance is destroyed (this does not apply to instances of
       subtypes; only the type referenced by the instance's ob_type gets INCREF'ed or
-      DECREF'ed).
+      DECREF'ed). Heap types should also :ref:`support garbage collection <supporting-cycle-detection>`
+      as they can form a reference cycle with their own module object.
 
       **Inheritance:**
 
@@ -1148,10 +1205,13 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
    .. c:macro:: Py_TPFLAGS_MANAGED_DICT
 
-      This bit indicates that instances of the class have a ``__dict__``
+      This bit indicates that instances of the class have a :attr:`~object.__dict__`
       attribute, and that the space for the dictionary is managed by the VM.
 
       If this flag is set, :c:macro:`Py_TPFLAGS_HAVE_GC` should also be set.
+
+      The type traverse function must call :c:func:`PyObject_VisitManagedDict`
+      and its clear function must call :c:func:`PyObject_ClearManagedDict`.
 
       .. versionadded:: 3.12
 
@@ -1206,8 +1266,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    .. c:macro:: Py_TPFLAGS_BASE_EXC_SUBCLASS
    .. c:macro:: Py_TPFLAGS_TYPE_SUBCLASS
 
-      These flags are used by functions such as
-      :c:func:`PyLong_Check` to quickly determine if a type is a subclass
+      Functions such as :c:func:`PyLong_Check` will call :c:func:`PyType_FastSubclass`
+      with one of these flags to quickly determine if a type is a subclass
       of a built-in type; such specific checks are faster than a generic
       check, like :c:func:`PyObject_IsInstance`. Custom types that inherit
       from built-ins should have their :c:member:`~PyTypeObject.tp_flags`
@@ -1228,6 +1288,9 @@ and :c:data:`PyType_Type` effectively act as defaults.)
          type structure.
 
 
+   .. c:macro:: _Py_TPFLAGS_HAVE_VECTORCALL
+      :no-typesetting:
+
    .. c:macro:: Py_TPFLAGS_HAVE_VECTORCALL
 
       This bit is set when the class implements
@@ -1239,7 +1302,12 @@ and :c:data:`PyType_Type` effectively act as defaults.)
       This bit is inherited if :c:member:`~PyTypeObject.tp_call` is also
       inherited.
 
-      .. versionadded:: 3.9
+      .. versionadded:: 3.8 as ``_Py_TPFLAGS_HAVE_VECTORCALL``
+
+      .. versionchanged:: 3.9
+
+      Renamed to the current name, without the leading underscore.
+      The old provisional name is :term:`soft deprecated`.
 
       .. versionchanged:: 3.12
 
@@ -1342,15 +1410,63 @@ and :c:data:`PyType_Type` effectively act as defaults.)
       To indicate that a class has changed call :c:func:`PyType_Modified`
 
       .. warning::
-         This flag is present in header files, but is an internal feature and should
-         not be used. It will be removed in a future version of CPython
+         This flag is present in header files, but is not be used.
+         It will be removed in a future version of CPython
+
+
+   .. c:macro:: Py_TPFLAGS_HAVE_VERSION_TAG
+
+      This is a :term:`soft deprecated` macro that does nothing.
+      Historically, this would indicate that the
+      :c:member:`~PyTypeObject.tp_version_tag` field was available and
+      initialized.
+
+
+   .. c:macro:: Py_TPFLAGS_INLINE_VALUES
+
+      This bit indicates that instances of this type will have an "inline values"
+      array (containing the object's attributes) placed directly after the end
+      of the object.
+
+      This requires that :c:macro:`Py_TPFLAGS_HAVE_GC` is set.
+
+      **Inheritance:**
+
+      This flag is not inherited.
+
+      .. versionadded:: 3.13
+
+
+   .. c:macro:: Py_TPFLAGS_IS_ABSTRACT
+
+      This bit indicates that this is an abstract type and therefore cannot
+      be instantiated.
+
+      **Inheritance:**
+
+      This flag is not inherited.
+
+      .. seealso::
+         :mod:`abc`
+
+
+   .. c:macro:: Py_TPFLAGS_HAVE_STACKLESS_EXTENSION
+
+      Internal. Do not set or unset this flag.
+      Historically, this was a reserved flag for use in Stackless Python.
+
+      .. warning::
+            This flag is present in header files, but is not be used.
+            This may be removed in a future version of CPython.
 
 
 .. c:member:: const char* PyTypeObject.tp_doc
 
+   .. corresponding-type-slot:: Py_tp_doc
+
    An optional pointer to a NUL-terminated C string giving the docstring for this
-   type object.  This is exposed as the :attr:`__doc__` attribute on the type and
-   instances of the type.
+   type object.  This is exposed as the :attr:`~type.__doc__` attribute on the
+   type and instances of the type.
 
    **Inheritance:**
 
@@ -1358,6 +1474,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: traverseproc PyTypeObject.tp_traverse
+
+   .. corresponding-type-slot:: Py_tp_traverse
 
    An optional pointer to a traversal function for the garbage collector.  This is
    only used if the :c:macro:`Py_TPFLAGS_HAVE_GC` flag bit is set.  The signature is::
@@ -1390,6 +1508,23 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    debugging aid you may want to visit it anyway just so the :mod:`gc` module's
    :func:`~gc.get_referents` function will include it.
 
+   Heap types (:c:macro:`Py_TPFLAGS_HEAPTYPE`) must visit their type with::
+
+       Py_VISIT(Py_TYPE(self));
+
+   It is only needed since Python 3.9. To support Python 3.8 and older, this
+   line must be conditional::
+
+       #if PY_VERSION_HEX >= 0x03090000
+           Py_VISIT(Py_TYPE(self));
+       #endif
+
+   If the :c:macro:`Py_TPFLAGS_MANAGED_DICT` bit is set in the
+   :c:member:`~PyTypeObject.tp_flags` field, the traverse function must call
+   :c:func:`PyObject_VisitManagedDict` like this::
+
+       PyObject_VisitManagedDict((PyObject*)self, visit, arg);
+
    .. warning::
        When implementing :c:member:`~PyTypeObject.tp_traverse`, only the
        members that the instance *owns* (by having :term:`strong references
@@ -1402,8 +1537,13 @@ and :c:data:`PyType_Type` effectively act as defaults.)
        but the instance has no strong reference to the elements inside it, as they
        are allowed to be removed even if the instance is still alive).
 
+   .. warning::
+      The traversal function must not have any side effects.  It must not
+      modify the reference counts of any Python objects nor create or destroy
+      any Python objects.
+
    Note that :c:func:`Py_VISIT` requires the *visit* and *arg* parameters to
-   :c:func:`local_traverse` to have these specific names; don't name them just
+   :c:func:`!local_traverse` to have these specific names; don't name them just
    anything.
 
    Instances of :ref:`heap-allocated types <heap-types>` hold a reference to
@@ -1431,6 +1571,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: inquiry PyTypeObject.tp_clear
+
+   .. corresponding-type-slot:: Py_tp_clear
 
    An optional pointer to a clear function for the garbage collector. This is only
    used if the :c:macro:`Py_TPFLAGS_HAVE_GC` flag bit is set.  The signature is::
@@ -1473,6 +1615,12 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    so that *self* knows the contained object can no longer be used.  The
    :c:func:`Py_CLEAR` macro performs the operations in a safe order.
 
+   If the :c:macro:`Py_TPFLAGS_MANAGED_DICT` bit is set in the
+   :c:member:`~PyTypeObject.tp_flags` field, the clear function must call
+   :c:func:`PyObject_ClearManagedDict` like this::
+
+       PyObject_ClearManagedDict((PyObject*)self);
+
    Note that :c:member:`~PyTypeObject.tp_clear` is not *always* called
    before an instance is deallocated. For example, when reference counting
    is enough to determine that an object is no longer used, the cyclic garbage
@@ -1499,6 +1647,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: richcmpfunc PyTypeObject.tp_richcompare
+
+   .. corresponding-type-slot:: Py_tp_richcompare
 
    An optional pointer to the rich comparison function, whose signature is::
 
@@ -1583,7 +1733,7 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    weak references to the type object itself.
 
    It is an error to set both the :c:macro:`Py_TPFLAGS_MANAGED_WEAKREF` bit and
-   :c:member:`~PyTypeObject.tp_weaklist`.
+   :c:member:`~PyTypeObject.tp_weaklistoffset`.
 
    **Inheritance:**
 
@@ -1595,12 +1745,14 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    **Default:**
 
    If the :c:macro:`Py_TPFLAGS_MANAGED_WEAKREF` bit is set in the
-   :c:member:`~PyTypeObject.tp_dict` field, then
+   :c:member:`~PyTypeObject.tp_flags` field, then
    :c:member:`~PyTypeObject.tp_weaklistoffset` will be set to a negative value,
    to indicate that it is unsafe to use this field.
 
 
 .. c:member:: getiterfunc PyTypeObject.tp_iter
+
+   .. corresponding-type-slot:: Py_tp_iter
 
    An optional pointer to a function that returns an :term:`iterator` for the
    object.  Its presence normally signals that the instances of this type are
@@ -1616,6 +1768,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: iternextfunc PyTypeObject.tp_iternext
+
+   .. corresponding-type-slot:: Py_tp_iternext
 
    An optional pointer to a function that returns the next item in an
    :term:`iterator`. The signature is::
@@ -1640,6 +1794,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: struct PyMethodDef* PyTypeObject.tp_methods
 
+   .. corresponding-type-slot:: Py_tp_methods
+
    An optional pointer to a static ``NULL``-terminated array of :c:type:`PyMethodDef`
    structures, declaring regular methods of this type.
 
@@ -1653,6 +1809,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: struct PyMemberDef* PyTypeObject.tp_members
+
+   .. corresponding-type-slot:: Py_tp_members
 
    An optional pointer to a static ``NULL``-terminated array of :c:type:`PyMemberDef`
    structures, declaring regular data members (fields or slots) of instances of
@@ -1669,6 +1827,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: struct PyGetSetDef* PyTypeObject.tp_getset
 
+   .. corresponding-type-slot:: Py_tp_getset
+
    An optional pointer to a static ``NULL``-terminated array of :c:type:`PyGetSetDef`
    structures, declaring computed attributes of instances of this type.
 
@@ -1682,6 +1842,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: PyTypeObject* PyTypeObject.tp_base
+
+   .. corresponding-type-slot:: Py_tp_base
 
    An optional pointer to a base type from which type properties are inherited.  At
    this level, only single inheritance is supported; multiple inheritance require
@@ -1755,6 +1917,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: descrgetfunc PyTypeObject.tp_descr_get
 
+   .. corresponding-type-slot:: Py_tp_descr_get
+
    An optional pointer to a "descriptor get" function.
 
    The function signature is::
@@ -1769,6 +1933,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: descrsetfunc PyTypeObject.tp_descr_set
+
+   .. corresponding-type-slot:: Py_tp_descr_set
 
    An optional pointer to a function for setting and deleting
    a descriptor's value.
@@ -1807,7 +1973,7 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    dictionary, so it is may be more efficient to call :c:func:`PyObject_GetAttr`
    when accessing an attribute on the object.
 
-   It is an error to set both the :c:macro:`Py_TPFLAGS_MANAGED_WEAKREF` bit and
+   It is an error to set both the :c:macro:`Py_TPFLAGS_MANAGED_DICT` bit and
    :c:member:`~PyTypeObject.tp_dictoffset`.
 
    **Inheritance:**
@@ -1823,12 +1989,14 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    field is ``NULL`` then no :attr:`~object.__dict__` gets created for instances.
 
    If the :c:macro:`Py_TPFLAGS_MANAGED_DICT` bit is set in the
-   :c:member:`~PyTypeObject.tp_dict` field, then
+   :c:member:`~PyTypeObject.tp_flags` field, then
    :c:member:`~PyTypeObject.tp_dictoffset` will be set to ``-1``, to indicate
    that it is unsafe to use this field.
 
 
 .. c:member:: initproc PyTypeObject.tp_init
+
+   .. corresponding-type-slot:: Py_tp_init
 
    An optional pointer to an instance initialization function.
 
@@ -1865,6 +2033,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: allocfunc PyTypeObject.tp_alloc
 
+   .. corresponding-type-slot:: Py_tp_alloc
+
    An optional pointer to an instance allocation function.
 
    The function signature is::
@@ -1888,6 +2058,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: newfunc PyTypeObject.tp_new
+
+   .. corresponding-type-slot:: Py_tp_new
 
    An optional pointer to an instance creation function.
 
@@ -1928,6 +2100,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: freefunc PyTypeObject.tp_free
 
+   .. corresponding-type-slot:: Py_tp_free
+
    An optional pointer to an instance deallocation function.  Its signature is::
 
       void tp_free(void *self);
@@ -1949,6 +2123,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: inquiry PyTypeObject.tp_is_gc
+
+   .. corresponding-type-slot:: Py_tp_is_gc
 
    An optional pointer to a function called by the garbage collector.
 
@@ -1977,6 +2153,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 
 .. c:member:: PyObject* PyTypeObject.tp_bases
+
+   .. corresponding-type-slot:: Py_tp_bases
 
    Tuple of base types.
 
@@ -2027,7 +2205,7 @@ and :c:data:`PyType_Type` effectively act as defaults.)
    A collection of subclasses.  Internal use only.  May be an invalid pointer.
 
    To get a list of subclasses, call the Python method
-   :py:meth:`~class.__subclasses__`.
+   :py:meth:`~type.__subclasses__`.
 
    .. versionchanged:: 3.12
 
@@ -2058,6 +2236,8 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: destructor PyTypeObject.tp_del
 
+   .. corresponding-type-slot:: Py_tp_del
+
    This field is deprecated.  Use :c:member:`~PyTypeObject.tp_finalize` instead.
 
 
@@ -2072,7 +2252,11 @@ and :c:data:`PyType_Type` effectively act as defaults.)
 
 .. c:member:: destructor PyTypeObject.tp_finalize
 
-   An optional pointer to an instance finalization function.  Its signature is::
+   .. corresponding-type-slot:: Py_tp_finalize
+
+   An optional pointer to an instance finalization function.  This is the C
+   implementation of the :meth:`~object.__del__` special method.  Its signature
+   is::
 
       void tp_finalize(PyObject *self);
 
@@ -2089,27 +2273,14 @@ and :c:data:`PyType_Type` effectively act as defaults.)
       static void
       local_finalize(PyObject *self)
       {
-          PyObject *error_type, *error_value, *error_traceback;
-
           /* Save the current exception, if any. */
-          PyErr_Fetch(&error_type, &error_value, &error_traceback);
+          PyObject *exc = PyErr_GetRaisedException();
 
           /* ... */
 
           /* Restore the saved exception. */
-          PyErr_Restore(error_type, error_value, error_traceback);
+          PyErr_SetRaisedException(exc);
       }
-
-   Also, note that, in a garbage collected Python,
-   :c:member:`~PyTypeObject.tp_dealloc` may be called from
-   any Python thread, not just the thread which created the object (if the object
-   becomes part of a refcount cycle, that cycle might be collected by a garbage
-   collection on any thread).  This is not a problem for Python API calls, since
-   the thread on which tp_dealloc is called will own the Global Interpreter Lock
-   (GIL). However, if the object being destroyed in turn destroys objects from some
-   other C or C++ library, care should be taken to ensure that destroying those
-   objects on the thread which called tp_dealloc will not violate any assumptions
-   of the library.
 
    **Inheritance:**
 
@@ -2190,7 +2361,7 @@ This is done by filling a :c:type:`PyType_Spec` structure and calling
 .. _number-structs:
 
 Number Object Structures
-========================
+------------------------
 
 .. sectionauthor:: Amaury Forgeot d'Arc
 
@@ -2264,47 +2435,153 @@ Number Object Structures
       Python 3.0.1.
 
 .. c:member:: binaryfunc PyNumberMethods.nb_add
+
+   .. corresponding-type-slot:: Py_nb_add
+
 .. c:member:: binaryfunc PyNumberMethods.nb_subtract
+
+   .. corresponding-type-slot:: Py_nb_subtract
+
 .. c:member:: binaryfunc PyNumberMethods.nb_multiply
+
+   .. corresponding-type-slot:: Py_nb_multiply
+
 .. c:member:: binaryfunc PyNumberMethods.nb_remainder
+
+   .. corresponding-type-slot:: Py_nb_remainder
+
 .. c:member:: binaryfunc PyNumberMethods.nb_divmod
+
+   .. corresponding-type-slot:: Py_nb_divmod
+
 .. c:member:: ternaryfunc PyNumberMethods.nb_power
+
+   .. corresponding-type-slot:: Py_nb_power
+
 .. c:member:: unaryfunc PyNumberMethods.nb_negative
+
+   .. corresponding-type-slot:: Py_nb_negative
+
 .. c:member:: unaryfunc PyNumberMethods.nb_positive
+
+   .. corresponding-type-slot:: Py_nb_positive
+
 .. c:member:: unaryfunc PyNumberMethods.nb_absolute
+
+   .. corresponding-type-slot:: Py_nb_absolute
+
 .. c:member:: inquiry PyNumberMethods.nb_bool
+
+   .. corresponding-type-slot:: Py_nb_bool
+
 .. c:member:: unaryfunc PyNumberMethods.nb_invert
+
+   .. corresponding-type-slot:: Py_nb_invert
+
 .. c:member:: binaryfunc PyNumberMethods.nb_lshift
+
+   .. corresponding-type-slot:: Py_nb_lshift
+
 .. c:member:: binaryfunc PyNumberMethods.nb_rshift
+
+   .. corresponding-type-slot:: Py_nb_rshift
+
 .. c:member:: binaryfunc PyNumberMethods.nb_and
+
+   .. corresponding-type-slot:: Py_nb_and
+
 .. c:member:: binaryfunc PyNumberMethods.nb_xor
+
+   .. corresponding-type-slot:: Py_nb_xor
+
 .. c:member:: binaryfunc PyNumberMethods.nb_or
+
+   .. corresponding-type-slot:: Py_nb_or
+
 .. c:member:: unaryfunc PyNumberMethods.nb_int
+
+   .. corresponding-type-slot:: Py_nb_int
+
 .. c:member:: void *PyNumberMethods.nb_reserved
+
 .. c:member:: unaryfunc PyNumberMethods.nb_float
+
+   .. corresponding-type-slot:: Py_nb_float
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_add
+
+   .. corresponding-type-slot:: Py_nb_inplace_add
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_subtract
+
+   .. corresponding-type-slot:: Py_nb_inplace_subtract
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_multiply
+
+   .. corresponding-type-slot:: Py_nb_inplace_multiply
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_remainder
+
+   .. corresponding-type-slot:: Py_nb_inplace_remainder
+
 .. c:member:: ternaryfunc PyNumberMethods.nb_inplace_power
+
+   .. corresponding-type-slot:: Py_nb_inplace_power
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_lshift
+
+   .. corresponding-type-slot:: Py_nb_inplace_lshift
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_rshift
+
+   .. corresponding-type-slot:: Py_nb_inplace_rshift
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_and
+
+   .. corresponding-type-slot:: Py_nb_inplace_and
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_xor
+
+   .. corresponding-type-slot:: Py_nb_inplace_xor
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_or
+
+   .. corresponding-type-slot:: Py_nb_inplace_or
+
 .. c:member:: binaryfunc PyNumberMethods.nb_floor_divide
+
+   .. corresponding-type-slot:: Py_nb_floor_divide
+
 .. c:member:: binaryfunc PyNumberMethods.nb_true_divide
+
+   .. corresponding-type-slot:: Py_nb_true_divide
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_floor_divide
+
+   .. corresponding-type-slot:: Py_nb_inplace_floor_divide
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_true_divide
+
+   .. corresponding-type-slot:: Py_nb_inplace_true_divide
+
 .. c:member:: unaryfunc PyNumberMethods.nb_index
+
+   .. corresponding-type-slot:: Py_nb_index
+
 .. c:member:: binaryfunc PyNumberMethods.nb_matrix_multiply
+
+   .. corresponding-type-slot:: Py_nb_matrix_multiply
+
 .. c:member:: binaryfunc PyNumberMethods.nb_inplace_matrix_multiply
+
+   .. corresponding-type-slot:: Py_nb_inplace_matrix_multiply
+
 
 
 .. _mapping-structs:
 
 Mapping Object Structures
-=========================
+-------------------------
 
 .. sectionauthor:: Amaury Forgeot d'Arc
 
@@ -2316,11 +2593,15 @@ Mapping Object Structures
 
 .. c:member:: lenfunc PyMappingMethods.mp_length
 
+   .. corresponding-type-slot:: Py_mp_length
+
    This function is used by :c:func:`PyMapping_Size` and
    :c:func:`PyObject_Size`, and has the same signature.  This slot may be set to
    ``NULL`` if the object has no defined length.
 
 .. c:member:: binaryfunc PyMappingMethods.mp_subscript
+
+   .. corresponding-type-slot:: Py_mp_subscript
 
    This function is used by :c:func:`PyObject_GetItem` and
    :c:func:`PySequence_GetSlice`, and has the same signature as
@@ -2329,6 +2610,8 @@ Mapping Object Structures
    otherwise.
 
 .. c:member:: objobjargproc PyMappingMethods.mp_ass_subscript
+
+   .. corresponding-type-slot:: Py_mp_ass_subscript
 
    This function is used by :c:func:`PyObject_SetItem`,
    :c:func:`PyObject_DelItem`, :c:func:`PySequence_SetSlice` and
@@ -2341,7 +2624,7 @@ Mapping Object Structures
 .. _sequence-structs:
 
 Sequence Object Structures
-==========================
+--------------------------
 
 .. sectionauthor:: Amaury Forgeot d'Arc
 
@@ -2353,6 +2636,8 @@ Sequence Object Structures
 
 .. c:member:: lenfunc PySequenceMethods.sq_length
 
+   .. corresponding-type-slot:: Py_sq_length
+
    This function is used by :c:func:`PySequence_Size` and
    :c:func:`PyObject_Size`, and has the same signature.  It is also used for
    handling negative indices via the :c:member:`~PySequenceMethods.sq_item`
@@ -2360,17 +2645,23 @@ Sequence Object Structures
 
 .. c:member:: binaryfunc PySequenceMethods.sq_concat
 
+   .. corresponding-type-slot:: Py_sq_concat
+
    This function is used by :c:func:`PySequence_Concat` and has the same
    signature.  It is also used by the ``+`` operator, after trying the numeric
    addition via the :c:member:`~PyNumberMethods.nb_add` slot.
 
 .. c:member:: ssizeargfunc PySequenceMethods.sq_repeat
 
+   .. corresponding-type-slot:: Py_sq_repeat
+
    This function is used by :c:func:`PySequence_Repeat` and has the same
    signature.  It is also used by the ``*`` operator, after trying numeric
    multiplication via the :c:member:`~PyNumberMethods.nb_multiply` slot.
 
 .. c:member:: ssizeargfunc PySequenceMethods.sq_item
+
+   .. corresponding-type-slot:: Py_sq_item
 
    This function is used by :c:func:`PySequence_GetItem` and has the same
    signature.  It is also used by :c:func:`PyObject_GetItem`, after trying
@@ -2385,6 +2676,8 @@ Sequence Object Structures
 
 .. c:member:: ssizeobjargproc PySequenceMethods.sq_ass_item
 
+   .. corresponding-type-slot:: Py_sq_ass_item
+
    This function is used by :c:func:`PySequence_SetItem` and has the same
    signature.  It is also used by :c:func:`PyObject_SetItem` and
    :c:func:`PyObject_DelItem`, after trying the item assignment and deletion
@@ -2394,12 +2687,16 @@ Sequence Object Structures
 
 .. c:member:: objobjproc PySequenceMethods.sq_contains
 
+   .. corresponding-type-slot:: Py_sq_contains
+
    This function may be used by :c:func:`PySequence_Contains` and has the same
    signature.  This slot may be left to ``NULL``, in this case
    :c:func:`!PySequence_Contains` simply traverses the sequence until it
    finds a match.
 
 .. c:member:: binaryfunc PySequenceMethods.sq_inplace_concat
+
+   .. corresponding-type-slot:: Py_sq_inplace_concat
 
    This function is used by :c:func:`PySequence_InPlaceConcat` and has the same
    signature.  It should modify its first operand, and return it.  This slot
@@ -2409,6 +2706,8 @@ Sequence Object Structures
    via the :c:member:`~PyNumberMethods.nb_inplace_add` slot.
 
 .. c:member:: ssizeargfunc PySequenceMethods.sq_inplace_repeat
+
+   .. corresponding-type-slot:: Py_sq_inplace_repeat
 
    This function is used by :c:func:`PySequence_InPlaceRepeat` and has the same
    signature.  It should modify its first operand, and return it.  This slot
@@ -2421,7 +2720,7 @@ Sequence Object Structures
 .. _buffer-structs:
 
 Buffer Object Structures
-========================
+------------------------
 
 .. sectionauthor:: Greg J. Stein <greg@lyra.org>
 .. sectionauthor:: Benjamin Peterson
@@ -2434,6 +2733,8 @@ Buffer Object Structures
    an exporter object can expose its internal data to consumer objects.
 
 .. c:member:: getbufferproc PyBufferProcs.bf_getbuffer
+
+   .. corresponding-type-slot:: Py_bf_getbuffer
 
    The signature of this function is::
 
@@ -2484,6 +2785,8 @@ Buffer Object Structures
 
 .. c:member:: releasebufferproc PyBufferProcs.bf_releasebuffer
 
+   .. corresponding-type-slot:: Py_bf_releasebuffer
+
    The signature of this function is::
 
        void (PyObject *exporter, Py_buffer *view);
@@ -2516,7 +2819,7 @@ Buffer Object Structures
 
 
 Async Object Structures
-=======================
+-----------------------
 
 .. sectionauthor:: Yury Selivanov <yselivanov@sprymix.com>
 
@@ -2538,6 +2841,8 @@ Async Object Structures
 
 .. c:member:: unaryfunc PyAsyncMethods.am_await
 
+   .. corresponding-type-slot:: Py_am_await
+
    The signature of this function is::
 
       PyObject *am_await(PyObject *self);
@@ -2548,6 +2853,8 @@ Async Object Structures
    This slot may be set to ``NULL`` if an object is not an :term:`awaitable`.
 
 .. c:member:: unaryfunc PyAsyncMethods.am_aiter
+
+   .. corresponding-type-slot:: Py_am_aiter
 
    The signature of this function is::
 
@@ -2561,6 +2868,8 @@ Async Object Structures
 
 .. c:member:: unaryfunc PyAsyncMethods.am_anext
 
+   .. corresponding-type-slot:: Py_am_anext
+
    The signature of this function is::
 
       PyObject *am_anext(PyObject *self);
@@ -2570,6 +2879,8 @@ Async Object Structures
    This slot may be set to ``NULL``.
 
 .. c:member:: sendfunc PyAsyncMethods.am_send
+
+   .. corresponding-type-slot:: Py_am_send
 
    The signature of this function is::
 
@@ -2584,7 +2895,7 @@ Async Object Structures
 .. _slot-typedefs:
 
 Slot Type typedefs
-==================
+------------------
 
 .. c:type:: PyObject *(*allocfunc)(PyTypeObject *cls, Py_ssize_t nitems)
 
@@ -2607,7 +2918,7 @@ Slot Type typedefs
 
    See :c:member:`~PyTypeObject.tp_free`.
 
-.. c:type:: PyObject *(*newfunc)(PyObject *, PyObject *, PyObject *)
+.. c:type:: PyObject *(*newfunc)(PyTypeObject *, PyObject *, PyObject *)
 
    See :c:member:`~PyTypeObject.tp_new`.
 
@@ -2693,7 +3004,7 @@ Slot Type typedefs
 .. _typedef-examples:
 
 Examples
-========
+--------
 
 The following are simple examples of Python type definitions.  They
 include common usage you may encounter.  Some demonstrate tricky corner

@@ -2,42 +2,64 @@
 Configure Python
 ****************
 
+.. highlight:: sh
+
 Build Requirements
 ==================
 
-Features required to build CPython:
+Features and minimum versions required to build CPython:
 
 * A `C11 <https://en.cppreference.com/w/c/11>`_ compiler. `Optional C11
   features
   <https://en.wikipedia.org/wiki/C11_(C_standard_revision)#Optional_features>`_
   are not required.
 
-* Support for `IEEE 754 <https://en.wikipedia.org/wiki/IEEE_754>`_ floating
-  point numbers and `floating point Not-a-Number (NaN)
+* On Windows, Microsoft Visual Studio 2017 or later is required.
+
+* Support for `IEEE 754 <https://en.wikipedia.org/wiki/IEEE_754>`_
+  floating-point numbers and `floating-point Not-a-Number (NaN)
   <https://en.wikipedia.org/wiki/NaN#Floating_point>`_.
 
 * Support for threads.
 
-* OpenSSL 1.1.1 or newer for the :mod:`ssl` and :mod:`hashlib` modules.
+* OpenSSL 1.1.1 is the minimum version and OpenSSL 3.0.18 is the recommended
+  minimum version for the :mod:`ssl` and :mod:`hashlib` extension modules.
 
-* On Windows, Microsoft Visual Studio 2017 or later is required.
+* SQLite 3.15.2 for the :mod:`sqlite3` extension module.
 
-.. versionchanged:: 3.11
-   C11 compiler, IEEE 754 and NaN support are now required.
-   On Windows, Visual Studio 2017 or later is required.
+* Tcl/Tk 8.5.12 for the :mod:`tkinter` module.
 
-.. versionchanged:: 3.10
-   OpenSSL 1.1.1 is now required.
+* `libmpdec <https://www.bytereef.org/mpdecimal/doc/libmpdec/>`_ 2.5.0
+  for the :mod:`decimal` module.
 
-.. versionchanged:: 3.7
-   Thread support and OpenSSL 1.0.2 are now required.
+* Autoconf 2.71 and aclocal 1.16.5 are required to regenerate the
+  :file:`configure` script.
+
+.. versionchanged:: 3.1
+   Tcl/Tk version 8.3.1 is now required.
+
+.. versionchanged:: 3.5
+   On Windows, Visual Studio 2015 or later is now required.
+   Tcl/Tk version 8.4 is now required.
 
 .. versionchanged:: 3.6
    Selected C99 features are now required, like ``<stdint.h>`` and ``static
    inline`` functions.
 
-.. versionchanged:: 3.5
-   On Windows, Visual Studio 2015 or later is required.
+.. versionchanged:: 3.7
+   Thread support and OpenSSL 1.0.2 are now required.
+
+.. versionchanged:: 3.10
+   OpenSSL 1.1.1 is now required.
+   Require SQLite 3.7.15.
+
+.. versionchanged:: 3.11
+   C11 compiler, IEEE 754 and NaN support are now required.
+   On Windows, Visual Studio 2017 or later is required.
+   Tcl/Tk version 8.5.12 is now required for the :mod:`tkinter` module.
+
+.. versionchanged:: 3.13
+   Autoconf 2.71, aclocal 1.16.5 and SQLite 3.15.2 are now required.
 
 See also :pep:`7` "Style Guide for C Code" and :pep:`11` "CPython platform
 support".
@@ -78,7 +100,7 @@ The generated files can change depending on the exact ``autoconf-archive``,
 Configure Options
 =================
 
-List all ``./configure`` script options using::
+List all :file:`configure` script options using::
 
     ./configure --help
 
@@ -205,15 +227,242 @@ General Options
 
 .. option:: --enable-pystats
 
-   Turn on internal statistics gathering.
+   Turn on internal Python performance statistics gathering.
+
+   By default, statistics gathering is off. Use ``python3 -X pystats`` command
+   or set ``PYTHONSTATS=1`` environment variable to turn on statistics
+   gathering at Python startup.
+
+   At Python exit, dump statistics if statistics gathering was on and not
+   cleared.
+
+   Effects:
+
+   * Add :option:`-X pystats <-X>` command line option.
+   * Add :envvar:`!PYTHONSTATS` environment variable.
+   * Define the ``Py_STATS`` macro.
+   * Add functions to the :mod:`sys` module:
+
+     * :func:`!sys._stats_on`: Turns on statistics gathering.
+     * :func:`!sys._stats_off`: Turns off statistics gathering.
+     * :func:`!sys._stats_clear`: Clears the statistics.
+     * :func:`!sys._stats_dump`: Dump statistics to file, and clears the statistics.
 
    The statistics will be dumped to a arbitrary (probably unique) file in
-   ``/tmp/py_stats/``, or ``C:\temp\py_stats\`` on Windows. If that directory
-   does not exist, results will be printed on stdout.
+   ``/tmp/py_stats/`` (Unix) or ``C:\temp\py_stats\`` (Windows). If that
+   directory does not exist, results will be printed on stderr.
 
    Use ``Tools/scripts/summarize_stats.py`` to read the stats.
 
+   Statistics:
+
+   * Opcode:
+
+     * Specialization: success, failure, hit, deferred, miss, deopt, failures;
+     * Execution count;
+     * Pair count.
+
+   * Call:
+
+     * Inlined Python calls;
+     * PyEval calls;
+     * Frames pushed;
+     * Frame object created;
+     * Eval calls: vector, generator, legacy, function VECTORCALL, build class,
+       slot, function "ex", API, method.
+
+   * Object:
+
+     * incref and decref;
+     * interpreter incref and decref;
+     * allocations: all, 512 bytes, 4 kiB, big;
+     * free;
+     * to/from free lists;
+     * dictionary materialized/dematerialized;
+     * type cache;
+     * optimization attempts;
+     * optimization traces created/executed;
+     * uops executed.
+
+   * Garbage collector:
+
+     * Garbage collections;
+     * Objects visited;
+     * Objects collected.
+
    .. versionadded:: 3.11
+
+.. _free-threading-build:
+
+.. option:: --disable-gil
+
+   Enables **experimental** support for running Python without the
+   :term:`global interpreter lock` (GIL): free threading build.
+
+   Defines the ``Py_GIL_DISABLED`` macro and adds ``"t"`` to
+   :data:`sys.abiflags`.
+
+   See :ref:`whatsnew313-free-threaded-cpython` for more detail.
+
+   .. versionadded:: 3.13
+
+.. option:: --enable-experimental-jit=[no|yes|yes-off|interpreter]
+
+   Indicate how to integrate the :ref:`JIT compiler <whatsnew313-jit-compiler>`.
+
+   * ``no`` - build the interpreter without the JIT.
+   * ``yes`` - build the interpreter with the JIT.
+   * ``yes-off`` - build the interpreter with the JIT but disable it by default.
+   * ``interpreter`` - build the interpreter without the JIT, but with the tier 2 enabled interpreter.
+
+   By convention, ``--enable-experimental-jit`` is a shorthand for ``--enable-experimental-jit=yes``.
+
+   .. note::
+
+      When building CPython with JIT enabled, ensure that your system has Python 3.11 or later installed.
+
+   .. versionadded:: 3.13
+
+.. option:: PKG_CONFIG
+
+   Path to ``pkg-config`` utility.
+
+.. option:: PKG_CONFIG_LIBDIR
+.. option:: PKG_CONFIG_PATH
+
+   ``pkg-config`` options.
+
+
+C compiler options
+------------------
+
+.. option:: CC
+
+   C compiler command.
+
+.. option:: CFLAGS
+
+   C compiler flags.
+
+.. option:: CPP
+
+   C preprocessor command.
+
+.. option:: CPPFLAGS
+
+   C preprocessor flags, e.g. :samp:`-I{include_dir}`.
+
+
+Linker options
+--------------
+
+.. option:: LDFLAGS
+
+   Linker flags, e.g. :samp:`-L{library_directory}`.
+
+.. option:: LIBS
+
+   Libraries to pass to the linker, e.g. :samp:`-l{library}`.
+
+.. option:: MACHDEP
+
+   Name for machine-dependent library files.
+
+
+Options for third-party dependencies
+------------------------------------
+
+.. versionadded:: 3.11
+
+.. option:: BZIP2_CFLAGS
+.. option:: BZIP2_LIBS
+
+   C compiler and linker flags to link Python to ``libbz2``, used by :mod:`bz2`
+   module, overriding ``pkg-config``.
+
+.. option:: CURSES_CFLAGS
+.. option:: CURSES_LIBS
+
+   C compiler and linker flags for ``libncurses`` or ``libncursesw``, used by
+   :mod:`curses` module, overriding ``pkg-config``.
+
+.. option:: GDBM_CFLAGS
+.. option:: GDBM_LIBS
+
+   C compiler and linker flags for ``gdbm``.
+
+.. option:: LIBB2_CFLAGS
+.. option:: LIBB2_LIBS
+
+   C compiler and linker flags for ``libb2`` (:ref:`BLAKE2 <hashlib-blake2>`),
+   used by :mod:`hashlib` module, overriding ``pkg-config``.
+
+.. option:: LIBEDIT_CFLAGS
+.. option:: LIBEDIT_LIBS
+
+   C compiler and linker flags for ``libedit``, used by :mod:`readline` module,
+   overriding ``pkg-config``.
+
+.. option:: LIBFFI_CFLAGS
+.. option:: LIBFFI_LIBS
+
+   C compiler and linker flags for ``libffi``, used by :mod:`ctypes` module,
+   overriding ``pkg-config``.
+
+.. option:: LIBMPDEC_CFLAGS
+.. option:: LIBMPDEC_LIBS
+
+   C compiler and linker flags for ``libmpdec``, used by :mod:`decimal` module,
+   overriding ``pkg-config``.
+
+   .. note::
+
+      These environment variables have no effect unless
+      :option:`--with-system-libmpdec` is specified.
+
+.. option:: LIBLZMA_CFLAGS
+.. option:: LIBLZMA_LIBS
+
+   C compiler and linker flags for ``liblzma``, used by :mod:`lzma` module,
+   overriding ``pkg-config``.
+
+.. option:: LIBREADLINE_CFLAGS
+.. option:: LIBREADLINE_LIBS
+
+   C compiler and linker flags for ``libreadline``, used by :mod:`readline`
+   module, overriding ``pkg-config``.
+
+.. option:: LIBSQLITE3_CFLAGS
+.. option:: LIBSQLITE3_LIBS
+
+   C compiler and linker flags for ``libsqlite3``, used by :mod:`sqlite3`
+   module, overriding ``pkg-config``.
+
+.. option:: LIBUUID_CFLAGS
+.. option:: LIBUUID_LIBS
+
+   C compiler and linker flags for ``libuuid``, used by :mod:`uuid` module,
+   overriding ``pkg-config``.
+
+.. option:: PANEL_CFLAGS
+.. option:: PANEL_LIBS
+
+   C compiler and linker flags for PANEL, overriding ``pkg-config``.
+
+   C compiler and linker flags for ``libpanel`` or ``libpanelw``, used by
+   :mod:`curses.panel` module, overriding ``pkg-config``.
+
+.. option:: TCLTK_CFLAGS
+.. option:: TCLTK_LIBS
+
+   C compiler and linker flags for TCLTK, overriding ``pkg-config``.
+
+.. option:: ZLIB_CFLAGS
+.. option:: ZLIB_LIBS
+
+   C compiler and linker flags for ``libzlib``, used by :mod:`gzip` module,
+   overriding ``pkg-config``.
+
 
 WebAssembly Options
 -------------------
@@ -300,6 +549,15 @@ also be used to improve performance.
    GCC is used: add ``-fno-semantic-interposition`` to the compiler and linker
    flags.
 
+   .. note::
+
+      During the build, you may encounter compiler warnings about
+      profile data not being available for some source files.
+      These warnings are harmless, as only a subset of the code is exercised
+      during profile data acquisition.
+      To disable these warnings on Clang, manually suppress them by adding
+      ``-Wno-profile-instr-unprofiled`` to :envvar:`CFLAGS`.
+
    .. versionadded:: 3.6
 
    .. versionchanged:: 3.10
@@ -313,6 +571,9 @@ also be used to improve performance.
    Default: ``-m test --pgo --timeout=$(TESTTIMEOUT)``.
 
    .. versionadded:: 3.8
+
+   .. versionchanged:: 3.13
+      Task failure is no longer ignored silently.
 
 .. option:: --with-lto=[full|thin|no|yes]
 
@@ -354,10 +615,30 @@ also be used to improve performance.
 
    .. versionadded:: 3.12
 
+.. option:: BOLT_APPLY_FLAGS
+
+   Arguments to ``llvm-bolt`` when creating a `BOLT optimized binary
+   <https://github.com/facebookarchive/BOLT>`_.
+
+   .. versionadded:: 3.12
+
+.. option:: BOLT_INSTRUMENT_FLAGS
+
+   Arguments to ``llvm-bolt`` when instrumenting binaries.
+
+   .. versionadded:: 3.12
+
 .. option:: --with-computed-gotos
 
    Enable computed gotos in evaluation loop (enabled by default on supported
    compilers).
+
+.. option:: --without-mimalloc
+
+   Disable the fast :ref:`mimalloc <mimalloc>` allocator
+   (enabled by default).
+
+   See also :envvar:`PYTHONMALLOC` environment variable.
 
 .. option:: --without-pymalloc
 
@@ -427,10 +708,11 @@ See also the :ref:`Python Development Mode <devmode>` and the
 :option:`--with-trace-refs` configure option.
 
 .. versionchanged:: 3.8
-   Release builds and debug builds are now ABI compatible: defining the
+   Release builds are now ABI compatible with debug builds: defining the
    ``Py_DEBUG`` macro no longer implies the ``Py_TRACE_REFS`` macro (see the
-   :option:`--with-trace-refs` option), which introduces the only ABI
-   incompatibility.
+   :option:`--with-trace-refs` option). However, debug builds still expose
+   more symbols than release builds and code built against a debug build is not
+   necessarily compatible with a release build.
 
 
 Debug options
@@ -448,13 +730,19 @@ Debug options
    Effects:
 
    * Define the ``Py_TRACE_REFS`` macro.
-   * Add :func:`!sys.getobjects` function.
+   * Add :func:`sys.getobjects` function.
    * Add :envvar:`PYTHONDUMPREFS` environment variable.
 
-   This build is not ABI compatible with release build (default build) or debug
-   build (``Py_DEBUG`` and ``Py_REF_DEBUG`` macros).
+   The :envvar:`PYTHONDUMPREFS` environment variable can be used to dump
+   objects and reference counts still alive at Python exit.
+
+   :ref:`Statically allocated objects <static-types>` are not traced.
 
    .. versionadded:: 3.8
+
+   .. versionchanged:: 3.13
+      This build is now ABI compatible with release build and :ref:`debug build
+      <debug-build>`.
 
 .. option:: --with-assertions
 
@@ -485,6 +773,9 @@ Debug options
 .. option:: --with-address-sanitizer
 
    Enable AddressSanitizer memory error detector, ``asan`` (default is no).
+   To improve ASan detection capabilities you may also want to combine this
+   with :option:`--without-pymalloc` to disable the specialized small-object
+   allocator whose allocations are not tracked by ASan.
 
    .. versionadded:: 3.6
 
@@ -500,6 +791,13 @@ Debug options
    (default is no).
 
    .. versionadded:: 3.6
+
+.. option:: --with-thread-sanitizer
+
+   Enable ThreadSanitizer data race detector, ``tsan``
+   (default is no).
+
+   .. versionadded:: 3.13
 
 
 Linker options
@@ -531,16 +829,26 @@ Libraries options
 
 .. option:: --with-system-libmpdec
 
-   Build the ``_decimal`` extension module using an installed ``mpdec``
-   library, see the :mod:`decimal` module (default is no).
+   Build the ``_decimal`` extension module using an installed ``mpdecimal``
+   library, see the :mod:`decimal` module (default is yes).
 
    .. versionadded:: 3.3
 
-.. option:: --with-readline=editline
+   .. versionchanged:: 3.13
+      Default to using the installed ``mpdecimal`` library.
 
-   Use ``editline`` library for backend of the :mod:`readline` module.
+   .. deprecated-removed:: 3.13 3.16
+      A copy of the ``mpdecimal`` library sources will no longer be distributed
+      with Python 3.16.
 
-   Define the ``WITH_EDITLINE`` macro.
+   .. seealso:: :option:`LIBMPDEC_CFLAGS` and :option:`LIBMPDEC_LIBS`.
+
+.. option:: --with-readline=readline|editline
+
+   Designate a backend library for the :mod:`readline` module.
+
+   * readline: Use readline as the backend.
+   * editline: Use editline as the backend.
 
    .. versionadded:: 3.10
 
@@ -627,7 +935,7 @@ Security Options
 macOS Options
 -------------
 
-See ``Mac/README.rst``.
+See :source:`Mac/README.rst`.
 
 .. option:: --enable-universalsdk
 .. option:: --enable-universalsdk=SDKDIR
@@ -648,19 +956,50 @@ See ``Mac/README.rst``.
 
    Options:
 
-   * ``universal2``;
-   * ``32-bit``;
-   * ``64-bit``;
-   * ``3-way``;
-   * ``intel``;
-   * ``intel-32``;
-   * ``intel-64``;
-   * ``all``.
+   * ``universal2`` (x86-64 and arm64);
+   * ``32-bit`` (PPC and i386);
+   * ``64-bit``  (PPC64 and x86-64);
+   * ``3-way`` (i386, PPC and x86-64);
+   * ``intel`` (i386 and x86-64);
+   * ``intel-32`` (i386);
+   * ``intel-64`` (x86-64);
+   * ``all``  (PPC, i386, PPC64 and x86-64).
+
+   Note that values for this configuration item are *not* the same as the
+   identifiers used for universal binary wheels on macOS. See the Python
+   Packaging User Guide for details on the `packaging platform compatibility
+   tags used on macOS
+   <https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/#macos>`_
 
 .. option:: --with-framework-name=FRAMEWORK
 
    Specify the name for the python framework on macOS only valid when
    :option:`--enable-framework` is set (default: ``Python``).
+
+.. option:: --with-app-store-compliance
+.. option:: --with-app-store-compliance=PATCH-FILE
+
+   The Python standard library contains strings that are known to trigger
+   automated inspection tool errors when submitted for distribution by
+   the macOS and iOS App Stores. If enabled, this option will apply the list of
+   patches that are known to correct app store compliance. A custom patch
+   file can also be specified. This option is disabled by default.
+
+   .. versionadded:: 3.13
+
+iOS Options
+-----------
+
+See :source:`iOS/README.rst`.
+
+.. option:: --enable-framework=INSTALLDIR
+
+   Create a Python.framework. Unlike macOS, the *INSTALLDIR* argument
+   specifying the installation path is mandatory.
+
+.. option:: --with-framework-name=FRAMEWORK
+
+   Specify the name for the framework (default: ``Python``).
 
 
 Cross Compiling Options
@@ -689,12 +1028,20 @@ the version of the cross compiled host Python.
 
    An environment variable that points to a file with configure overrides.
 
-   Example *config.site* file::
+   Example *config.site* file:
+
+   .. code-block:: ini
 
       # config.site-aarch64
       ac_cv_buggy_getaddrinfo=no
       ac_cv_file__dev_ptmx=yes
       ac_cv_file__dev_ptc=no
+
+.. option:: HOSTRUNNER
+
+   Program to run CPython for the host platform for cross-compilation.
+
+   .. versionadded:: 3.11
 
 
 Cross compiling example::
@@ -729,30 +1076,108 @@ Main build steps
 Main Makefile targets
 ---------------------
 
-* ``make``: Build Python with the standard library.
-* ``make platform:``: build the ``python`` program, but don't build the
-  standard library extension modules.
-* ``make profile-opt``: build Python using Profile Guided Optimization (PGO).
-  You can use the configure :option:`--enable-optimizations` option to make
-  this the default target of the ``make`` command (``make all`` or just
-  ``make``).
-* ``make buildbottest``: Build Python and run the Python test suite, the same
-  way than buildbots test Python. Set ``TESTTIMEOUT`` variable (in seconds)
-  to change the test timeout (1200 by default: 20 minutes).
-* ``make install``: Build and install Python.
-* ``make regen-all``: Regenerate (almost) all generated files;
-  ``make regen-stdlib-module-names`` and ``autoconf`` must be run separately
-  for the remaining generated files.
-* ``make clean``: Remove built files.
-* ``make distclean``: Same than ``make clean``, but remove also files created
-  by the configure script.
+make
+^^^^
+
+For the most part, when rebuilding after editing some code or
+refreshing your checkout from upstream, all you need to do is execute
+``make``, which (per Make's semantics) builds the default target, the
+first one defined in the Makefile.  By tradition (including in the
+CPython project) this is usually the ``all`` target. The
+``configure`` script expands an ``autoconf`` variable,
+``@DEF_MAKE_ALL_RULE@`` to describe precisely which targets ``make
+all`` will build. The three choices are:
+
+* ``profile-opt`` (configured with ``--enable-optimizations``)
+* ``build_wasm`` (configured with ``--with-emscripten-target``)
+* ``build_all`` (configured without explicitly using either of the others)
+
+Depending on the most recent source file changes, Make will rebuild
+any targets (object files and executables) deemed out-of-date,
+including running ``configure`` again if necessary. Source/target
+dependencies are many and maintained manually however, so Make
+sometimes doesn't have all the information necessary to correctly
+detect all targets which need to be rebuilt.  Depending on which
+targets aren't rebuilt, you might experience a number of problems. If
+you have build or test problems which you can't otherwise explain,
+``make clean && make`` should work around most dependency problems, at
+the expense of longer build times.
+
+
+make platform
+^^^^^^^^^^^^^
+
+Build the ``python`` program, but don't build the standard library
+extension modules. This generates a file named ``platform`` which
+contains a single line describing the details of the build platform,
+e.g., ``macosx-14.3-arm64-3.12`` or ``linux-x86_64-3.13``.
+
+
+make profile-opt
+^^^^^^^^^^^^^^^^
+
+Build Python using profile-guided optimization (PGO).  You can use the
+configure :option:`--enable-optimizations` option to make this the
+default target of the ``make`` command (``make all`` or just
+``make``).
+
+
+
+make clean
+^^^^^^^^^^
+
+Remove built files.
+
+
+make distclean
+^^^^^^^^^^^^^^
+
+In addition to the work done by ``make clean``, remove files
+created by the configure script.  ``configure`` will have to be run
+before building again. [#]_
+
+
+make install
+^^^^^^^^^^^^
+
+Build the ``all`` target and install Python.
+
+
+make test
+^^^^^^^^^
+
+Build the ``all`` target and run the Python test suite with the
+``--fast-ci`` option. Variables:
+
+* ``TESTOPTS``: additional regrtest command-line options.
+* ``TESTPYTHONOPTS``: additional Python command-line options.
+* ``TESTTIMEOUT``: timeout in seconds (default: 10 minutes).
+
+
+make buildbottest
+^^^^^^^^^^^^^^^^^
+
+This is similar to ``make test``, but uses the ``--slow-ci``
+option and default timeout of 20 minutes, instead of ``--fast-ci`` option.
+
+
+make regen-all
+^^^^^^^^^^^^^^
+
+Regenerate (almost) all generated files. These include (but are not
+limited to) bytecode cases, and parser generator file.
+``make regen-stdlib-module-names`` and ``autoconf`` must be run
+separately for the remaining `generated files <#generated-files>`_.
+
 
 C extensions
 ------------
 
 Some C extensions are built as built-in modules, like the ``sys`` module.
 They are built with the ``Py_BUILD_CORE_BUILTIN`` macro defined.
-Built-in modules have no ``__file__`` attribute::
+Built-in modules have no ``__file__`` attribute:
+
+.. code-block:: pycon
 
     >>> import sys
     >>> sys
@@ -764,7 +1189,9 @@ Built-in modules have no ``__file__`` attribute::
 
 Other C extensions are built as dynamic libraries, like the ``_asyncio`` module.
 They are built with the ``Py_BUILD_CORE_MODULE`` macro defined.
-Example on Linux x86-64::
+Example on Linux x86-64:
+
+.. code-block:: pycon
 
     >>> import _asyncio
     >>> _asyncio
@@ -1036,3 +1463,14 @@ Linker flags
    Linker flags used for building the interpreter object files.
 
    .. versionadded:: 3.8
+
+
+.. rubric:: Footnotes
+
+.. [#] ``git clean -fdx`` is an even more extreme way to "clean" your
+   checkout. It removes all files not known to Git.
+   When bug hunting using ``git bisect``, this is
+   `recommended between probes <https://github.com/python/cpython/issues/114505#issuecomment-1907021718>`_
+   to guarantee a completely clean build. **Use with care**, as it
+   will delete all files not checked into Git, including your
+   new, uncommitted work.
