@@ -70,7 +70,13 @@
       <!-- from python.props -->
       <PreprocessorDefinitions>_USRDLL;Py_BUILD_CORE;Py_BUILD_CORE_BUILTIN;Py_ENABLE_SHARED;MS_DLL_ID="";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)PC;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- $(IntDir) comes before $(PySourcePath)PC so the
+           build-time-generated pyconfig.h (see GenerateMagPythonConfigH
+           target below) shadows anything in PC; in CPython 3.13 PC
+           ships pyconfig.h.in (template) rather than pyconfig.h, so
+           there's nothing to shadow today, but ordering matters if
+           upstream restores the .h name in a future bump. -->
+      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(PySourcePath)Modules\_hacl\include;$(PySourcePath)Modules\_hacl\internal;$(PySourcePath)Python;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(zlibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <!-- end from python.props -->
@@ -138,7 +144,6 @@
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\genobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\import.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\initconfig.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\cpython\interpreteridobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\listobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\longintrepr.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\longobject.h" />
@@ -148,9 +153,7 @@
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\object.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\objimpl.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\odictobject.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\cpython\parser_interface.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\picklebufobject.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\cpython\pyarena.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\pyctype.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\pydebug.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\cpython\pyerrors.h" />
@@ -185,15 +188,12 @@
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_ast.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_ast_state.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_atexit.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_atomic.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_atomic_funcs.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_bitutils.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_bytes_methods.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_bytesobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_call.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_ceval.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_ceval_state.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_cfg.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_code.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_compile.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_condvar.h" />
@@ -261,7 +261,6 @@
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_unicodeobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_unicodeobject_generated.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\internal\pycore_warnings.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\interpreteridobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\intrcheck.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\iterobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\listobject.h" />
@@ -301,15 +300,12 @@
     <ClInclude Include="$(PythonSourceDir)\Include\sliceobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\structmember.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\structseq.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\symtable.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\sysmodule.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\traceback.h" />
-    <ClInclude Include="$(PythonSourceDir)\Include\tracemalloc.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\tupleobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\unicodeobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Include\weakrefobject.h" />
     <ClInclude Include="$(PythonSourceDir)\Modules\_math.h" />
-    <ClInclude Include="$(PythonSourceDir)\Modules\hashtable.h" />
     <ClInclude Include="$(PythonSourceDir)\Modules\rotatingtree.h" />
     <ClInclude Include="$(PythonSourceDir)\Modules\_io\_iomodule.h" />
     <ClInclude Include="$(PythonSourceDir)\Modules\cjkcodecs\alg_jisx0201.h" />
@@ -329,13 +325,20 @@
     <ClInclude Include="$(PythonSourceDir)\Objects\stringlib\replace.h" />
     <ClInclude Include="$(PythonSourceDir)\Objects\stringlib\split.h" />
     <ClInclude Include="$(PythonSourceDir)\Objects\unicodetype_db.h" />
-    <ClInclude Include="$(PythonSourceDir)\Parser\tokenizer.h" />
+    <ClInclude Include="$(PythonSourceDir)\Parser\lexer\buffer.h" />
+    <ClInclude Include="$(PythonSourceDir)\Parser\lexer\lexer.h" />
+    <ClInclude Include="$(PythonSourceDir)\Parser\lexer\state.h" />
+    <ClInclude Include="$(PythonSourceDir)\Parser\tokenizer\helpers.h" />
+    <ClInclude Include="$(PythonSourceDir)\Parser\tokenizer\tokenizer.h" />
     <ClInclude Include="$(PythonSourceDir)\Parser\string_parser.h" />
     <ClInclude Include="$(PythonSourceDir)\Parser\pegen.h" />
     <ClInclude Include="$(PythonSourceDir)\PC\errmap.h" />
-    <ClInclude Include="$(PythonSourceDir)\PC\pyconfig.h" />
+    <!-- pyconfig.h is generated at build time from PC\pyconfig.h.in by
+         the GenerateMagPythonConfigH target below; the upstream template
+         is included here (and not the generated copy) so the IDE shows
+         the source of truth. -->
+    <ClInclude Include="$(PythonSourceDir)\PC\pyconfig.h.in" />
     <ClInclude Include="$(PythonSourceDir)\Python\condvar.h" />
-    <ClInclude Include="$(PythonSourceDir)\Python\importdl.h" />
     <ClInclude Include="$(PythonSourceDir)\Python\stdlib_module_names.h" />
     <ClInclude Include="$(PythonSourceDir)\Python\thread_nt.h" />
   </ItemGroup>
@@ -381,7 +384,6 @@
     <ClCompile Include="$(PythonSourceDir)\Modules\_weakref.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\arraymodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\atexitmodule.c" />
-    <ClCompile Include="$(PythonSourceDir)\Modules\audioop.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\binascii.c">
       <PreprocessorDefinitions>USE_ZLIB_CRC32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -411,8 +413,11 @@
     <ClCompile Include="$(PythonSourceDir)\Modules\_typingmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\timemodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\xxsubtype.c" />
-    <ClCompile Include="$(PythonSourceDir)\Modules\_xxsubinterpretersmodule.c" />
-    <ClCompile Include="$(PythonSourceDir)\Modules\_xxinterpchannelsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_interpretersmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_interpchannelsmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_interpqueuesmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_suggestions.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_sysconfig.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_io\fileio.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_io\bytesio.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_io\stringio.c" />
@@ -450,7 +455,6 @@
     <ClCompile Include="$(PythonSourceDir)\Objects\funcobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\genericaliasobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\genobject.c" />
-    <ClCompile Include="$(PythonSourceDir)\Objects\interpreteridobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\iterobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\listobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\longobject.c" />
@@ -474,8 +478,15 @@
     <ClCompile Include="$(PythonSourceDir)\Objects\unionobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\weakrefobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\myreadline.c" />
-    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\token.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\buffer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\lexer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\state.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\file_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\helpers.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\readline_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\string_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\utf8_tokenizer.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\pegen.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\pegen_errors.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\action_helpers.c" />
@@ -484,7 +495,9 @@
     <ClCompile Include="$(PythonSourceDir)\Parser\peg_api.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\invalid_parameter_handler.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\winreg.c" />
-    <ClCompile Include="$(PythonSourceDir)\PC\config.c" />
+    <!-- Project-local replacement for $(PythonSourceDir)\PC\config.c — see
+         MagPython-config.c's header comment for rationale. -->
+    <ClCompile Include="MagPython-config.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\msvcrtmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyhash.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\_warnings.c" />
@@ -495,10 +508,13 @@
     <ClCompile Include="$(PythonSourceDir)\Python\ast_unparse.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\bltinmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\bootstrap_hash.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\brc.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\ceval.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\codecs.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\compile.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\context.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\critical_section.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\crossinterp.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\dynamic_annotations.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\errors.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\fileutils.c" />
@@ -506,6 +522,13 @@
     <ClCompile Include="$(PythonSourceDir)\Python\formatter_unicode.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\frame.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\frozen.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\gc.c" />
+    <!-- gc_free_threading.c and gc_gil.c are mutually-exclusive at the
+         preprocessor level (see Py_GIL_DISABLED). The default build
+         compiles gc_gil.c live and #ifdefs gc_free_threading.c to
+         empty; including both matches upstream pythoncore.vcxproj. -->
+    <ClCompile Include="$(PythonSourceDir)\Python\gc_free_threading.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\gc_gil.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\future.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\getargs.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\getcompiler.c" />
@@ -519,16 +542,30 @@
     <ClCompile Include="$(PythonSourceDir)\Python\import.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\importdl.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\initconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\interpconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\instruction_sequence.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\intrinsics.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\instrumentation.c" />
+    <!-- jit.c / perf_jit_trampoline.c only emit code when
+         _Py_JIT is defined; including them mirrors upstream
+         pythoncore.vcxproj and keeps ifdefs in upstream code happy. -->
+    <ClCompile Include="$(PythonSourceDir)\Python\jit.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\legacy_tracing.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\lock.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\marshal.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\modsupport.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\mysnprintf.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\mystrtoul.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\object_stack.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer_analysis.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer_symbols.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\parking_lot.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pathconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\perf_jit_trampoline.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\perf_trampoline.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\preconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\qsbr.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyarena.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyctype.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyfpe.c" />
@@ -553,11 +590,6 @@
     <ClCompile Include="$(PythonSourceDir)\Python\thread.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\traceback.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\tracemalloc.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- BEGIN deepfreeze -->
-    <ClCompile Include="$(PythonSourceDir)\Python\deepfreeze\deepfreeze.c" />
-    <!-- END deepfreeze -->
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\zlibmodule.c" />
@@ -657,9 +689,46 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 
+  <!-- Generate $(IntDir)\pyconfig.h from PC\pyconfig.h.in with two
+       project-local edits:
+
+         1. The libname pragma (#pragma comment(lib, "python313*.lib"))
+            is rewritten to "MagPython.lib". The pragma only fires for
+            consumers that don't define Py_BUILD_CORE / Py_BUILD_CORE_BUILTIN
+            (i.e. extensions linking against MagPython.dll using our
+            shipped headers), so this affects downstream linkage only.
+
+         2. HAVE_DYNAMIC_LOADING is commented out: libMagPython.dll
+            statically links every C extension it ships (see
+            MagPython-config.c), so the dynamic-loading code paths
+            should not be compiled.
+
+       Doing the substitutions at build time (rather than editing
+       PC\pyconfig.h.in in the imported tree) keeps the imported tree
+       byte-identical to upstream, so update-python.sh's wipe-and-replace
+       doesn't have to be followed by a manual re-patch step on Windows. -->
+  <Target Name="GenerateMagPythonConfigH" BeforeTargets="ClCompile" Inputs="$(PythonSourceDir)\PC\pyconfig.h.in" Outputs="$(IntDir)pyconfig.h">
+    <PropertyGroup>
+      <_PyConfigSrc>$([System.IO.File]::ReadAllText('$(PythonSourceDir)\PC\pyconfig.h.in'))</_PyConfigSrc>
+      <!-- Two booleans the assertions below check; computing them in
+           PropertyGroup (rather than directly inside Condition="...")
+           keeps property-function syntax out of the condition parser,
+           which gets confused by file content containing quotes/=/etc. -->
+      <_HasLibnamePragma>$(_PyConfigSrc.Contains('python313'))</_HasLibnamePragma>
+      <_HasDynLoading>$(_PyConfigSrc.Contains('%23define HAVE_DYNAMIC_LOADING'))</_HasDynLoading>
+      <_PyConfigPatched>$(_PyConfigSrc.Replace('"python313t_d.lib"', '"MagPython_d.lib"').Replace('"python313_d.lib"', '"MagPython_d.lib"').Replace('"python313t.lib"', '"MagPython.lib"').Replace('"python313.lib"', '"MagPython.lib"').Replace('"python3t.lib"', '"MagPython.lib"').Replace('"python3.lib"', '"MagPython.lib"').Replace('%23define HAVE_DYNAMIC_LOADING', '/* %23define HAVE_DYNAMIC_LOADING */'))</_PyConfigPatched>
+    </PropertyGroup>
+    <Error Text="GenerateMagPythonConfigH: libname pragma block (python313*.lib) not found in PC\pyconfig.h.in — upstream may have moved or renamed it; update the .Replace() chain in MagPython.vcxproj." Condition="'$(_HasLibnamePragma)' != 'True'" />
+    <Error Text="GenerateMagPythonConfigH: '#define HAVE_DYNAMIC_LOADING' not found in PC\pyconfig.h.in — upstream may have changed the directive; update MagPython.vcxproj." Condition="'$(_HasDynLoading)' != 'True'" />
+    <MakeDir Directories="$(IntDir)" />
+    <WriteLinesToFile File="$(IntDir)pyconfig.h" Lines="$(_PyConfigPatched)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
   <Target Name="CopyArtifacts" AfterTargets="Build">
     <ItemGroup>
-      <ExtraIncludeFile Include="$(PythonSourceDir)\PC\pyconfig.h" />
+      <!-- Ship the build-time-generated pyconfig.h, not the upstream
+           PC\pyconfig.h.in template. -->
+      <ExtraIncludeFile Include="$(IntDir)pyconfig.h" />
       <IncludeFile Include="$(PythonSourceDir)\include\**\*" />
       <PythonFiles Include="$(PythonSourceDir)\lib\**\*.py" />
     </ItemGroup>
