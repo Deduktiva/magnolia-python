@@ -7,7 +7,7 @@ shared library. Three platforms are produced from the same source tree:
 
 | Platform        | Runner          | Main library             |
 | ---             | ---             | ---                      |
-| Windows x86     | `windows-2022`  | `MagPython.dll`          |
+| Windows x86     | `windows-2025`  | `MagPython.dll`          |
 | Linux x86_64    | manylinux_2_28  | `libMagPython.so`        |
 | macOS arm64     | `macos-14`      | `libMagPython.dylib`     |
 
@@ -547,7 +547,7 @@ always reported regardless — `<ClInclude>` ones rot the IDE view,
 `.github/workflows/Build All.yml` is a single matrix-based workflow that
 fans out across three platforms:
 
-- `windows-2022` (x86, MSVC) — runs the existing `msbuild MagPython.metaproj`
+- `windows-2025` (x86, MSVC) — runs the existing `msbuild MagPython.metaproj`
   flow.
 - `ubuntu-22.04` inside the `quay.io/pypa/manylinux_2_28_x86_64` container
   — runs `MagPython/build-linux.sh`.
