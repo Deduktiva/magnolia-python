@@ -53,6 +53,13 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(DepsDir)</AdditionalLibraryDirectories>
+      <!-- libssl.lib / libcrypto.lib are MagPython's responsibility for its
+           own static link, but test.c also calls OpenSSL directly to verify
+           the artifact ships a usable OpenSSL SDK (headers + import libs +
+           DLLs). MagPython.lib is auto-linked via the #pragma in the
+           generated pyconfig.h; OpenSSL has no such pragma, so list its
+           import libs explicitly. -->
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
