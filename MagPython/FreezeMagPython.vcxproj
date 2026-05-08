@@ -58,7 +58,10 @@
       <AdditionalIncludeDirectories>$(OutDir)\include</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <!-- from python.props -->
-      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)PC;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- $(IntDir) precedes $(PySourcePath)PC so the build-time-
+           generated pyconfig.h (see magpython-pyconfig-h.targets,
+           imported below) shadows anything in PC. -->
+      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)Include\internal\mimalloc;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(PySourcePath)Modules\_hacl\include;$(PySourcePath)Modules\_hacl\internal;$(PySourcePath)Python;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <!-- end from python.props -->
       <CompileAsManaged>false</CompileAsManaged>
@@ -130,7 +133,6 @@
     <ClCompile Include="$(PythonSourceDir)\Objects\funcobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\genericaliasobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\genobject.c" />
-    <ClCompile Include="$(PythonSourceDir)\Objects\interpreteridobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\iterobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\listobject.c" />
     <ClCompile Include="$(PythonSourceDir)\Objects\longobject.c" />
@@ -161,7 +163,14 @@
     <ClCompile Include="$(PythonSourceDir)\Parser\action_helpers.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\string_parser.c" />
     <ClCompile Include="$(PythonSourceDir)\Parser\token.c" />
-    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\buffer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\lexer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\lexer\state.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\file_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\helpers.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\readline_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\string_tokenizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Parser\tokenizer\utf8_tokenizer.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\invalid_parameter_handler.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\msvcrtmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\PC\winreg.c" />
@@ -173,10 +182,13 @@
     <ClCompile Include="$(PythonSourceDir)\Python\ast_unparse.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\bltinmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\bootstrap_hash.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\brc.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\ceval.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\codecs.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\compile.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\context.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\critical_section.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\crossinterp.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\dtoa.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\dynamic_annotations.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\errors.c" />
@@ -185,6 +197,13 @@
     <ClCompile Include="$(PythonSourceDir)\Python\formatter_unicode.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\frame.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\future.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\gc.c" />
+    <!-- gc_free_threading.c and gc_gil.c are mutually-exclusive at
+         the preprocessor level (Py_GIL_DISABLED). The default build
+         compiles gc_gil.c live and #ifdefs gc_free_threading.c to
+         empty; including both matches upstream. -->
+    <ClCompile Include="$(PythonSourceDir)\Python\gc_free_threading.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\gc_gil.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\getargs.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\getcompiler.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\getcopyright.c" />
@@ -197,16 +216,29 @@
     <ClCompile Include="$(PythonSourceDir)\Python\import.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\importdl.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\initconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\interpconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\instruction_sequence.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\intrinsics.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\instrumentation.c" />
+    <!-- jit.c / perf_jit_trampoline.c only emit code under _Py_JIT;
+         kept aligned with upstream's _freeze_module.vcxproj. -->
+    <ClCompile Include="$(PythonSourceDir)\Python\jit.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\legacy_tracing.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\lock.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\marshal.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\modsupport.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\mysnprintf.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\mystrtoul.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\object_stack.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer_analysis.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\optimizer_symbols.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\parking_lot.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pathconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\perf_jit_trampoline.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\perf_trampoline.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\preconfig.c" />
+    <ClCompile Include="$(PythonSourceDir)\Python\qsbr.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyarena.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyctype.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\pyfpe.c" />
@@ -360,6 +392,7 @@
     </GetPath>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="magpython-pyconfig-h.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <Target Name="_RebuildGetPath" AfterTargets="_RebuildFrozen" Condition="$(Configuration) != 'PGUpdate'">
@@ -386,45 +419,17 @@
     <Message Text="Updated files: @(_Updated->'%(Filename)%(Extension)',', ')"
              Condition="'@(_Updated)' != ''" Importance="high" />
   </Target>
-  <Target Name="_RebuildDeepFrozen"
-          AfterTargets="_RebuildFrozen"
-          DependsOnTargets="FindPythonForBuild"
-          Condition="$(Configuration) != 'PGUpdate'">
-    <!-- BEGIN deepfreeze rule -->
-	<Exec Command='$(PythonForBuild) "$(PySourcePath)Tools\build\deepfreeze.py" ^
-		 "$(PySourcePath)Python\frozen_modules\importlib._bootstrap.h:importlib._bootstrap" ^
-		 "$(PySourcePath)Python\frozen_modules\importlib._bootstrap_external.h:importlib._bootstrap_external" ^
-		 "$(PySourcePath)Python\frozen_modules\zipimport.h:zipimport" ^
-		 "$(PySourcePath)Python\frozen_modules\abc.h:abc" ^
-		 "$(PySourcePath)Python\frozen_modules\codecs.h:codecs" ^
-		 "$(PySourcePath)Python\frozen_modules\io.h:io" ^
-		 "$(PySourcePath)Python\frozen_modules\_collections_abc.h:_collections_abc" ^
-		 "$(PySourcePath)Python\frozen_modules\_sitebuiltins.h:_sitebuiltins" ^
-		 "$(PySourcePath)Python\frozen_modules\genericpath.h:genericpath" ^
-		 "$(PySourcePath)Python\frozen_modules\ntpath.h:ntpath" ^
-		 "$(PySourcePath)Python\frozen_modules\posixpath.h:posixpath" ^
-		 "$(PySourcePath)Python\frozen_modules\os.h:os" ^
-		 "$(PySourcePath)Python\frozen_modules\site.h:site" ^
-		 "$(PySourcePath)Python\frozen_modules\stat.h:stat" ^
-		 "$(PySourcePath)Python\frozen_modules\importlib.util.h:importlib.util" ^
-		 "$(PySourcePath)Python\frozen_modules\importlib.machinery.h:importlib.machinery" ^
-		 "$(PySourcePath)Python\frozen_modules\runpy.h:runpy" ^
-		 "$(PySourcePath)Python\frozen_modules\__hello__.h:__hello__" ^
-		 "$(PySourcePath)Python\frozen_modules\__phello__.h:__phello__" ^
-		 "$(PySourcePath)Python\frozen_modules\__phello__.ham.h:__phello__.ham" ^
-		 "$(PySourcePath)Python\frozen_modules\__phello__.ham.eggs.h:__phello__.ham.eggs" ^
-		 "$(PySourcePath)Python\frozen_modules\__phello__.spam.h:__phello__.spam" ^
-		 "$(PySourcePath)Python\frozen_modules\frozen_only.h:frozen_only" ^
-		 "-o" "$(PySourcePath)Python\deepfreeze\deepfreeze.c"'/>
-    <!-- END deepfreeze rule -->
-  </Target>
+  <!-- CPython 3.13 removed deepfreeze entirely (the pre-3.13 deep-baked
+       importlib bootstrap as a generated .c file). frozen modules are now
+       the only path, so the _RebuildDeepFrozen target and the
+       Python\deepfreeze\deepfreeze.c clean entry that previously sat here
+       are gone. -->
   <Target Name="_CleanFrozen" BeforeTargets="CoreClean" Condition="$(Configuration) != 'PGUpdate'">
     <ItemGroup>
       <Clean Include="%(None.IntFile)" />
       <Clean Include="%(None.OutFile)" />
       <Clean Include="%(GetPath.IntFile)" />
       <Clean Include="%(GetPath.OutFile)" />
-      <Clean Include="$(PySourcePath)Python\deepfreeze\deepfreeze.c" />
     </ItemGroup>
   </Target>
 </Project>

@@ -1,6 +1,6 @@
-=================================
-:mod:`turtle` --- Turtle graphics
-=================================
+==================================
+:mod:`!turtle` --- Turtle graphics
+==================================
 
 .. module:: turtle
    :synopsis: An educational framework for simple graphics applications
@@ -23,6 +23,15 @@ Turtle graphics is an implementation of `the popular geometric drawing tools
 introduced in Logo <https://en.wikipedia.org/wiki/Turtle_
 (robot)>`_, developed by Wally Feurzeig, Seymour Papert and Cynthia Solomon
 in 1967.
+
+
+Get started
+===========
+
+Imagine a robotic turtle starting at (0, 0) in the x-y plane.  After an ``import turtle``, give it the
+command ``turtle.forward(15)``, and it moves (on-screen!) 15 pixels in the
+direction it is facing, drawing a line as it moves.  Give it the command
+``turtle.right(25)``, and it rotates in-place 25 degrees clockwise.
 
 .. sidebar:: Turtle star
 
@@ -111,7 +120,7 @@ off-screen)::
    home()
 
 The home position is at the center of the turtle's screen. If you ever need to
-know them, get the turtle's x-y co-ordinates with::
+know them, get the turtle's x-y coordinates with::
 
     pos()
 
@@ -356,7 +365,6 @@ Turtle state
       | :func:`resizemode`
       | :func:`shapesize` | :func:`turtlesize`
       | :func:`shearfactor`
-      | :func:`settiltangle`
       | :func:`tiltangle`
       | :func:`tilt`
       | :func:`shapetransform`
@@ -598,7 +606,7 @@ Turtle motion
       >>> turtle.pos()
       (20.00,30.00)
 
-   .. versionadded: 3.12
+   .. versionadded:: 3.12
 
 
 .. function:: setx(x)
@@ -735,13 +743,17 @@ Turtle motion
       180.0
 
 
-.. function:: dot(size=None, *color)
+.. function:: dot()
+              dot(size)
+              dot(color, /)
+              dot(size, color, /)
+              dot(size, r, g, b, /)
 
    :param size: an integer >= 1 (if given)
    :param color: a colorstring or a numeric color tuple
 
    Draw a circular dot with diameter *size*, using *color*.  If *size* is
-   not given, the maximum of pensize+4 and 2*pensize is used.
+   not given, the maximum of ``pensize+4`` and ``2*pensize`` is used.
 
 
    .. doctest::
@@ -979,8 +991,8 @@ Settings for measurement
       >>> turtle.heading()
       90.0
 
-      Change angle measurement unit to grad (also known as gon,
-      grade, or gradian and equals 1/100-th of the right angle.)
+      >>> # Change angle measurement unit to grad (also known as gon,
+      >>> # grade, or gradian and equals 1/100-th of the right angle.)
       >>> turtle.degrees(400.0)
       >>> turtle.heading()
       100.0
@@ -1110,7 +1122,9 @@ Drawing state
 Color control
 ~~~~~~~~~~~~~
 
-.. function:: pencolor(*args)
+.. function:: pencolor()
+              pencolor(color, /)
+              pencolor(r, g, b, /)
 
    Return or set the pencolor.
 
@@ -1119,7 +1133,7 @@ Color control
    ``pencolor()``
       Return the current pencolor as color specification string or
       as a tuple (see example).  May be used as input to another
-      color/pencolor/fillcolor call.
+      color/pencolor/fillcolor/bgcolor call.
 
    ``pencolor(colorstring)``
       Set pencolor to *colorstring*, which is a Tk color specification string,
@@ -1159,7 +1173,9 @@ Color control
       (50.0, 193.0, 143.0)
 
 
-.. function:: fillcolor(*args)
+.. function:: fillcolor()
+              fillcolor(color, /)
+              fillcolor(r, g, b, /)
 
    Return or set the fillcolor.
 
@@ -1168,7 +1184,7 @@ Color control
    ``fillcolor()``
       Return the current fillcolor as color specification string, possibly
       in tuple format (see example).  May be used as input to another
-      color/pencolor/fillcolor call.
+      color/pencolor/fillcolor/bgcolor call.
 
    ``fillcolor(colorstring)``
       Set fillcolor to *colorstring*, which is a Tk color specification string,
@@ -1202,7 +1218,10 @@ Color control
       (255.0, 255.0, 255.0)
 
 
-.. function:: color(*args)
+.. function:: color()
+              color(color, /)
+              color(r, g, b, /)
+              color(pencolor, fillcolor, /)
 
    Return or set pencolor and fillcolor.
 
@@ -1489,28 +1508,6 @@ Appearance
       >>> turtle.fd(50)
       >>> turtle.tilt(30)
       >>> turtle.fd(50)
-
-
-.. function:: settiltangle(angle)
-
-   :param angle: a number
-
-   Rotate the turtleshape to point in the direction specified by *angle*,
-   regardless of its current tilt-angle.  *Do not* change the turtle's heading
-   (direction of movement).
-
-   .. doctest::
-      :skipif: _tkinter is None or 'always; deprecated method'
-
-      >>> turtle.reset()
-      >>> turtle.shape("circle")
-      >>> turtle.shapesize(5,2)
-      >>> turtle.settiltangle(45)
-      >>> turtle.fd(50)
-      >>> turtle.settiltangle(-45)
-      >>> turtle.fd(50)
-
-   .. deprecated:: 3.1
 
 
 .. function:: tiltangle(angle=None)
@@ -1810,13 +1807,32 @@ Most of the examples in this section refer to a TurtleScreen instance called
 Window control
 --------------
 
-.. function:: bgcolor(*args)
+.. function:: bgcolor()
+              bgcolor(color, /)
+              bgcolor(r, g, b, /)
 
-   :param args: a color string or three numbers in the range 0..colormode or a
-                3-tuple of such numbers
+   Return or set the background color of the TurtleScreen.
 
+   Four input formats are allowed:
 
-   Set or return background color of the TurtleScreen.
+   ``bgcolor()``
+      Return the current background color as color specification string or
+      as a tuple (see example).  May be used as input to another
+      color/pencolor/fillcolor/bgcolor call.
+
+   ``bgcolor(colorstring)``
+      Set the background color to *colorstring*, which is a Tk color
+      specification string, such as ``"red"``, ``"yellow"``, or ``"#33cc8c"``.
+
+   ``bgcolor((r, g, b))``
+      Set the background color to the RGB color represented by the tuple of
+      *r*, *g*, and *b*.
+      Each of *r*, *g*, and *b* must be in the range 0..colormode, where
+      colormode is either 1.0 or 255 (see :func:`colormode`).
+
+   ``bgcolor(r, g, b)``
+      Set the background color to the RGB color represented by *r*, *g*, and *b*.  Each of
+      *r*, *g*, and *b* must be in the range 0..colormode.
 
    .. doctest::
       :skipif: _tkinter is None
@@ -2660,68 +2676,68 @@ The demo scripts are:
 
 .. tabularcolumns:: |l|L|L|
 
-+----------------+------------------------------+-----------------------+
-| Name           | Description                  | Features              |
-+================+==============================+=======================+
-| bytedesign     | complex classical            | :func:`tracer`, delay,|
-|                | turtle graphics pattern      | :func:`update`        |
-+----------------+------------------------------+-----------------------+
-| chaos          | graphs Verhulst dynamics,    | world coordinates     |
-|                | shows that computer's        |                       |
-|                | computations can generate    |                       |
-|                | results sometimes against the|                       |
-|                | common sense expectations    |                       |
-+----------------+------------------------------+-----------------------+
-| clock          | analog clock showing time    | turtles as clock's    |
-|                | of your computer             | hands, ontimer        |
-+----------------+------------------------------+-----------------------+
-| colormixer     | experiment with r, g, b      | :func:`ondrag`        |
-+----------------+------------------------------+-----------------------+
-| forest         | 3 breadth-first trees        | randomization         |
-+----------------+------------------------------+-----------------------+
-| fractalcurves  | Hilbert & Koch curves        | recursion             |
-+----------------+------------------------------+-----------------------+
-| lindenmayer    | ethnomathematics             | L-System              |
-|                | (indian kolams)              |                       |
-+----------------+------------------------------+-----------------------+
-| minimal_hanoi  | Towers of Hanoi              | Rectangular Turtles   |
-|                |                              | as Hanoi discs        |
-|                |                              | (shape, shapesize)    |
-+----------------+------------------------------+-----------------------+
-| nim            | play the classical nim game  | turtles as nimsticks, |
-|                | with three heaps of sticks   | event driven (mouse,  |
-|                | against the computer.        | keyboard)             |
-+----------------+------------------------------+-----------------------+
-| paint          | super minimalistic           | :func:`onclick`       |
-|                | drawing program              |                       |
-+----------------+------------------------------+-----------------------+
-| peace          | elementary                   | turtle: appearance    |
-|                |                              | and animation         |
-+----------------+------------------------------+-----------------------+
-| penrose        | aperiodic tiling with        | :func:`stamp`         |
-|                | kites and darts              |                       |
-+----------------+------------------------------+-----------------------+
-| planet_and_moon| simulation of                | compound shapes,      |
-|                | gravitational system         | :class:`Vec2D`        |
-+----------------+------------------------------+-----------------------+
-| rosette        | a pattern from the wikipedia | :func:`clone`,        |
-|                | article on turtle graphics   | :func:`undo`          |
-+----------------+------------------------------+-----------------------+
-| round_dance    | dancing turtles rotating     | compound shapes, clone|
-|                | pairwise in opposite         | shapesize, tilt,      |
-|                | direction                    | get_shapepoly, update |
-+----------------+------------------------------+-----------------------+
-| sorting_animate| visual demonstration of      | simple alignment,     |
-|                | different sorting methods    | randomization         |
-+----------------+------------------------------+-----------------------+
-| tree           | a (graphical) breadth        | :func:`clone`         |
-|                | first tree (using generators)|                       |
-+----------------+------------------------------+-----------------------+
-| two_canvases   | simple design                | turtles on two        |
-|                |                              | canvases              |
-+----------------+------------------------------+-----------------------+
-| yinyang        | another elementary example   | :func:`circle`        |
-+----------------+------------------------------+-----------------------+
++------------------------+------------------------------+--------------------------------------+
+| Name                   | Description                  | Features                             |
++========================+==============================+======================================+
+| ``bytedesign``         | complex classical            | :func:`tracer`, :func:`delay`,       |
+|                        | turtle graphics pattern      | :func:`update`                       |
++------------------------+------------------------------+--------------------------------------+
+| ``chaos``              | graphs Verhulst dynamics,    | world coordinates                    |
+|                        | shows that computer's        |                                      |
+|                        | computations can generate    |                                      |
+|                        | results sometimes against the|                                      |
+|                        | common sense expectations    |                                      |
++------------------------+------------------------------+--------------------------------------+
+| ``clock``              | analog clock showing time    | turtles as clock's                   |
+|                        | of your computer             | hands, :func:`ontimer`               |
++------------------------+------------------------------+--------------------------------------+
+| ``colormixer``         | experiment with r, g, b      | :func:`ondrag`                       |
++------------------------+------------------------------+--------------------------------------+
+| ``forest``             | 3 breadth-first trees        | randomization                        |
++------------------------+------------------------------+--------------------------------------+
+| ``fractalcurves``      | Hilbert & Koch curves        | recursion                            |
++------------------------+------------------------------+--------------------------------------+
+| ``lindenmayer``        | ethnomathematics             | L-System                             |
+|                        | (indian kolams)              |                                      |
++------------------------+------------------------------+--------------------------------------+
+| ``minimal_hanoi``      | Towers of Hanoi              | Rectangular Turtles                  |
+|                        |                              | as Hanoi discs                       |
+|                        |                              | (:func:`shape`, :func:`shapesize`)   |
++------------------------+------------------------------+--------------------------------------+
+| ``nim``                | play the classical nim game  | turtles as nimsticks,                |
+|                        | with three heaps of sticks   | event driven (mouse,                 |
+|                        | against the computer.        | keyboard)                            |
++------------------------+------------------------------+--------------------------------------+
+| ``paint``              | super minimalistic           | :func:`onclick`                      |
+|                        | drawing program              |                                      |
++------------------------+------------------------------+--------------------------------------+
+| ``peace``              | elementary                   | turtle: appearance                   |
+|                        |                              | and animation                        |
++------------------------+------------------------------+--------------------------------------+
+| ``penrose``            | aperiodic tiling with        | :func:`stamp`                        |
+|                        | kites and darts              |                                      |
++------------------------+------------------------------+--------------------------------------+
+| ``planet_and_moon``    | simulation of                | compound shapes,                     |
+|                        | gravitational system         | :class:`Vec2D`                       |
++------------------------+------------------------------+--------------------------------------+
+| ``rosette``            | a pattern from the wikipedia | :func:`clone`,                       |
+|                        | article on turtle graphics   | :func:`undo`                         |
++------------------------+------------------------------+--------------------------------------+
+| ``round_dance``        | dancing turtles rotating     | compound shapes, :func:`clone`       |
+|                        | pairwise in opposite         | :func:`shapesize`, :func:`tilt`,     |
+|                        | direction                    | :func:`get_shapepoly`, :func:`update`|
++------------------------+------------------------------+--------------------------------------+
+| ``sorting_animate``    | visual demonstration of      | simple alignment,                    |
+|                        | different sorting methods    | randomization                        |
++------------------------+------------------------------+--------------------------------------+
+| ``tree``               | a (graphical) breadth        | :func:`clone`                        |
+|                        | first tree (using generators)|                                      |
++------------------------+------------------------------+--------------------------------------+
+| ``two_canvases``       | simple design                | turtles on two                       |
+|                        |                              | canvases                             |
++------------------------+------------------------------+--------------------------------------+
+| ``yinyang``            | another elementary example   | :func:`circle`                       |
++------------------------+------------------------------+--------------------------------------+
 
 Have fun!
 
@@ -2754,8 +2770,7 @@ Changes since Python 3.0
   :func:`get_shapepoly` have been added. Thus the full range of
   regular linear transforms is now available for transforming turtle shapes.
   :func:`tiltangle` has been enhanced in functionality: it now can
-  be used to get or set the tilt angle. :func:`settiltangle` has been
-  deprecated.
+  be used to get or set the tilt angle.
 
 - The :class:`Screen` method :func:`onkeypress` has been added as a complement to
   :func:`onkey`. As the latter binds actions to the key release event,

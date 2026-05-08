@@ -1,5 +1,5 @@
-:mod:`sqlite3` --- DB-API 2.0 interface for SQLite databases
-============================================================
+:mod:`!sqlite3` --- DB-API 2.0 interface for SQLite databases
+=============================================================
 
 .. module:: sqlite3
    :synopsis: A DB-API 2.0 implementation using SQLite 3.x.
@@ -16,6 +16,8 @@
    src = sqlite3.connect(":memory:", isolation_level=None)
    dst = sqlite3.connect("tutorial.db", isolation_level=None)
    src.backup(dst)
+   src.close()
+   dst.close()
    del src, dst
 
 .. _sqlite3-intro:
@@ -29,7 +31,7 @@ PostgreSQL or Oracle.
 
 The :mod:`!sqlite3` module was written by Gerhard Häring.  It provides an SQL interface
 compliant with the DB-API 2.0 specification described by :pep:`249`, and
-requires SQLite 3.7.15 or newer.
+requires SQLite 3.15.2 or newer.
 
 This document includes four main sections:
 
@@ -125,7 +127,7 @@ and call :meth:`res.fetchone() <Cursor.fetchone>` to fetch the resulting row:
 We can see that the table has been created,
 as the query returns a :class:`tuple` containing the table's name.
 If we query ``sqlite_master`` for a non-existent table ``spam``,
-:meth:`!res.fetchone()` will return ``None``:
+:meth:`!res.fetchone` will return ``None``:
 
 .. doctest::
 
@@ -220,6 +222,7 @@ creating a new cursor, then querying the database:
    >>> title, year = res.fetchone()
    >>> print(f'The highest scoring Monty Python movie is {title!r}, released in {year}')
    The highest scoring Monty Python movie is 'Monty Python and the Holy Grail', released in 1975
+   >>> new_con.close()
 
 You've now created an SQLite database using the :mod:`!sqlite3` module,
 inserted data and retrieved values from it in multiple ways.
@@ -286,10 +289,7 @@ Module functions
        Set it to any combination (using ``|``, bitwise or) of
        :const:`PARSE_DECLTYPES` and :const:`PARSE_COLNAMES`
        to enable this.
-       Column names takes precedence over declared types if both flags are set.
-       Types cannot be detected for generated fields (for example ``max(data)``),
-       even when the *detect_types* parameter is set; :class:`str` will be
-       returned instead.
+       Column names take precedence over declared types if both flags are set.
        By default (``0``), type detection is disabled.
 
    :param isolation_level:
@@ -355,6 +355,12 @@ Module functions
    .. versionchanged:: 3.12
       Added the *autocommit* parameter.
 
+   .. versionchanged:: 3.13
+      Positional use of the parameters *timeout*, *detect_types*,
+      *isolation_level*, *check_same_thread*, *factory*, *cached_statements*,
+      and *uri* is deprecated.
+      They will become keyword-only parameters in Python 3.15.
+
 .. function:: complete_statement(statement)
 
    Return ``True`` if the string *statement* appears to contain
@@ -388,29 +394,11 @@ Module functions
    will get tracebacks from callbacks on :data:`sys.stderr`. Use ``False``
    to disable the feature again.
 
-   Register an :func:`unraisable hook handler <sys.unraisablehook>` for an
-   improved debug experience:
+   .. note::
 
-   .. testsetup:: sqlite3.trace
-
-      import sqlite3
-
-   .. doctest:: sqlite3.trace
-
-      >>> sqlite3.enable_callback_tracebacks(True)
-      >>> con = sqlite3.connect(":memory:")
-      >>> def evil_trace(stmt):
-      ...     5/0
-      ...
-      >>> con.set_trace_callback(evil_trace)
-      >>> def debug(unraisable):
-      ...     print(f"{unraisable.exc_value!r} in callback {unraisable.object.__name__}")
-      ...     print(f"Error message: {unraisable.err_msg}")
-      >>> import sys
-      >>> sys.unraisablehook = debug
-      >>> cur = con.execute("SELECT 1")
-      ZeroDivisionError('division by zero') in callback evil_trace
-      Error message: None
+      Errors in user-defined function callbacks are logged as unraisable exceptions.
+      Use an :func:`unraisable hook handler <sys.unraisablehook>` for
+      introspection of the failed callback.
 
 .. function:: register_adapter(type, adapter, /)
 
@@ -445,21 +433,6 @@ Module constants
    old style (pre-Python 3.12) transaction control behaviour.
    See :ref:`sqlite3-transaction-control-isolation-level` for more information.
 
-.. data:: PARSE_COLNAMES
-
-   Pass this flag value to the *detect_types* parameter of
-   :func:`connect` to look up a converter function by
-   using the type name, parsed from the query column name,
-   as the converter dictionary key.
-   The type name must be wrapped in square brackets (``[]``).
-
-   .. code-block:: sql
-
-      SELECT p as "p [point]" FROM test;  ! will look up converter "point"
-
-   This flag may be combined with :const:`PARSE_DECLTYPES` using the ``|``
-   (bitwise or) operator.
-
 .. data:: PARSE_DECLTYPES
 
    Pass this flag value to the *detect_types* parameter of
@@ -479,6 +452,27 @@ Module constants
        )
 
    This flag may be combined with :const:`PARSE_COLNAMES` using the ``|``
+   (bitwise or) operator.
+
+   .. note::
+
+      Generated fields (for example ``MAX(p)``) are returned as :class:`str`.
+      Use :const:`!PARSE_COLNAMES` to enforce types for such queries.
+
+.. data:: PARSE_COLNAMES
+
+   Pass this flag value to the *detect_types* parameter of
+   :func:`connect` to look up a converter function by
+   using the type name, parsed from the query column name,
+   as the converter dictionary key.
+   The query column name must be wrapped in double quotes (``"``)
+   and the type name must be wrapped in square brackets (``[]``).
+
+   .. code-block:: sql
+
+      SELECT MAX(p) as "p [point]" FROM test;  ! will look up converter "point"
+
+   This flag may be combined with :const:`PARSE_DECLTYPES` using the ``|``
    (bitwise or) operator.
 
 .. data:: SQLITE_OK
@@ -534,21 +528,20 @@ Module constants
    The mappings from SQLite threading modes to DB-API 2.0 threadsafety levels
    are as follows:
 
-   +------------------+-----------------+----------------------+-------------------------------+
-   | SQLite threading | `threadsafety`_ | `SQLITE_THREADSAFE`_ | DB-API 2.0 meaning            |
-   | mode             |                 |                      |                               |
-   +==================+=================+======================+===============================+
-   | single-thread    | 0               | 0                    | Threads may not share the     |
-   |                  |                 |                      | module                        |
-   +------------------+-----------------+----------------------+-------------------------------+
-   | multi-thread     | 1               | 2                    | Threads may share the module, |
-   |                  |                 |                      | but not connections           |
-   +------------------+-----------------+----------------------+-------------------------------+
-   | serialized       | 3               | 1                    | Threads may share the module, |
-   |                  |                 |                      | connections and cursors       |
-   +------------------+-----------------+----------------------+-------------------------------+
+   +------------------+----------------------+----------------------+-------------------------------+
+   | SQLite threading | :pep:`threadsafety   | `SQLITE_THREADSAFE`_ | DB-API 2.0 meaning            |
+   | mode             | <0249#threadsafety>` |                      |                               |
+   +==================+======================+======================+===============================+
+   | single-thread    | 0                    | 0                    | Threads may not share the     |
+   |                  |                      |                      | module                        |
+   +------------------+----------------------+----------------------+-------------------------------+
+   | multi-thread     | 1                    | 2                    | Threads may share the module, |
+   |                  |                      |                      | but not connections           |
+   +------------------+----------------------+----------------------+-------------------------------+
+   | serialized       | 3                    | 1                    | Threads may share the module, |
+   |                  |                      |                      | connections and cursors       |
+   +------------------+----------------------+----------------------+-------------------------------+
 
-   .. _threadsafety: https://peps.python.org/pep-0249/#threadsafety
    .. _SQLITE_THREADSAFE: https://sqlite.org/compile.html#threadsafe
 
    .. versionchanged:: 3.11
@@ -624,6 +617,12 @@ Connection objects
       * :ref:`sqlite3-connection-shortcuts`
       * :ref:`sqlite3-connection-context-manager`
 
+
+   .. versionchanged:: 3.13
+
+      A :exc:`ResourceWarning` is emitted if :meth:`close` is not called before
+      a :class:`!Connection` object is deleted.
+
    An SQLite database connection has the following attributes and methods:
 
    .. method:: cursor(factory=Cursor)
@@ -633,7 +632,7 @@ Connection objects
       supplied, this must be a :term:`callable` returning
       an instance of :class:`Cursor` or its subclasses.
 
-   .. method:: blobopen(table, column, row, /, *, readonly=False, name="main")
+   .. method:: blobopen(table, column, rowid, /, *, readonly=False, name="main")
 
       Open a :class:`Blob` handle to an existing
       :abbr:`BLOB (Binary Large OBject)`.
@@ -644,8 +643,8 @@ Connection objects
       :param str column:
           The name of the column where the blob is located.
 
-      :param str row:
-          The name of the row where the blob is located.
+      :param int rowid:
+          The row id where the blob is located.
 
       :param bool readonly:
           Set to ``True`` if the blob should be opened without write
@@ -735,9 +734,6 @@ Connection objects
           `deterministic <https://sqlite.org/deterministic.html>`_,
           which allows SQLite to perform additional optimizations.
 
-      :raises NotSupportedError:
-          If *deterministic* is used with SQLite versions older than 3.8.3.
-
       .. versionchanged:: 3.8
          Added the *deterministic* parameter.
 
@@ -753,6 +749,12 @@ Connection objects
          >>> for row in con.execute("SELECT md5(?)", (b"foo",)):
          ...     print(row)
          ('acbd18db4cc2f85cedef654fccc4a4d8',)
+         >>> con.close()
+
+      .. versionchanged:: 3.13
+
+         Passing *name*, *narg*, and *func* as keyword arguments is deprecated.
+         These parameters will become positional-only in Python 3.15.
 
 
    .. method:: create_aggregate(name, n_arg, aggregate_class)
@@ -807,6 +809,11 @@ Connection objects
          :hide:
 
          3
+
+      .. versionchanged:: 3.13
+
+         Passing *name*, *n_arg*, and *aggregate_class* as keyword arguments is deprecated.
+         These parameters will become positional-only in Python 3.15.
 
 
    .. method:: create_window_function(name, num_params, aggregate_class, /)
@@ -889,6 +896,7 @@ Connection objects
              FROM test ORDER BY x
          """)
          print(cur.fetchall())
+         con.close()
 
       .. testoutput::
          :hide:
@@ -972,6 +980,10 @@ Connection objects
       .. versionchanged:: 3.11
          Added support for disabling the authorizer using ``None``.
 
+      .. versionchanged:: 3.13
+         Passing *authorizer_callback* as a keyword argument is deprecated.
+         The parameter will become positional-only in Python 3.15.
+
 
    .. method:: set_progress_handler(progress_handler, n)
 
@@ -986,6 +998,10 @@ Connection objects
       Returning a non-zero value from the handler function will terminate the
       currently executing query and cause it to raise a :exc:`DatabaseError`
       exception.
+
+      .. versionchanged:: 3.13
+         Passing *progress_handler* as a keyword argument is deprecated.
+         The parameter will become positional-only in Python 3.15.
 
 
    .. method:: set_trace_callback(trace_callback)
@@ -1010,6 +1026,10 @@ Connection objects
          tracebacks from exceptions raised in the trace callback.
 
       .. versionadded:: 3.3
+
+      .. versionchanged:: 3.13
+         Passing *trace_callback* as a keyword argument is deprecated.
+         The parameter will become positional-only in Python 3.15.
 
 
    .. method:: enable_load_extension(enabled, /)
@@ -1037,13 +1057,10 @@ Connection objects
       .. versionchanged:: 3.10
          Added the ``sqlite3.enable_load_extension`` auditing event.
 
-      .. testsetup:: sqlite3.loadext
+      .. We cannot doctest the load extension API, since there is no convenient
+         way to skip it.
 
-         import sqlite3
-         con = sqlite3.connect(":memory:")
-
-      .. testcode:: sqlite3.loadext
-         :skipif: True  # not testable at the moment
+      .. code-block::
 
          con.enable_load_extension(True)
 
@@ -1066,14 +1083,6 @@ Connection objects
              """)
          for row in con.execute("SELECT rowid, name, ingredients FROM recipe WHERE name MATCH 'pie'"):
              print(row)
-
-         con.close()
-
-      .. testoutput:: sqlite3.loadext
-         :hide:
-
-         (2, 'broccoli pie', 'broccoli cheese onions flour')
-         (3, 'pumpkin pie', 'pumpkin sugar flour butter')
 
    .. method:: load_extension(path, /, *, entrypoint=None)
 
@@ -1104,13 +1113,20 @@ Connection objects
       .. versionchanged:: 3.12
          Added the *entrypoint* parameter.
 
-   .. _Loading an Extension: https://www.sqlite.org/loadext.html#loading_an_extension_
+   .. _Loading an Extension: https://www.sqlite.org/loadext.html#loading_an_extension
 
-   .. method:: iterdump
+   .. method:: iterdump(*, filter=None)
 
       Return an :term:`iterator` to dump the database as SQL source code.
       Useful when saving an in-memory database for later restoration.
       Similar to the ``.dump`` command in the :program:`sqlite3` shell.
+
+      :param filter:
+
+        An optional ``LIKE`` pattern for database objects to dump, e.g. ``prefix_%``.
+        If ``None`` (the default), all database objects will be included.
+
+      :type filter: str | None
 
       Example:
 
@@ -1127,6 +1143,8 @@ Connection objects
 
          :ref:`sqlite3-howto-encoding`
 
+      .. versionchanged:: 3.13
+         Added the *filter* parameter.
 
    .. method:: backup(target, *, pages=-1, progress=None, name="main", sleep=0.250)
 
@@ -1190,6 +1208,8 @@ Connection objects
          src = sqlite3.connect('example.db')
          dst = sqlite3.connect(':memory:')
          src.backup(dst)
+         dst.close()
+         src.close()
 
       .. versionadded:: 3.7
 
@@ -1255,6 +1275,10 @@ Connection objects
          10
          >>> con.getlimit(sqlite3.SQLITE_LIMIT_ATTACHED)
          1
+
+      .. testcleanup:: sqlite3.limits
+
+         con.close()
 
       .. versionadded:: 3.11
 
@@ -1537,6 +1561,10 @@ Cursor objects
          # cur is an sqlite3.Cursor object
          cur.executemany("INSERT INTO data VALUES(?)", rows)
 
+      .. testcleanup:: sqlite3.cursor
+
+         con.close()
+
       .. note::
 
          Any resulting rows are discarded,
@@ -1602,6 +1630,9 @@ Cursor objects
       If the *size* parameter is used, then it is best for it to retain the same
       value from one :meth:`fetchmany` call to the next.
 
+      .. versionchanged:: 3.13.8
+         Negative *size* values are rejected by raising :exc:`ValueError`.
+
    .. method:: fetchall()
 
       Return all (remaining) rows of a query result as a :class:`list`.
@@ -1629,6 +1660,9 @@ Cursor objects
       Read/write attribute that controls the number of rows returned by :meth:`fetchmany`.
       The default value is 1 which means a single row would be fetched per call.
 
+      .. versionchanged:: 3.13.8
+         Negative values are rejected by raising :exc:`ValueError`.
+
    .. attribute:: connection
 
       Read-only attribute that provides the SQLite database :class:`Connection`
@@ -1642,6 +1676,7 @@ Cursor objects
          >>> cur = con.cursor()
          >>> cur.connection == con
          True
+         >>> con.close()
 
    .. attribute:: description
 
@@ -1762,6 +1797,7 @@ Blob objects
           greeting = blob.read()
 
       print(greeting)  # outputs "b'Hello, world!'"
+      con.close()
 
    .. testoutput::
       :hide:
@@ -2074,6 +2110,7 @@ Here's an example of both styles:
    params = (1972,)
    cur.execute("SELECT * FROM lang WHERE first_appeared = ?", params)
    print(cur.fetchall())
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2132,6 +2169,7 @@ The object passed to *protocol* will be of type :class:`PrepareProtocol`.
 
    cur.execute("SELECT ?", (Point(4.0, -3.2),))
    print(cur.fetchone()[0])
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2162,6 +2200,7 @@ This function can then be registered using :func:`register_adapter`.
 
    cur.execute("SELECT ?", (Point(1.0, 2.5),))
    print(cur.fetchone()[0])
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2246,6 +2285,8 @@ The following example illustrates the implicit and explicit approaches:
    cur.execute("INSERT INTO test(p) VALUES(?)", (p,))
    cur.execute('SELECT p AS "p [point]" FROM test')
    print("with column names:", cur.fetchone()[0])
+   cur.close()
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2263,7 +2304,7 @@ This section shows recipes for common adapters and converters.
 
 .. testcode::
 
-   import datetime
+   import datetime as dt
    import sqlite3
 
    def adapt_date_iso(val):
@@ -2272,27 +2313,27 @@ This section shows recipes for common adapters and converters.
 
    def adapt_datetime_iso(val):
        """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
-       return val.isoformat()
+       return val.replace(tzinfo=None).isoformat()
 
    def adapt_datetime_epoch(val):
        """Adapt datetime.datetime to Unix timestamp."""
        return int(val.timestamp())
 
-   sqlite3.register_adapter(datetime.date, adapt_date_iso)
-   sqlite3.register_adapter(datetime.datetime, adapt_datetime_iso)
-   sqlite3.register_adapter(datetime.datetime, adapt_datetime_epoch)
+   sqlite3.register_adapter(dt.date, adapt_date_iso)
+   sqlite3.register_adapter(dt.datetime, adapt_datetime_iso)
+   sqlite3.register_adapter(dt.datetime, adapt_datetime_epoch)
 
    def convert_date(val):
        """Convert ISO 8601 date to datetime.date object."""
-       return datetime.date.fromisoformat(val.decode())
+       return dt.date.fromisoformat(val.decode())
 
    def convert_datetime(val):
        """Convert ISO 8601 datetime to datetime.datetime object."""
-       return datetime.datetime.fromisoformat(val.decode())
+       return dt.datetime.fromisoformat(val.decode())
 
    def convert_timestamp(val):
        """Convert Unix epoch timestamp to datetime.datetime object."""
-       return datetime.datetime.fromtimestamp(int(val))
+       return dt.datetime.fromtimestamp(int(val))
 
    sqlite3.register_converter("date", convert_date)
    sqlite3.register_converter("datetime", convert_datetime)
@@ -2301,17 +2342,17 @@ This section shows recipes for common adapters and converters.
 .. testcode::
    :hide:
 
-   dt = datetime.datetime(2019, 5, 18, 15, 17, 8, 123456)
+   when = dt.datetime(2019, 5, 18, 15, 17, 8, 123456)
 
-   assert adapt_date_iso(dt.date()) == "2019-05-18"
-   assert convert_date(b"2019-05-18") == dt.date()
+   assert adapt_date_iso(when.date()) == "2019-05-18"
+   assert convert_date(b"2019-05-18") == when.date()
 
-   assert adapt_datetime_iso(dt) == "2019-05-18T15:17:08.123456"
-   assert convert_datetime(b"2019-05-18T15:17:08.123456") == dt
+   assert adapt_datetime_iso(when) == "2019-05-18T15:17:08.123456"
+   assert convert_datetime(b"2019-05-18T15:17:08.123456") == when
 
    # Using current time as fromtimestamp() returns local date/time.
    # Dropping microseconds as adapt_datetime_epoch truncates fractional second part.
-   now = datetime.datetime.now().replace(microsecond=0)
+   now = dt.datetime.now().replace(microsecond=0)
    current_timestamp = int(now.timestamp())
 
    assert adapt_datetime_epoch(now) == current_timestamp
@@ -2428,6 +2469,7 @@ Some useful URI tricks include:
    >>> con.execute("CREATE TABLE readonly(data)")
    Traceback (most recent call last):
    OperationalError: attempt to write a readonly database
+   >>> con.close()
 
 * Do not implicitly create a new database file if it does not already exist;
   will raise :exc:`~sqlite3.OperationalError` if unable to create a new file:
@@ -2452,6 +2494,8 @@ Some useful URI tricks include:
    res = con2.execute("SELECT data FROM shared")
    assert res.fetchone() == (28,)
 
+   con1.close()
+   con2.close()
 
 More information about this feature, including a list of parameters,
 can be found in the `SQLite URI documentation`_.
@@ -2498,6 +2542,7 @@ Queries now return :class:`!Row` objects:
    'Earth'
    >>> row["RADIUS"]  # Column names are case-insensitive.
    6378
+   >>> con.close()
 
 .. note::
 
@@ -2524,6 +2569,7 @@ Using it, queries now return a :class:`!dict` instead of a :class:`!tuple`:
    >>> for row in con.execute("SELECT 1 AS a, 2 AS b"):
    ...     print(row)
    {'a': 1, 'b': 2}
+   >>> con.close()
 
 The following row factory returns a :term:`named tuple`:
 
@@ -2550,6 +2596,7 @@ The following row factory returns a :term:`named tuple`:
    1
    >>> row.b   # Attribute access.
    2
+   >>> con.close()
 
 With some adjustments, the above recipe can be adapted to use a
 :class:`~dataclasses.dataclass`, or any other custom class,
@@ -2707,3 +2754,11 @@ regardless of the value of :attr:`~Connection.isolation_level`.
 
 .. _SQLite transaction behaviour:
    https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions
+
+.. testcleanup::
+
+   import os
+   os.remove("backup.db")
+   os.remove("dump.sql")
+   os.remove("example.db")
+   os.remove("tutorial.db")

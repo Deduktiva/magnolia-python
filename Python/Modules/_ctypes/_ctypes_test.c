@@ -1,10 +1,24 @@
-#include <Python.h>
-
-#ifdef MS_WIN32
-#include <windows.h>
+// Need limited C API version 3.13 for Py_mod_gil
+#include "pyconfig.h"   // Py_GIL_DISABLED
+#ifndef Py_GIL_DISABLED
+#  define Py_LIMITED_API 0x030d0000
 #endif
 
+// gh-85283: On Windows, Py_LIMITED_API requires Py_BUILD_CORE to not attempt
+// linking the extension to python3.lib (which fails). Py_BUILD_CORE_MODULE is
+// needed to import Python symbols. Then Python.h undefines Py_BUILD_CORE and
+// Py_BUILD_CORE_MODULE if Py_LIMITED_API is defined.
+#define Py_BUILD_CORE
+#define Py_BUILD_CORE_MODULE
+
+#include <Python.h>
+
+#include <stdio.h>                // printf()
 #include <stdlib.h>               // qsort()
+#include <string.h>               // memset()
+#ifdef MS_WIN32
+#  include <windows.h>
+#endif
 
 #define EXPORT(x) Py_EXPORTED_SYMBOL x
 
@@ -164,7 +178,7 @@ _testfunc_array_in_struct3B_set_defaults(void)
 
 /*
  * Test3C struct tests the MAX_STRUCT_SIZE 32. Structs containing arrays of up
- * to four floating point types are passed in registers on Arm platforms.
+ * to four floating-point types are passed in registers on Arm platforms.
  * This struct is used for within bounds test on Arm platfroms and for an
  * out-of-bounds tests for platfroms where MAX_STRUCT_SIZE is less than 32.
  * See gh-110190.
@@ -188,7 +202,7 @@ _testfunc_array_in_struct3C_set_defaults(void)
 
 /*
  * Test3D struct tests the MAX_STRUCT_SIZE 64. Structs containing arrays of up
- * to eight floating point types are passed in registers on PPC64LE platforms.
+ * to eight floating-point types are passed in registers on PPC64LE platforms.
  * This struct is used for within bounds test on PPC64LE platfroms and for an
  * out-of-bounds tests for platfroms where MAX_STRUCT_SIZE is less than 64.
  * See gh-110190.
@@ -857,13 +871,10 @@ EXPORT(RECT) ReturnRect(int i, RECT ar, RECT* br, POINT cp, RECT dr,
     {
     case 0:
         return ar;
-        break;
     case 1:
         return dr;
-        break;
     case 2:
         return gr;
-        break;
 
     }
     return ar;
@@ -1153,6 +1164,7 @@ _testfunc_pylist_append(PyObject *list, PyObject *item)
 
 static struct PyModuleDef_Slot _ctypes_test_slots[] = {
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL}
 };
 

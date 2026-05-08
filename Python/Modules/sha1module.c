@@ -30,15 +30,6 @@ class SHA1Type "SHA1object *" "&PyType_Type"
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=3dc9a20d1becb759]*/
 
-/* Some useful types */
-
-#if SIZEOF_INT == 4
-typedef unsigned int SHA1_INT32;        /* 32-bit integer */
-typedef long long SHA1_INT64;        /* 64-bit integer */
-#else
-/* not defined. compilation will die. */
-#endif
-
 /* The SHA1 block size and message digest sizes, in bytes */
 
 #define SHA1_BLOCKSIZE    64
@@ -49,9 +40,10 @@ typedef long long SHA1_INT64;        /* 64-bit integer */
 typedef struct {
     PyObject_HEAD
     // Prevents undefined behavior via multiple threads entering the C API.
-    // The lock will be NULL before threaded access has been enabled.
+    bool use_mutex;
+    PyMutex mutex;
     PyThread_type_lock lock;
-    Hacl_Streaming_SHA1_state *hash_state;
+    Hacl_Hash_SHA1_state_t *hash_state;
 } SHA1object;
 
 #include "clinic/sha1module.c.h"
@@ -73,7 +65,11 @@ static SHA1object *
 newSHA1object(SHA1State *st)
 {
     SHA1object *sha = (SHA1object *)PyObject_GC_New(SHA1object, st->sha1_type);
-    sha->lock = NULL;
+    if (sha == NULL) {
+        return NULL;
+    }
+    HASHLIB_INIT_MUTEX(sha);
+
     PyObject_GC_Track(sha);
     return sha;
 }
@@ -90,10 +86,7 @@ SHA1_traverse(PyObject *ptr, visitproc visit, void *arg)
 static void
 SHA1_dealloc(SHA1object *ptr)
 {
-    Hacl_Streaming_SHA1_legacy_free(ptr->hash_state);
-    if (ptr->lock != NULL) {
-        PyThread_free_lock(ptr->lock);
-    }
+    Hacl_Hash_SHA1_free(ptr->hash_state);
     PyTypeObject *tp = Py_TYPE(ptr);
     PyObject_GC_UnTrack(ptr);
     PyObject_GC_Del(ptr);
@@ -122,7 +115,7 @@ SHA1Type_copy_impl(SHA1object *self, PyTypeObject *cls)
         return NULL;
 
     ENTER_HASHLIB(self);
-    newobj->hash_state = Hacl_Streaming_SHA1_legacy_copy(self->hash_state);
+    newobj->hash_state = Hacl_Hash_SHA1_copy(self->hash_state);
     LEAVE_HASHLIB(self);
     return (PyObject *)newobj;
 }
@@ -139,7 +132,7 @@ SHA1Type_digest_impl(SHA1object *self)
 {
     unsigned char digest[SHA1_DIGESTSIZE];
     ENTER_HASHLIB(self);
-    Hacl_Streaming_SHA1_legacy_finish(self->hash_state, digest);
+    Hacl_Hash_SHA1_digest(self->hash_state, digest);
     LEAVE_HASHLIB(self);
     return PyBytes_FromStringAndSize((const char *)digest, SHA1_DIGESTSIZE);
 }
@@ -156,20 +149,20 @@ SHA1Type_hexdigest_impl(SHA1object *self)
 {
     unsigned char digest[SHA1_DIGESTSIZE];
     ENTER_HASHLIB(self);
-    Hacl_Streaming_SHA1_legacy_finish(self->hash_state, digest);
+    Hacl_Hash_SHA1_digest(self->hash_state, digest);
     LEAVE_HASHLIB(self);
     return _Py_strhex((const char *)digest, SHA1_DIGESTSIZE);
 }
 
-static void update(Hacl_Streaming_SHA1_state *state, uint8_t *buf, Py_ssize_t len) {
+static void update(Hacl_Hash_SHA1_state_t *state, uint8_t *buf, Py_ssize_t len) {
 #if PY_SSIZE_T_MAX > UINT32_MAX
   while (len > UINT32_MAX) {
-    Hacl_Streaming_SHA1_legacy_update(state, buf, UINT32_MAX);
+    Hacl_Hash_SHA1_update(state, buf, UINT32_MAX);
     len -= UINT32_MAX;
     buf += UINT32_MAX;
   }
 #endif
-  Hacl_Streaming_SHA1_legacy_update(state, buf, (uint32_t) len);
+  Hacl_Hash_SHA1_update(state, buf, (uint32_t) len);
 }
 
 /*[clinic input]
@@ -189,14 +182,14 @@ SHA1Type_update(SHA1object *self, PyObject *obj)
 
     GET_BUFFER_VIEW_OR_ERROUT(obj, &buf);
 
-    if (self->lock == NULL && buf.len >= HASHLIB_GIL_MINSIZE) {
-        self->lock = PyThread_allocate_lock();
+    if (!self->use_mutex && buf.len >= HASHLIB_GIL_MINSIZE) {
+        self->use_mutex = true;
     }
-    if (self->lock != NULL) {
+    if (self->use_mutex) {
         Py_BEGIN_ALLOW_THREADS
-        PyThread_acquire_lock(self->lock, 1);
+        PyMutex_Lock(&self->mutex);
         update(self->hash_state, buf.buf, buf.len);
-        PyThread_release_lock(self->lock);
+        PyMutex_Unlock(&self->mutex);
         Py_END_ALLOW_THREADS
     } else {
         update(self->hash_state, buf.buf, buf.len);
@@ -269,19 +262,25 @@ static PyType_Spec sha1_type_spec = {
 /*[clinic input]
 _sha1.sha1
 
-    string: object(c_default="NULL") = b''
+    data: object(c_default="NULL") = b''
     *
     usedforsecurity: bool = True
+    string as string_obj: object(c_default="NULL") = None
 
 Return a new SHA1 hash object; optionally initialized with a string.
 [clinic start generated code]*/
 
 static PyObject *
-_sha1_sha1_impl(PyObject *module, PyObject *string, int usedforsecurity)
-/*[clinic end generated code: output=6f8b3af05126e18e input=bd54b68e2bf36a8a]*/
+_sha1_sha1_impl(PyObject *module, PyObject *data, int usedforsecurity,
+                PyObject *string_obj)
+/*[clinic end generated code: output=0d453775924f88a7 input=807f25264e0ac656]*/
 {
     SHA1object *new;
     Py_buffer buf;
+    PyObject *string;
+    if (_Py_hashlib_data_argument(&string, data, string_obj) < 0) {
+        return NULL;
+    }
 
     if (string)
         GET_BUFFER_VIEW_OR_ERROUT(string, &buf);
@@ -293,7 +292,7 @@ _sha1_sha1_impl(PyObject *module, PyObject *string, int usedforsecurity)
         return NULL;
     }
 
-    new->hash_state = Hacl_Streaming_SHA1_legacy_create_in();
+    new->hash_state = Hacl_Hash_SHA1_malloc();
 
     if (PyErr_Occurred()) {
         Py_DECREF(new);
@@ -354,16 +353,9 @@ _sha1_exec(PyObject *module)
 
     st->sha1_type = (PyTypeObject *)PyType_FromModuleAndSpec(
         module, &sha1_type_spec, NULL);
-
-    if (st->sha1_type == NULL) {
-        return -1;
-    }
-
-    Py_INCREF(st->sha1_type);
-    if (PyModule_AddObject(module,
+    if (PyModule_AddObjectRef(module,
                            "SHA1Type",
                            (PyObject *)st->sha1_type) < 0) {
-        Py_DECREF(st->sha1_type);
         return -1;
     }
 
@@ -376,6 +368,7 @@ _sha1_exec(PyObject *module)
 static PyModuleDef_Slot _sha1_slots[] = {
     {Py_mod_exec, _sha1_exec},
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL}
 };
 

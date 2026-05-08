@@ -74,6 +74,7 @@ Future Functions
       Deprecation warning is emitted if *future* is not a Future-like object
       and *loop* is not specified and there is no running event loop.
 
+.. _asyncio-future-obj:
 
 Future Object
 =============
@@ -120,20 +121,20 @@ Future Object
       a :exc:`CancelledError` exception.
 
       If the Future's result isn't yet available, this method raises
-      a :exc:`InvalidStateError` exception.
+      an :exc:`InvalidStateError` exception.
 
    .. method:: set_result(result)
 
       Mark the Future as *done* and set its result.
 
-      Raises a :exc:`InvalidStateError` error if the Future is
+      Raises an :exc:`InvalidStateError` error if the Future is
       already *done*.
 
    .. method:: set_exception(exception)
 
       Mark the Future as *done* and set an exception.
 
-      Raises a :exc:`InvalidStateError` error if the Future is
+      Raises an :exc:`InvalidStateError` error if the Future is
       already *done*.
 
    .. method:: done()

@@ -14,6 +14,21 @@ BUILD="$REPO/build-out"
 STAGE="$BUILD/stage/MagPython"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
+# Derive the imported tree's <major>.<minor> version from the upstream
+# header so the build scripts don't have to hardcode it — every spot
+# that previously named libpython3.13 or lib/python3.13 reads $PY_X_Y
+# instead, and a future update-python.sh run to 3.14+ flows through
+# automatically.
+PY_X_Y="$(awk '
+    /^#define PY_MAJOR_VERSION[ \t]+/ { maj=$3 }
+    /^#define PY_MINOR_VERSION[ \t]+/ { min=$3 }
+    END { if (maj!="" && min!="") printf "%s.%s\n", maj, min }
+' "$REPO/Python/Include/patchlevel.h")"
+if [ -z "$PY_X_Y" ]; then
+    echo "Failed to parse PY_MAJOR_VERSION/PY_MINOR_VERSION from Python/Include/patchlevel.h" >&2
+    exit 1
+fi
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -92,18 +107,19 @@ build_openssl() {
      make install_sw)
 }
 
-# Regenerate frozen + deepfreeze sources via upstream's make targets,
-# inside the main build dir (so we don't pay for a second configure).
-# Both outputs are gitignored and required before linking libMagPython.
+# Regenerate frozen sources via upstream's make targets, inside the main
+# build dir (so we don't pay for a second configure). The output is
+# gitignored and required before linking libMagPython. CPython 3.13
+# dropped deepfreeze (the .c-pre-baked importlib bootstrap) — frozen
+# modules are now the only path, so we only invoke regen-frozen.
 # $1: build dir (already configured)
-# $2: host python interpreter for deepfreeze.py.
+# $2: host python interpreter for freeze_modules.py.
 regen_frozen() {
     local build_dir="$1"
     local host_python="$2"
-    log "Regenerating frozen + deepfreeze with $host_python"
+    log "Regenerating frozen modules with $host_python"
     (cd "$build_dir"
-     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-frozen
-     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-deepfreeze)
+     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-frozen)
 }
 
 # Drop in the project's Setup.local (disables stdlib modules that aren't in
@@ -197,7 +213,7 @@ flip_modules_to_static() {
 }
 
 # Stage headers and pure-Python stdlib into the artifact tree.
-# On Unix the stdlib lives under `lib/python3.12/` so Python's path
+# On Unix the stdlib lives under `lib/python$PY_X_Y/` so Python's path
 # discovery (which looks for `lib/pythonX.Y/os.py` walking up from the
 # executable) just works without env vars or symlinks. The Windows
 # artifact uses `lib/` directly because Windows discovery looks for
@@ -205,13 +221,13 @@ flip_modules_to_static() {
 stage_headers_and_stdlib() {
     local build_dir="$1"
     log "Staging headers and stdlib"
-    mkdir -p "$STAGE/include/Python" "$STAGE/lib/python3.12/lib-dynload"
+    mkdir -p "$STAGE/include/Python" "$STAGE/lib/python$PY_X_Y/lib-dynload"
     cp -R "$REPO/Python/Include/." "$STAGE/include/Python/"
     cp "$build_dir/pyconfig.h" "$STAGE/include/Python/pyconfig.h"
     # Only .py files from the stdlib tree. Use a tar pipe so we don't depend
     # on rsync (manylinux_2_28 doesn't ship it) or GNU-specific cp --parents.
     (cd "$REPO/Python/Lib" && find . -name '*.py' -print0 | tar --null -T - -cf -) \
-        | (cd "$STAGE/lib/python3.12" && tar -xf -)
+        | (cd "$STAGE/lib/python$PY_X_Y" && tar -xf -)
 }
 
 # Build and run the smoke test (MagPython/test.c) against the staged tree.
@@ -227,8 +243,8 @@ run_smoke_test() {
         -o "$STAGE/MagPython_test"
     log "Running smoke test"
     # No PYTHONPATH/PYTHONHOME needed: stage_headers_and_stdlib added a
-    # `lib/python3.12 -> .` symlink so Python's Unix path discovery
-    # finds `lib/python3.12/os.py` next to the executable and computes
+    # `lib/python$PY_X_Y -> .` symlink so Python's Unix path discovery
+    # finds `lib/python$PY_X_Y/os.py` next to the executable and computes
     # the right sys.prefix. Same shape as the Windows test which runs
     # MagPython.dll's smoke test without setting any env vars.
     (cd "$STAGE" && ./MagPython_test)

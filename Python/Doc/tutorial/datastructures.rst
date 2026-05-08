@@ -12,24 +12,23 @@ and adds some new things as well.
 More on Lists
 =============
 
-The list data type has some more methods.  Here are all of the methods of list
-objects:
+The :ref:`list <typesseq-list>` data type has some more methods. Here are all
+of the methods of list objects:
 
-
-.. method:: list.append(x)
+.. method:: list.append(value, /)
    :noindex:
 
-   Add an item to the end of the list.  Equivalent to ``a[len(a):] = [x]``.
+   Add an item to the end of the list.  Similar to ``a[len(a):] = [x]``.
 
 
-.. method:: list.extend(iterable)
+.. method:: list.extend(iterable, /)
    :noindex:
 
-   Extend the list by appending all the items from the iterable.  Equivalent to
+   Extend the list by appending all the items from the iterable.  Similar to
    ``a[len(a):] = iterable``.
 
 
-.. method:: list.insert(i, x)
+.. method:: list.insert(index, value, /)
    :noindex:
 
    Insert an item at a given position.  The first argument is the index of the
@@ -37,14 +36,14 @@ objects:
    the list, and ``a.insert(len(a), x)`` is equivalent to ``a.append(x)``.
 
 
-.. method:: list.remove(x)
+.. method:: list.remove(value, /)
    :noindex:
 
-   Remove the first item from the list whose value is equal to *x*.  It raises a
+   Remove the first item from the list whose value is equal to *value*.  It raises a
    :exc:`ValueError` if there is no such item.
 
 
-.. method:: list.pop([i])
+.. method:: list.pop(index=-1, /)
    :noindex:
 
    Remove the item at the given position in the list, and return it.  If no index
@@ -56,13 +55,13 @@ objects:
 .. method:: list.clear()
    :noindex:
 
-   Remove all items from the list.  Equivalent to ``del a[:]``.
+   Remove all items from the list.  Similar to ``del a[:]``.
 
 
-.. method:: list.index(x[, start[, end]])
+.. method:: list.index(value[, start[, stop]])
    :noindex:
 
-   Return zero-based index in the list of the first item whose value is equal to *x*.
+   Return zero-based index of the first occurrence of *value* in the list.
    Raises a :exc:`ValueError` if there is no such item.
 
    The optional arguments *start* and *end* are interpreted as in the slice
@@ -71,10 +70,10 @@ objects:
    sequence rather than the *start* argument.
 
 
-.. method:: list.count(x)
+.. method:: list.count(value, /)
    :noindex:
 
-   Return the number of times *x* appears in the list.
+   Return the number of times *value* appears in the list.
 
 
 .. method:: list.sort(*, key=None, reverse=False)
@@ -93,7 +92,7 @@ objects:
 .. method:: list.copy()
    :noindex:
 
-   Return a shallow copy of the list.  Equivalent to ``a[:]``.
+   Return a shallow copy of the list.  Similar to ``a[:]``.
 
 
 An example that uses most of the list methods::
@@ -126,7 +125,7 @@ Python.
 
 Another thing you might notice is that not all data can be sorted or
 compared.  For instance, ``[None, 'hello', 10]`` doesn't sort because
-integers can't be compared to strings and *None* can't be compared to
+integers can't be compared to strings and ``None`` can't be compared to
 other types.  Also, there are some types that don't have a defined
 ordering relation.  For example, ``3+4j < 5+7j`` isn't a valid
 comparison.
@@ -383,16 +382,16 @@ A tuple consists of a number of values separated by commas, for instance::
    >>> t
    (12345, 54321, 'hello!')
    >>> # Tuples may be nested:
-   ... u = t, (1, 2, 3, 4, 5)
+   >>> u = t, (1, 2, 3, 4, 5)
    >>> u
    ((12345, 54321, 'hello!'), (1, 2, 3, 4, 5))
    >>> # Tuples are immutable:
-   ... t[0] = 88888
+   >>> t[0] = 88888
    Traceback (most recent call last):
      File "<stdin>", line 1, in <module>
    TypeError: 'tuple' object does not support item assignment
    >>> # but they can contain mutable objects:
-   ... v = ([1, 2, 3], [3, 2, 1])
+   >>> v = ([1, 2, 3], [3, 2, 1])
    >>> v
    ([1, 2, 3], [3, 2, 1])
 
@@ -445,14 +444,18 @@ packing and sequence unpacking.
 Sets
 ====
 
-Python also includes a data type for *sets*.  A set is an unordered collection
-with no duplicate elements.  Basic uses include membership testing and
-eliminating duplicate entries.  Set objects also support mathematical operations
-like union, intersection, difference, and symmetric difference.
+Python also includes a data type for :ref:`sets <types-set>`.  A set is
+an unordered collection with no duplicate elements.  Basic uses include
+membership testing and eliminating duplicate entries.  Set objects also
+support mathematical operations like union, intersection, difference, and
+symmetric difference.
 
 Curly braces or the :func:`set` function can be used to create sets.  Note: to
 create an empty set you have to use ``set()``, not ``{}``; the latter creates an
 empty dictionary, a data structure that we discuss in the next section.
+
+Because sets are unordered, iterating over them or printing them can
+produce the elements in a different order than you expect.
 
 Here is a brief demonstration::
 
@@ -465,7 +468,7 @@ Here is a brief demonstration::
    False
 
    >>> # Demonstrate set operations on unique letters from two words
-   ...
+   >>>
    >>> a = set('abracadabra')
    >>> b = set('alacazam')
    >>> a                                  # unique letters in a
@@ -512,8 +515,12 @@ dictionary; this is also the way dictionaries are written on output.
 The main operations on a dictionary are storing a value with some key and
 extracting the value given the key.  It is also possible to delete a key:value
 pair with ``del``. If you store using a key that is already in use, the old
-value associated with that key is forgotten.  It is an error to extract a value
-using a non-existent key.
+value associated with that key is forgotten.
+
+Extracting a value for a non-existent key by subscripting (``d[key]``) raises a
+:exc:`KeyError`. To avoid getting this error when trying to access a possibly
+non-existent key, use the :meth:`~dict.get` method instead, which returns
+``None`` (or a specified default value) if the key is not in the dictionary.
 
 Performing ``list(d)`` on a dictionary returns a list of all the keys
 used in the dictionary, in insertion order (if you want it sorted, just use
@@ -528,6 +535,12 @@ Here is a small example using a dictionary::
    {'jack': 4098, 'sape': 4139, 'guido': 4127}
    >>> tel['jack']
    4098
+   >>> tel['irv']
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   KeyError: 'irv'
+   >>> print(tel.get('irv'))
+   None
    >>> del tel['sape']
    >>> tel['irv'] = 4127
    >>> tel

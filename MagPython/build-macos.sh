@@ -71,10 +71,10 @@ mv "$BUILD/main/Makefile.tmp" "$BUILD/main/Makefile"
 log "Building libpython"
 (cd "$BUILD/main" && make -j"$JOBS")
 
-log "Renaming libpython3.12 -> libMagPython"
+log "Renaming libpython$PY_X_Y -> libMagPython"
 (cd "$BUILD/main"
  # Apple equivalent of patchelf --set-soname is install_name_tool -id.
- cp libpython3.12.dylib "$STAGE/libMagPython.dylib"
+ cp "libpython$PY_X_Y.dylib" "$STAGE/libMagPython.dylib"
  install_name_tool -id @rpath/libMagPython.dylib "$STAGE/libMagPython.dylib")
 
 log "Copying OpenSSL dylibs"

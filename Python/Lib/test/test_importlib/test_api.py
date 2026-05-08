@@ -8,9 +8,10 @@ import os.path
 import sys
 from test.support import import_helper
 from test.support import os_helper
+from test import support
+import traceback
 import types
 import unittest
-import warnings
 
 
 class ImportModuleTests:
@@ -354,6 +355,20 @@ class ReloadTests:
             with self.assertRaises(ModuleNotFoundError):
                 self.init.reload(module)
 
+    def test_reload_traceback_with_non_str(self):
+        # gh-125519
+        with support.captured_stdout() as stdout:
+            try:
+                self.init.reload("typing")
+            except TypeError as exc:
+                traceback.print_exception(exc, file=stdout)
+            else:
+                self.fail("Expected TypeError to be raised")
+        printed_traceback = stdout.getvalue()
+        self.assertIn("TypeError", printed_traceback)
+        self.assertNotIn("AttributeError", printed_traceback)
+        self.assertNotIn("module.__spec__.name", printed_traceback)
+
 
 (Frozen_ReloadTests,
  Source_ReloadTests
@@ -415,8 +430,7 @@ class StartupTests:
         for name, module in sys.modules.items():
             if isinstance(module, types.ModuleType):
                 with self.subTest(name=name):
-                    self.assertTrue(hasattr(module, '__loader__'),
-                                    '{!r} lacks a __loader__ attribute'.format(name))
+                    self.assertHasAttr(module, '__loader__')
                     if self.machinery.BuiltinImporter.find_spec(name):
                         self.assertIsNot(module.__loader__, None)
                     elif self.machinery.FrozenImporter.find_spec(name):
@@ -426,7 +440,7 @@ class StartupTests:
         for name, module in sys.modules.items():
             if isinstance(module, types.ModuleType):
                 with self.subTest(name=name):
-                    self.assertTrue(hasattr(module, '__spec__'))
+                    self.assertHasAttr(module, '__spec__')
                     if self.machinery.BuiltinImporter.find_spec(name):
                         self.assertIsNot(module.__spec__, None)
                     elif self.machinery.FrozenImporter.find_spec(name):

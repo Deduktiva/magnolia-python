@@ -7,7 +7,6 @@
 
 extern PyObject* PyInit__abc(void);
 extern PyObject* PyInit_array(void);
-extern PyObject* PyInit_audioop(void);
 extern PyObject* PyInit_binascii(void);
 extern PyObject* PyInit_cmath(void);
 extern PyObject* PyInit_errno(void);
@@ -23,6 +22,7 @@ extern PyObject* PyInit__sha1(void);
 extern PyObject* PyInit__sha2(void);
 extern PyObject* PyInit__sha3(void);
 extern PyObject* PyInit__statistics(void);
+extern PyObject* PyInit__sysconfig(void);
 extern PyObject* PyInit__typing(void);
 extern PyObject* PyInit__blake2(void);
 extern PyObject* PyInit_time(void);
@@ -35,8 +35,9 @@ extern PyObject* PyInit__codecs(void);
 extern PyObject* PyInit__weakref(void);
 /* XXX: These two should really be extracted to standalone extensions. */
 extern PyObject* PyInit_xxsubtype(void);
-extern PyObject* PyInit__xxsubinterpreters(void);
-extern PyObject* PyInit__xxinterpchannels(void);
+extern PyObject* PyInit__interpreters(void);
+extern PyObject* PyInit__interpchannels(void);
+extern PyObject* PyInit__interpqueues(void);
 extern PyObject* PyInit__random(void);
 extern PyObject* PyInit_itertools(void);
 extern PyObject* PyInit__collections(void);
@@ -76,13 +77,7 @@ extern PyObject* PyInit__stat(void);
 extern PyObject* PyInit__opcode(void);
 extern PyObject* PyInit__contextvars(void);
 extern PyObject* PyInit__tokenize(void);
-
-extern PyObject* PyInit__ctypes(void);
-extern PyObject* PyInit__ssl(void);
-extern PyObject* PyInit__hashlib(void);
-extern PyObject* PyInit__socket(void);
-extern PyObject* PyInit_select(void);
-extern PyObject* PyInit_unicodedata(void);
+extern PyObject* PyInit__suggestions(void);
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
@@ -94,7 +89,6 @@ struct _inittab _PyImport_Inittab[] = {
     {"_abc", PyInit__abc},
     {"array", PyInit_array},
     {"_ast", PyInit__ast},
-    {"audioop", PyInit_audioop},
     {"binascii", PyInit_binascii},
     {"cmath", PyInit_cmath},
     {"errno", PyInit_errno},
@@ -109,6 +103,7 @@ struct _inittab _PyImport_Inittab[] = {
     {"_sha2", PyInit__sha2},
     {"_sha3", PyInit__sha3},
     {"_blake2", PyInit__blake2},
+    {"_sysconfig", PyInit__sysconfig},
     {"time", PyInit_time},
     {"_thread", PyInit__thread},
     {"_tokenize", PyInit__tokenize},
@@ -143,10 +138,12 @@ struct _inittab _PyImport_Inittab[] = {
     {"_datetime", PyInit__datetime},
     {"_functools", PyInit__functools},
     {"_json", PyInit__json},
+    {"_suggestions", PyInit__suggestions},
 
     {"xxsubtype", PyInit_xxsubtype},
-    {"_xxsubinterpreters", PyInit__xxsubinterpreters},
-    {"_xxinterpchannels", PyInit__xxinterpchannels},
+    {"_interpreters", PyInit__interpreters},
+    {"_interpchannels", PyInit__interpchannels},
+    {"_interpqueues", PyInit__interpqueues},
 #ifdef _Py_HAVE_ZLIB
     {"zlib", PyInit_zlib},
 #endif
@@ -182,13 +179,6 @@ struct _inittab _PyImport_Inittab[] = {
     {"_opcode", PyInit__opcode},
 
     {"_contextvars", PyInit__contextvars},
-
-    {"_ctypes", PyInit__ctypes},
-    {"_ssl", PyInit__ssl},
-    {"_hashlib", PyInit__hashlib},
-    {"_socket", PyInit__socket},
-    {"select", PyInit_select},
-    {"unicodedata", PyInit_unicodedata},
 
     /* Sentinel */
     {0, 0}

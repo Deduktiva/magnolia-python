@@ -55,8 +55,10 @@ from the previous chapter.  This file defines three things:
 #. How the :class:`!Custom` **type** behaves: this is the ``CustomType`` struct,
    which defines a set of flags and function pointers that the interpreter
    inspects when specific operations are requested.
-#. How to initialize the :mod:`!custom` module: this is the ``PyInit_custom``
-   function and the associated ``custommodule`` struct.
+#. How to define and execute the :mod:`!custom` module: this is the
+   ``PyInit_custom`` function and the associated ``custom_module`` struct for
+   defining the module, and the ``custom_module_exec`` function to set up
+   a fresh module object.
 
 The first bit is::
 
@@ -144,7 +146,7 @@ only used for variable-sized objects and should otherwise be zero.
    If you want your type to be subclassable from Python, and your type has the same
    :c:member:`~PyTypeObject.tp_basicsize` as its base type, you may have problems with multiple
    inheritance.  A Python subclass of your type will have to list your type first
-   in its :attr:`~class.__bases__`, or else it will not be able to call your type's
+   in its :attr:`~type.__bases__`, or else it will not be able to call your type's
    :meth:`~object.__new__` method without getting an error.  You can avoid this problem by
    ensuring that your type has a larger value for :c:member:`~PyTypeObject.tp_basicsize` than its
    base type does.  Most of the time, this will be true anyway, because either your
@@ -171,20 +173,18 @@ implementation provided by the API function :c:func:`PyType_GenericNew`. ::
    .tp_new = PyType_GenericNew,
 
 Everything else in the file should be familiar, except for some code in
-:c:func:`!PyInit_custom`::
+:c:func:`!custom_module_exec`::
 
-   if (PyType_Ready(&CustomType) < 0)
-       return;
+   if (PyType_Ready(&CustomType) < 0) {
+       return -1;
+   }
 
 This initializes the :class:`!Custom` type, filling in a number of members
 to the appropriate default values, including :c:member:`~PyObject.ob_type` that we initially
 set to ``NULL``. ::
 
-   Py_INCREF(&CustomType);
-   if (PyModule_AddObject(m, "Custom", (PyObject *) &CustomType) < 0) {
-       Py_DECREF(&CustomType);
-       Py_DECREF(m);
-       return NULL;
+   if (PyModule_AddObjectRef(m, "Custom", (PyObject *) &CustomType) < 0) {
+       return -1;
    }
 
 This adds the type to the module dictionary.  This allows us to create
@@ -449,7 +449,7 @@ Further, the attributes can be deleted, setting the C pointers to ``NULL``.  Eve
 though we can make sure the members are initialized to non-``NULL`` values, the
 members can be set to ``NULL`` if the attributes are deleted.
 
-We define a single method, :meth:`!Custom.name()`, that outputs the objects name as the
+We define a single method, :meth:`!Custom.name`, that outputs the objects name as the
 concatenation of the first and last names. ::
 
    static PyObject *
@@ -847,29 +847,22 @@ but let the base class handle it by calling its own :c:member:`~PyTypeObject.tp_
 The :c:type:`PyTypeObject` struct supports a :c:member:`~PyTypeObject.tp_base`
 specifying the type's concrete base class.  Due to cross-platform compiler
 issues, you can't fill that field directly with a reference to
-:c:type:`PyList_Type`; it should be done later in the module initialization
+:c:type:`PyList_Type`; it should be done in the :c:data:`Py_mod_exec`
 function::
 
-   PyMODINIT_FUNC
-   PyInit_sublist(void)
+   static int
+   sublist_module_exec(PyObject *m)
    {
-       PyObject* m;
        SubListType.tp_base = &PyList_Type;
-       if (PyType_Ready(&SubListType) < 0)
-           return NULL;
-
-       m = PyModule_Create(&sublistmodule);
-       if (m == NULL)
-           return NULL;
-
-       Py_INCREF(&SubListType);
-       if (PyModule_AddObject(m, "SubList", (PyObject *) &SubListType) < 0) {
-           Py_DECREF(&SubListType);
-           Py_DECREF(m);
-           return NULL;
+       if (PyType_Ready(&SubListType) < 0) {
+           return -1;
        }
 
-       return m;
+       if (PyModule_AddObjectRef(m, "SubList", (PyObject *) &SubListType) < 0) {
+           return -1;
+       }
+
+       return 0;
    }
 
 Before calling :c:func:`PyType_Ready`, the type structure must have the

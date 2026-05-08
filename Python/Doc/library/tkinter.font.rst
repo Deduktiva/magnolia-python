@@ -1,8 +1,7 @@
-:mod:`tkinter.font` --- Tkinter font wrapper
-============================================
+:mod:`!tkinter.font` --- Tkinter font wrapper
+=============================================
 
 .. module:: tkinter.font
-   :platform: Tk
    :synopsis: Tkinter font-wrapping class
 
 **Source code:** :source:`Lib/tkinter/font.py`

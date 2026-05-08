@@ -24,6 +24,7 @@ you're working through IDLE, you can import this test module and call test()
 with the corresponding argument.
 """
 
+import logging
 import math
 import os, sys
 import operator
@@ -34,10 +35,10 @@ import numbers
 import locale
 from test.support import (is_resource_enabled,
                           requires_IEEE_754, requires_docstrings,
-                          requires_legacy_unicode_capi, check_sanitizer)
+                          check_disallow_instantiation)
 from test.support import (TestFailed,
                           run_with_locale, cpython_only,
-                          darwin_malloc_err_warning, is_emscripten)
+                          darwin_malloc_err_warning)
 from test.support.import_helper import import_fresh_module
 from test.support import threading_helper
 from test.support import warnings_helper
@@ -586,18 +587,6 @@ class ExplicitConstructionTest:
             # underscores don't prevent errors
             self.assertRaises(InvalidOperation, Decimal, "1_2_\u00003")
 
-    @cpython_only
-    @requires_legacy_unicode_capi()
-    @warnings_helper.ignore_warnings(category=DeprecationWarning)
-    def test_from_legacy_strings(self):
-        import _testcapi
-        Decimal = self.decimal.Decimal
-        context = self.decimal.Context()
-
-        s = _testcapi.unicode_legacy_string('9.999999')
-        self.assertEqual(str(Decimal(s)), '9.999999')
-        self.assertEqual(str(context.create_decimal(s)), '9.999999')
-
     def test_explicit_from_tuples(self):
         Decimal = self.decimal.Decimal
 
@@ -1070,6 +1059,11 @@ class FormatTest:
             (',%', '123.456789', '12,345.6789%'),
             (',e', '123456', '1.23456e+5'),
             (',E', '123456', '1.23456E+5'),
+            # ... with '_' instead
+            ('_', '1234567', '1_234_567'),
+            ('07_', '1234.56', '1_234.56'),
+            ('_', '1.23456789', '1.23456789'),
+            ('_%', '123.456789', '12_345.6789%'),
 
             # negative zero: default behavior
             ('.1f', '-0', '-0.0'),
@@ -1121,6 +1115,13 @@ class FormatTest:
             ('z>z6.1f', '-0.', 'zzz0.0'),
             ('x>z6.1f', '-0.', 'xxx0.0'),
             ('🖤>z6.1f', '-0.', '🖤🖤🖤0.0'),  # multi-byte fill char
+            ('\x00>z6.1f', '-0.', '\x00\x00\x000.0'),  # null fill char
+
+            # issue 114563 ('z' format on F type in cdecimal)
+            ('z3,.10F', '-6.24E-323', '0.0000000000'),
+
+            # issue 91060 ('#' format in cdecimal)
+            ('#', '0', '0.'),
 
             # issue 6850
             ('a=-7.0', '0.12345', 'aaaa0.1'),
@@ -1234,7 +1235,31 @@ class FormatTest:
         self.assertEqual(get_fmt(Decimal('-1.5'), dotsep_wide, '020n'),
                          '-0\u00b4000\u00b4000\u00b4000\u00b4001\u00bf5')
 
-    @run_with_locale('LC_ALL', 'ps_AF')
+    def test_deprecated_N_format(self):
+        Decimal = self.decimal.Decimal
+        h = Decimal('6.62607015e-34')
+        if self.decimal == C:
+            with self.assertWarns(DeprecationWarning) as cm:
+                r = format(h, 'N')
+            self.assertEqual(cm.filename, __file__)
+            self.assertEqual(r, format(h, 'n').upper())
+            with self.assertWarns(DeprecationWarning) as cm:
+                r = format(h, '010.3N')
+            self.assertEqual(cm.filename, __file__)
+            self.assertEqual(r, format(h, '010.3n').upper())
+        else:
+            self.assertRaises(ValueError, format, h, 'N')
+            self.assertRaises(ValueError, format, h, '010.3N')
+        with warnings_helper.check_no_warnings(self):
+            self.assertEqual(format(h, 'N>10.3'), 'NN6.63E-34')
+            self.assertEqual(format(h, 'N>10.3n'), 'NN6.63e-34')
+            self.assertEqual(format(h, 'N>10.3e'), 'N6.626e-34')
+            self.assertEqual(format(h, 'N>10.3f'), 'NNNNN0.000')
+            self.assertRaises(ValueError, format, h, '>Nf')
+            self.assertRaises(ValueError, format, h, '10Nf')
+            self.assertRaises(ValueError, format, h, 'Nx')
+
+    @run_with_locale('LC_ALL', 'ps_AF', '')
     def test_wide_char_separator_decimal_point(self):
         # locale with wide char separator and decimal point
         Decimal = self.decimal.Decimal
@@ -2052,7 +2077,9 @@ class UsabilityTest:
         #to quantize, which is already extensively tested
         test_triples = [
             ('123.456', -4, '0E+4'),
+            ('-123.456', -4, '-0E+4'),
             ('123.456', -3, '0E+3'),
+            ('-123.456', -3, '-0E+3'),
             ('123.456', -2, '1E+2'),
             ('123.456', -1, '1.2E+2'),
             ('123.456', 0, '123'),
@@ -2917,23 +2944,6 @@ class ContextAPItests:
             assert_signals(self, c, 'flags', [])
             assert_signals(self, c, 'traps', [InvalidOperation, DivisionByZero,
                                               Overflow])
-
-    @cpython_only
-    @requires_legacy_unicode_capi()
-    @warnings_helper.ignore_warnings(category=DeprecationWarning)
-    def test_from_legacy_strings(self):
-        import _testcapi
-        c = self.decimal.Context()
-
-        for rnd in RoundingModes:
-            c.rounding = _testcapi.unicode_legacy_string(rnd)
-            self.assertEqual(c.rounding, rnd)
-
-        s = _testcapi.unicode_legacy_string('')
-        self.assertRaises(TypeError, setattr, c, 'rounding', s)
-
-        s = _testcapi.unicode_legacy_string('ROUND_\x00UP')
-        self.assertRaises(TypeError, setattr, c, 'rounding', s)
 
     def test_pickle(self):
 
@@ -4377,7 +4387,8 @@ class CheckAttributes(unittest.TestCase):
 
         self.assertEqual(C.__version__, P.__version__)
 
-        self.assertEqual(dir(C), dir(P))
+        self.assertLessEqual(set(dir(C)), set(dir(P)))
+        self.assertEqual([n for n in dir(C) if n[:2] != '__'], sorted(P.__all__))
 
     def test_context_attributes(self):
 
@@ -4453,6 +4464,15 @@ class Coverage:
             self.assertIs(Decimal("NaN").fma(7, 1).is_nan(), True)
             # three arg power
             self.assertEqual(pow(Decimal(10), 2, 7), 2)
+            if self.decimal == C:
+                self.assertEqual(pow(10, Decimal(2), 7), 2)
+                self.assertEqual(pow(10, 2, Decimal(7)), 2)
+            else:
+                # XXX: Three-arg power doesn't use __rpow__.
+                self.assertRaises(TypeError, pow, 10, Decimal(2), 7)
+                # XXX: There is no special method to dispatch on the
+                # third arg of three-arg power.
+                self.assertRaises(TypeError, pow, 10, 2, Decimal(7))
             # exp
             self.assertEqual(Decimal("1.01").exp(), 3)
             # is_normal
@@ -4714,8 +4734,32 @@ class PyWhitebox(unittest.TestCase):
 
             c.prec = 1
             x = Decimal("152587890625") ** Decimal('-0.5')
+            self.assertEqual(x, Decimal('3e-6'))
+            c.prec = 2
+            x = Decimal("152587890625") ** Decimal('-0.5')
+            self.assertEqual(x, Decimal('2.6e-6'))
+            c.prec = 3
+            x = Decimal("152587890625") ** Decimal('-0.5')
+            self.assertEqual(x, Decimal('2.56e-6'))
+            c.prec = 28
+            x = Decimal("152587890625") ** Decimal('-0.5')
+            self.assertEqual(x, Decimal('2.56e-6'))
+
             c.prec = 201
             x = Decimal(2**578) ** Decimal("-0.5")
+
+            # See https://github.com/python/cpython/issues/118027
+            # Testing for an exact power could appear to hang, in the Python
+            # version, as it attempted to compute 10**(MAX_EMAX + 1).
+            # Fixed via https://github.com/python/cpython/pull/118503.
+            c.prec = P.MAX_PREC
+            c.Emax = P.MAX_EMAX
+            c.Emin = P.MIN_EMIN
+            c.traps[P.Inexact] = 1
+            D2 = Decimal(2)
+            # If the bug is still present, the next statement won't complete.
+            res = D2 ** 117
+            self.assertEqual(res, 1 << 117)
 
     def test_py_immutability_operations(self):
         # Do operations and check that it didn't change internal objects.
@@ -5640,47 +5684,24 @@ class CWhitebox(unittest.TestCase):
             self.assertEqual(Decimal.from_float(cls(101.1)),
                              Decimal.from_float(101.1))
 
-    # Issue 41540:
-    @unittest.skipIf(sys.platform.startswith("aix"),
-                     "AIX: default ulimit: test is flaky because of extreme over-allocation")
-    @unittest.skipIf(is_emscripten, "Test is unstable on Emscripten")
-    @unittest.skipIf(check_sanitizer(address=True, memory=True),
-                     "ASAN/MSAN sanitizer defaults to crashing "
-                     "instead of returning NULL for malloc failure.")
-    def test_maxcontext_exact_arith(self):
+    def test_c_immutable_types(self):
+        SignalDict = type(C.Context().flags)
+        SignalDictMixin = SignalDict.__bases__[0]
+        ContextManager = type(C.localcontext())
+        types = (
+            SignalDictMixin,
+            ContextManager,
+            C.Decimal,
+            C.Context,
+        )
+        for tp in types:
+            with self.subTest(tp=tp):
+                with self.assertRaisesRegex(TypeError, "immutable"):
+                    tp.foo = 1
 
-        # Make sure that exact operations do not raise MemoryError due
-        # to huge intermediate values when the context precision is very
-        # large.
-
-        # The following functions fill the available precision and are
-        # therefore not suitable for large precisions (by design of the
-        # specification).
-        MaxContextSkip = ['logical_invert', 'next_minus', 'next_plus',
-                          'logical_and', 'logical_or', 'logical_xor',
-                          'next_toward', 'rotate', 'shift']
-
-        Decimal = C.Decimal
-        Context = C.Context
-        localcontext = C.localcontext
-
-        # Here only some functions that are likely candidates for triggering a
-        # MemoryError are tested.  deccheck.py has an exhaustive test.
-        maxcontext = Context(prec=C.MAX_PREC, Emin=C.MIN_EMIN, Emax=C.MAX_EMAX)
-        with localcontext(maxcontext):
-            self.assertEqual(Decimal(0).exp(), 1)
-            self.assertEqual(Decimal(1).ln(), 0)
-            self.assertEqual(Decimal(1).log10(), 0)
-            self.assertEqual(Decimal(10**2).log10(), 2)
-            self.assertEqual(Decimal(10**223).log10(), 223)
-            self.assertEqual(Decimal(10**19).logb(), 19)
-            self.assertEqual(Decimal(4).sqrt(), 2)
-            self.assertEqual(Decimal("40E9").sqrt(), Decimal('2.0E+5'))
-            self.assertEqual(divmod(Decimal(10), 3), (3, 1))
-            self.assertEqual(Decimal(10) // 3, 3)
-            self.assertEqual(Decimal(4) / 2, 2)
-            self.assertEqual(Decimal(400) ** -1, Decimal('0.0025'))
-
+    def test_c_disallow_instantiation(self):
+        ContextManager = type(C.localcontext())
+        check_disallow_instantiation(self, ContextManager)
 
     def test_c_signaldict_segfault(self):
         # See gh-106263 for details.
@@ -5711,6 +5732,20 @@ class CWhitebox(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, err_msg):
             sd.copy()
+
+    def test_format_fallback_capitals(self):
+        # Fallback to _pydecimal formatting (triggered by `#` format which
+        # is unsupported by mpdecimal) should honor the current context.
+        x = C.Decimal('6.09e+23')
+        self.assertEqual(format(x, '#'), '6.09E+23')
+        with C.localcontext(capitals=0):
+            self.assertEqual(format(x, '#'), '6.09e+23')
+
+    def test_format_fallback_rounding(self):
+        y = C.Decimal('6.09')
+        self.assertEqual(format(y, '#.1f'), '6.1')
+        with C.localcontext(rounding=C.ROUND_DOWN):
+            self.assertEqual(format(y, '#.1f'), '6.0')
 
 @requires_docstrings
 @requires_cdecimal
@@ -5875,13 +5910,17 @@ def load_tests(loader, tests, pattern):
 
     if TODO_TESTS is None:
         from doctest import DocTestSuite, IGNORE_EXCEPTION_DETAIL
+        orig_context = orig_sys_decimal.getcontext().copy()
         for mod in C, P:
             if not mod:
                 continue
             def setUp(slf, mod=mod):
                 sys.modules['decimal'] = mod
-            def tearDown(slf):
+                init(mod)
+            def tearDown(slf, mod=mod):
                 sys.modules['decimal'] = orig_sys_decimal
+                mod.setcontext(ORIGINAL_CONTEXT[mod].copy())
+                orig_sys_decimal.setcontext(orig_context.copy())
             optionflags = IGNORE_EXCEPTION_DETAIL if mod is C else 0
             sys.modules['decimal'] = mod
             tests.addTest(DocTestSuite(mod, setUp=setUp, tearDown=tearDown,
@@ -5896,11 +5935,12 @@ def setUpModule():
     TEST_ALL = ARITH if ARITH is not None else is_resource_enabled('decimal')
 
 def tearDownModule():
-    if C: C.setcontext(ORIGINAL_CONTEXT[C])
-    P.setcontext(ORIGINAL_CONTEXT[P])
+    if C: C.setcontext(ORIGINAL_CONTEXT[C].copy())
+    P.setcontext(ORIGINAL_CONTEXT[P].copy())
     if not C:
-        warnings.warn('C tests skipped: no module named _decimal.',
-                      UserWarning)
+        logging.getLogger(__name__).warning(
+            'C tests skipped: no module named _decimal.'
+        )
     if not orig_sys_decimal is sys.modules['decimal']:
         raise TestFailed("Internal error: unbalanced number of changes to "
                          "sys.modules['decimal'].")

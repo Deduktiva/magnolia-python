@@ -1,10 +1,9 @@
-:mod:`curses` --- Terminal handling for character-cell displays
-===============================================================
+:mod:`!curses` --- Terminal handling for character-cell displays
+================================================================
 
 .. module:: curses
    :synopsis: An interface to the curses library, providing portable
               terminal handling.
-   :platform: Unix
 
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 .. sectionauthor:: Eric Raymond <esr@thyrsus.com>
@@ -20,6 +19,10 @@ While curses is most widely used in the Unix environment, versions are available
 for Windows, DOS, and possibly other systems as well.  This extension module is
 designed to match the API of ncurses, an open-source curses library hosted on
 Linux and the BSD variants of Unix.
+
+.. include:: ../includes/wasm-mobile-notavail.rst
+
+.. availability:: Unix.
 
 .. note::
 
@@ -701,8 +704,10 @@ The module :mod:`curses` defines the following functions:
 Window Objects
 --------------
 
-Window objects, as returned by :func:`initscr` and :func:`newwin` above, have
-the following methods and attributes:
+.. class:: window
+
+   Window objects, as returned by :func:`initscr` and :func:`newwin` above, have
+   the following methods and attributes:
 
 
 .. method:: window.addch(ch[, attr])
@@ -755,7 +760,7 @@ the following methods and attributes:
 
 .. method:: window.attron(attr)
 
-   Add attribute *attr* from the "background" set applied to all writes to the
+   Add attribute *attr* to the "background" set applied to all writes to the
    current window.
 
 
@@ -922,7 +927,7 @@ the following methods and attributes:
 
 .. method:: window.getbegyx()
 
-   Return a tuple ``(y, x)`` of co-ordinates of upper-left corner.
+   Return a tuple ``(y, x)`` of coordinates of upper-left corner.
 
 
 .. method:: window.getbkgd()
@@ -1324,7 +1329,6 @@ The :mod:`curses` module defines the following data members:
 
 
 .. data:: version
-.. data:: __version__
 
    A bytes object representing the current version of the module.
 

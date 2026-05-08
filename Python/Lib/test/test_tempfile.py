@@ -13,6 +13,7 @@ import types
 import weakref
 import gc
 import shutil
+import subprocess
 from unittest import mock
 
 import unittest
@@ -62,16 +63,10 @@ class TestLowLevelInternals(unittest.TestCase):
             tempfile._infer_return_type(b'', None, '')
 
     def test_infer_return_type_pathlib(self):
-        self.assertIs(str, tempfile._infer_return_type(pathlib.Path('/')))
+        self.assertIs(str, tempfile._infer_return_type(os_helper.FakePath('/')))
 
     def test_infer_return_type_pathlike(self):
-        class Path:
-            def __init__(self, path):
-                self.path = path
-
-            def __fspath__(self):
-                return self.path
-
+        Path = os_helper.FakePath
         self.assertIs(str, tempfile._infer_return_type(Path('/')))
         self.assertIs(bytes, tempfile._infer_return_type(Path(b'/')))
         self.assertIs(str, tempfile._infer_return_type('', Path('')))
@@ -339,17 +334,36 @@ class TestBadTempdir:
     )
     def test_read_only_directory(self):
         with _inside_empty_temp_dir():
-            oldmode = mode = os.stat(tempfile.tempdir).st_mode
-            mode &= ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
-            os.chmod(tempfile.tempdir, mode)
+            probe = os.path.join(tempfile.tempdir, 'probe')
+            if os.name == 'nt':
+                cmd = ['icacls', tempfile.tempdir, '/deny', 'Everyone:(W)']
+                stdout = None if support.verbose > 1 else subprocess.DEVNULL
+                subprocess.run(cmd, check=True, stdout=stdout)
+            else:
+                oldmode = mode = os.stat(tempfile.tempdir).st_mode
+                mode &= ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+                mode = stat.S_IREAD
+                os.chmod(tempfile.tempdir, mode)
             try:
-                if os.access(tempfile.tempdir, os.W_OK):
+                # Check that the directory is read-only.
+                try:
+                    os.mkdir(probe)
+                except PermissionError:
+                    pass
+                else:
+                    os.rmdir(probe)
                     self.skipTest("can't set the directory read-only")
+                # gh-66305: Now it takes a split second, but previously
+                # it took about 10 days on Windows.
                 with self.assertRaises(PermissionError):
                     self.make_temp()
-                self.assertEqual(os.listdir(tempfile.tempdir), [])
             finally:
-                os.chmod(tempfile.tempdir, oldmode)
+                if os.name == 'nt':
+                    cmd = ['icacls', tempfile.tempdir, '/grant:r', 'Everyone:(M)']
+                    subprocess.run(cmd, check=True, stdout=stdout)
+                else:
+                    os.chmod(tempfile.tempdir, oldmode)
+            self.assertEqual(os.listdir(tempfile.tempdir), [])
 
     def test_nonexisting_directory(self):
         with _inside_empty_temp_dir():
@@ -442,7 +456,7 @@ class TestMkstempInner(TestBadTempdir, BaseTestCase):
         dir = tempfile.mkdtemp()
         try:
             self.do_create(dir=dir).write(b"blat")
-            self.do_create(dir=pathlib.Path(dir)).write(b"blat")
+            self.do_create(dir=os_helper.FakePath(dir)).write(b"blat")
         finally:
             support.gc_collect()  # For PyPy or other GCs.
             os.rmdir(dir)
@@ -680,7 +694,7 @@ class TestMkstemp(BaseTestCase):
         dir = tempfile.mkdtemp()
         try:
             self.do_create(dir=dir)
-            self.do_create(dir=pathlib.Path(dir))
+            self.do_create(dir=os_helper.FakePath(dir))
         finally:
             os.rmdir(dir)
 
@@ -781,7 +795,7 @@ class TestMkdtemp(TestBadTempdir, BaseTestCase):
         dir = tempfile.mkdtemp()
         try:
             os.rmdir(self.do_create(dir=dir))
-            os.rmdir(self.do_create(dir=pathlib.Path(dir)))
+            os.rmdir(self.do_create(dir=os_helper.FakePath(dir)))
         finally:
             os.rmdir(dir)
 
@@ -802,6 +816,33 @@ class TestMkdtemp(TestBadTempdir, BaseTestCase):
             self.assertEqual(mode, expected)
         finally:
             os.rmdir(dir)
+
+    @unittest.skipUnless(os.name == "nt", "Only on Windows.")
+    def test_mode_win32(self):
+        # Use icacls.exe to extract the users with some level of access
+        # Main thing we are testing is that the BUILTIN\Users group has
+        # no access. The exact ACL is going to vary based on which user
+        # is running the test.
+        dir = self.do_create()
+        try:
+            out = subprocess.check_output(["icacls.exe", dir], encoding="oem").casefold()
+        finally:
+            os.rmdir(dir)
+
+        dir = dir.casefold()
+        users = set()
+        found_user = False
+        for line in out.strip().splitlines():
+            acl = None
+            # First line of result includes our directory
+            if line.startswith(dir):
+                acl = line.removeprefix(dir).strip()
+            elif line and line[:1].isspace():
+                acl = line.strip()
+            if acl:
+                users.add(acl.partition(":")[0])
+
+        self.assertNotIn(r"BUILTIN\Users".casefold(), users)
 
     def test_collision_with_existing_file(self):
         # mkdtemp tries another name when a file with
@@ -1265,6 +1306,34 @@ class TestSpooledTemporaryFile(BaseTestCase):
         self.assertEqual(pos, 0)
         buf = f.read()
         self.assertEqual(buf, b'xyz')
+
+    def test_writelines_rollover(self):
+        # Verify writelines rolls over before exhausting the iterator
+        f = self.do_create(max_size=2)
+
+        def it():
+            yield b'xy'
+            self.assertFalse(f._rolled)
+            yield b'z'
+            self.assertTrue(f._rolled)
+
+        f.writelines(it())
+        pos = f.seek(0)
+        self.assertEqual(pos, 0)
+        buf = f.read()
+        self.assertEqual(buf, b'xyz')
+
+    def test_writelines_fast_path(self):
+        f = self.do_create(max_size=2)
+        f.write(b'abc')
+        self.assertTrue(f._rolled)
+
+        f.writelines([b'd', b'e', b'f'])
+        pos = f.seek(0)
+        self.assertEqual(pos, 0)
+        buf = f.read()
+        self.assertEqual(buf, b'abcdef')
+
 
     def test_writelines_sequential(self):
         # A SpooledTemporaryFile should hold exactly max_size bytes, and roll

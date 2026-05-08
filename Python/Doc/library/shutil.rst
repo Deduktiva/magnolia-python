@@ -1,5 +1,5 @@
-:mod:`shutil` --- High-level file operations
-============================================
+:mod:`!shutil` --- High-level file operations
+=============================================
 
 .. module:: shutil
    :synopsis: High-level file operations, including copying.
@@ -39,7 +39,7 @@ Directory and files operations
 
 .. function:: copyfileobj(fsrc, fdst[, length])
 
-   Copy the contents of the file-like object *fsrc* to the file-like object *fdst*.
+   Copy the contents of the :term:`file-like object <file object>` *fsrc* to the file-like object *fdst*.
    The integer *length*, if given, is the buffer size. In particular, a negative
    *length* value means to copy the data without looping over the source data in
    chunks; by default the data is read in chunks to avoid uncontrolled memory
@@ -52,7 +52,7 @@ Directory and files operations
 
    Copy the contents (no metadata) of the file named *src* to a file named
    *dst* and return *dst* in the most efficient way possible.
-   *src* and *dst* are path-like objects or path names given as strings.
+   *src* and *dst* are :term:`path-like objects <path-like object>` or path names given as strings.
 
    *dst* must be the complete target file name; look at :func:`~shutil.copy`
    for a copy that accepts a target directory path.  If *src* and *dst*
@@ -83,6 +83,13 @@ Directory and files operations
       copy the file more efficiently. See
       :ref:`shutil-platform-dependent-efficient-copy-operations` section.
 
+.. exception:: SpecialFileError
+
+   This exception is raised when :func:`copyfile` or :func:`copytree` attempt
+   to copy a named pipe.
+
+   .. versionadded:: 2.7
+
 .. exception:: SameFileError
 
    This exception is raised if source and destination in :func:`copyfile`
@@ -94,7 +101,7 @@ Directory and files operations
 .. function:: copymode(src, dst, *, follow_symlinks=True)
 
    Copy the permission bits from *src* to *dst*.  The file contents, owner, and
-   group are unaffected.  *src* and *dst* are path-like objects or path names
+   group are unaffected.  *src* and *dst* are :term:`path-like objects <path-like object>` or path names
    given as strings.
    If *follow_symlinks* is false, and both *src* and *dst* are symbolic links,
    :func:`copymode` will attempt to modify the mode of *dst* itself (rather
@@ -113,7 +120,7 @@ Directory and files operations
    Copy the permission bits, last access time, last modification time, and
    flags from *src* to *dst*.  On Linux, :func:`copystat` also copies the
    "extended attributes" where possible.  The file contents, owner, and
-   group are unaffected.  *src* and *dst* are path-like objects or path
+   group are unaffected.  *src* and *dst* are :term:`path-like objects <path-like object>` or path
    names given as strings.
 
    If *follow_symlinks* is false, and *src* and *dst* both
@@ -242,7 +249,7 @@ Directory and files operations
    be copied as far as the platform allows; if false or omitted, the contents
    and metadata of the linked files are copied to the new tree.
 
-   When *symlinks* is false, if the file pointed by the symlink doesn't
+   When *symlinks* is false, if the file pointed to by the symlink doesn't
    exist, an exception will be added in the list of errors raised in
    an :exc:`Error` exception at the end of the copy process.
    You can set the optional *ignore_dangling_symlinks* flag to true if you
@@ -274,15 +281,15 @@ Directory and files operations
 
    .. audit-event:: shutil.copytree src,dst shutil.copytree
 
-   .. versionchanged:: 3.3
-      Copy metadata when *symlinks* is false.
-      Now returns *dst*.
-
    .. versionchanged:: 3.2
       Added the *copy_function* argument to be able to provide a custom copy
       function.
       Added the *ignore_dangling_symlinks* argument to silence dangling symlinks
       errors when *symlinks* is false.
+
+   .. versionchanged:: 3.3
+      Copy metadata when *symlinks* is false.
+      Now returns *dst*.
 
    .. versionchanged:: 3.8
       Platform-specific fast-copy syscalls may be used internally in order to
@@ -327,6 +334,10 @@ Directory and files operations
    The deprecated *onerror* is similar to *onexc*, except that the third
    parameter it receives is the tuple returned from :func:`sys.exc_info`.
 
+   .. seealso::
+      :ref:`shutil-rmtree-example` for an example of handling the removal
+      of a directory tree that contains read-only files.
+
    .. audit-event:: shutil.rmtree path,dir_fd shutil.rmtree
 
    .. versionchanged:: 3.3
@@ -338,10 +349,16 @@ Directory and files operations
       before removing the junction.
 
    .. versionchanged:: 3.11
-      The *dir_fd* parameter.
+      Added the *dir_fd* parameter.
 
    .. versionchanged:: 3.12
       Added the *onexc* parameter, deprecated *onerror*.
+
+   .. versionchanged:: 3.13
+      :func:`!rmtree` now ignores :exc:`FileNotFoundError` exceptions for all
+      but the top-level path.
+      Exceptions other than :exc:`OSError` and subclasses of :exc:`!OSError`
+      are now always propagated to the caller.
 
    .. attribute:: rmtree.avoids_symlink_attacks
 
@@ -415,7 +432,8 @@ Directory and files operations
 
    .. availability:: Unix, Windows.
 
-.. function:: chown(path, user=None, group=None)
+.. function:: chown(path, user=None, group=None, *, dir_fd=None, \
+                    follow_symlinks=True)
 
    Change owner *user* and/or *group* of the given *path*.
 
@@ -430,6 +448,9 @@ Directory and files operations
 
    .. versionadded:: 3.3
 
+   .. versionchanged:: 3.13
+      Added *dir_fd* and *follow_symlinks* parameters.
+
 
 .. function:: which(cmd, mode=os.F_OK | os.X_OK, path=None)
 
@@ -437,10 +458,16 @@ Directory and files operations
    called.  If no *cmd* would be called, return ``None``.
 
    *mode* is a permission mask passed to :func:`os.access`, by default
-   determining if the file exists and executable.
+   determining if the file exists and is executable.
 
-   When no *path* is specified, the results of :func:`os.environ` are used,
-   returning either the "PATH" value or a fallback of :data:`os.defpath`.
+   *path* is a "``PATH`` string" specifying the directories to look in,
+   delimited by :data:`os.pathsep`. When no *path* is specified, the
+   :envvar:`PATH` environment variable is read from :data:`os.environ`,
+   falling back to :data:`os.defpath` if it is not set.
+
+   If *cmd* contains a directory component, :func:`!which` only checks the
+   specified path directly and does not search the directories listed in
+   *path* or in the system's :envvar:`PATH` environment variable.
 
    On Windows, the current directory is prepended to the *path* if *mode* does
    not include ``os.X_OK``. When the *mode* does include ``os.X_OK``, the
@@ -449,9 +476,9 @@ Directory and files operations
    consulting the current working directory for executables: set the environment
    variable ``NoDefaultCurrentDirectoryInExePath``.
 
-   Also on Windows, the ``PATHEXT`` variable is used to resolve commands
-   that may not already include an extension. For example, if you call
-   ``shutil.which("python")``, :func:`which` will search ``PATHEXT``
+   Also on Windows, the :envvar:`PATHEXT` environment variable is used to
+   resolve commands that may not already include an extension. For example,
+   if you call ``shutil.which("python")``, :func:`which` will search ``PATHEXT``
    to know that it should look for ``python.exe`` within the *path*
    directories. For example, on Windows::
 
@@ -461,7 +488,7 @@ Directory and files operations
    This is also applied when *cmd* is a path that contains a directory
    component::
 
-      >> shutil.which("C:\\Python33\\python")
+      >>> shutil.which("C:\\Python33\\python")
       'C:\\Python33\\python.EXE'
 
    .. versionadded:: 3.3
@@ -478,12 +505,6 @@ Directory and files operations
       ``PATHEXT`` is used now even when *cmd* includes a directory component
       or ends with an extension that is in ``PATHEXT``; and filenames that
       have no extension can now be found.
-
-   .. versionchanged:: 3.12.1
-      On Windows, if *mode* includes ``os.X_OK``, executables with an
-      extension in ``PATHEXT`` will be preferred over executables without a
-      matching extension.
-      This brings behavior closer to that of Python 3.11.
 
 .. exception:: Error
 
@@ -513,7 +534,7 @@ instead of 64 KiB) and a :func:`memoryview`-based variant of
 :func:`shutil.copyfileobj` is used.
 
 If the fast-copy operation fails and no data was written in the destination
-file then shutil will silently fallback on using less efficient
+file then shutil will silently fall back to less efficient
 :func:`copyfileobj` function internally.
 
 .. versionchanged:: 3.8
@@ -821,7 +842,7 @@ In the final archive, :file:`please_add.txt` should be included, but
     ...     root_dir='tmp/root',
     ...     base_dir='structure/content',
     ... )
-    '/Users/tarek/my_archive.tar'
+    '/Users/tarek/myarchive.tar'
 
 Listing the files in the resulting archive gives us:
 

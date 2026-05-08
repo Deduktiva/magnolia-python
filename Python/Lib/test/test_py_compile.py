@@ -207,6 +207,14 @@ class PyCompileTestsBase:
             with self.assertRaises(py_compile.PyCompileError):
                 py_compile.compile(bad_coding, doraise=True, quiet=1)
 
+    def test_utf7_decoded_cr_compiles(self):
+        with open(self.source_path, 'wb') as file:
+            file.write(b"#coding=U7+AA0''\n")
+
+        pyc_path = py_compile.compile(self.source_path, self.pyc_path, doraise=True)
+        self.assertEqual(pyc_path, self.pyc_path)
+        self.assertTrue(os.path.exists(self.pyc_path))
+
 
 class PyCompileTestsWithSourceEpoch(PyCompileTestsBase,
                                     unittest.TestCase,
@@ -227,7 +235,8 @@ class PyCompileCLITestCase(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.mkdtemp()
         self.source_path = os.path.join(self.directory, '_test.py')
-        self.cache_path = importlib.util.cache_from_source(self.source_path)
+        self.cache_path = importlib.util.cache_from_source(self.source_path,
+                                optimization='' if __debug__ else 1)
         with open(self.source_path, 'w') as file:
             file.write('x = 123\n')
 
@@ -250,6 +259,7 @@ class PyCompileCLITestCase(unittest.TestCase):
         return script_helper.assert_python_failure('-m', 'py_compile', *args)
 
     def test_stdin(self):
+        self.assertFalse(os.path.exists(self.cache_path))
         result = self.pycompilecmd('-', input=self.source_path)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b'')

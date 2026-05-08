@@ -18,6 +18,10 @@ import struct
 from test.support import import_helper
 
 
+class MyObject:
+    pass
+
+
 class AbstractMemoryTests:
     source_bytes = b"abcdef"
 
@@ -228,8 +232,6 @@ class AbstractMemoryTests:
                     self.m = memoryview(base)
             class MySource(tp):
                 pass
-            class MyObject:
-                pass
 
             # Create a reference cycle through a memoryview object.
             # This exercises mbuf_clear().
@@ -342,6 +344,20 @@ class AbstractMemoryTests:
         m = self._view(b)
         self.assertRaises(ValueError, hash, m)
 
+    def test_hash_use_after_free(self):
+        # Prevent crash in memoryview(v).__hash__ with re-entrant v.__hash__.
+        # Regression test for https://github.com/python/cpython/issues/142664.
+        class E(array.array):
+            def __hash__(self):
+                mv.release()
+                self.clear()
+                return 123
+
+        v = E('B', b'A' * 4096)
+        mv = memoryview(v).toreadonly()   # must be read-only for hash()
+        self.assertRaises(BufferError, hash, mv)
+        self.assertRaises(BufferError, mv.__hash__)
+
     def test_weakref(self):
         # Check memoryviews are weakrefable
         for tp in self._types:
@@ -396,6 +412,20 @@ class AbstractMemoryTests:
         self.assertEqual(d[0], 256)
         self.assertEqual(c.format, "H")
         self.assertEqual(d.format, "H")
+
+    def test_hex_use_after_free(self):
+        # Prevent UAF in memoryview.hex(sep) with re-entrant sep.__len__.
+        # Regression test for https://github.com/python/cpython/issues/143195.
+        ba = bytearray(b'A' * 1024)
+        mv = memoryview(ba)
+
+        class S(bytes):
+            def __len__(self):
+                mv.release()
+                ba.clear()
+                return 1
+
+        self.assertRaises(BufferError, mv.hex, S(b':'))
 
 
 # Variations on source objects for the buffer: bytes-like objects, then arrays
@@ -543,6 +573,25 @@ class OtherTest(unittest.TestCase):
         m2 = m1[::-1]
         self.assertEqual(m2.hex(), '30' * 200000)
 
+    def test_memoryview_hex_separator(self):
+        x = bytes(range(97, 102))
+        m1 = memoryview(x)
+        m2 = m1[::-1]
+        self.assertEqual(m2.hex(':'), '65:64:63:62:61')
+        self.assertEqual(m2.hex(':', 2), '65:6463:6261')
+        self.assertEqual(m2.hex(':', -2), '6564:6362:61')
+        self.assertEqual(m2.hex(sep=':', bytes_per_sep=2), '65:6463:6261')
+        self.assertEqual(m2.hex(sep=':', bytes_per_sep=-2), '6564:6362:61')
+        for bytes_per_sep in 5, -5, 2**31-1, -(2**31-1):
+            with self.subTest(bytes_per_sep=bytes_per_sep):
+                self.assertEqual(m2.hex(':', bytes_per_sep), '6564636261')
+        for bytes_per_sep in 2**31, -2**31, 2**1000, -2**1000:
+            with self.subTest(bytes_per_sep=bytes_per_sep):
+                try:
+                    self.assertEqual(m2.hex(':', bytes_per_sep), '6564636261')
+                except OverflowError:
+                    pass
+
     def test_copy(self):
         m = memoryview(b'abc')
         with self.assertRaises(TypeError):
@@ -655,6 +704,27 @@ class OtherTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "operation forbidden"):
             m[0] = MyBool()
         self.assertEqual(ba[:8], b'\0'*8)
+
+    def test_buffer_reference_loop(self):
+        m = memoryview(b'abc').__buffer__(0)
+        o = MyObject()
+        o.m = m
+        o.o = o
+        wr = weakref.ref(o)
+        del m, o
+        gc.collect()
+        self.assertIsNone(wr())
+
+    def test_picklebuffer_reference_loop(self):
+        pb = pickle.PickleBuffer(memoryview(b'abc'))
+        o = MyObject()
+        o.pb = pb
+        o.o = o
+        wr = weakref.ref(o)
+        del pb, o
+        gc.collect()
+        self.assertIsNone(wr())
+
 
 if __name__ == "__main__":
     unittest.main()

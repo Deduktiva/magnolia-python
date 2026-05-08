@@ -1,5 +1,5 @@
-:mod:`shelve` --- Python object persistence
-===========================================
+:mod:`!shelve` --- Python object persistence
+============================================
 
 .. module:: shelve
    :synopsis: Python object persistence.
@@ -65,7 +65,7 @@ lots of shared  sub-objects.  The keys are ordinary strings.
    to load a shelf from an untrusted source.  Like with pickle, loading a shelf
    can execute arbitrary code.
 
-Shelf objects support most of methods and operations supported by dictionaries
+Shelf objects support most of the methods and operations supported by dictionaries
 (except copying, constructors and operators ``|`` and ``|=``).  This eases the
 transition from dictionary based scripts to those requiring persistent storage.
 
@@ -86,7 +86,7 @@ Two additional methods are supported:
 
 .. seealso::
 
-   `Persistent dictionary recipe <https://code.activestate.com/recipes/576642/>`_
+   `Persistent dictionary recipe <https://code.activestate.com/recipes/576642-persistent-dict-with-multiple-standard-file-format/>`_
    with widely supported storage formats and having the speed of native
    dictionaries.
 

@@ -2,7 +2,7 @@ import argparse
 import os.path
 import shlex
 import sys
-from test.support import os_helper
+from test.support import os_helper, Py_DEBUG
 from .utils import ALL_RESOURCES, RESOURCE_NAMES, TestFilter
 
 
@@ -120,6 +120,13 @@ resources to test.  Currently only the following are defined:
 
     tzdata -    Run tests that require timezone data.
 
+    xpickle -   Test pickle and _pickle against Python 3.6, 3.7, 3.8
+                and 3.9 to test backwards compatibility. These tests
+                may take very long to complete.
+
+    wantobjects -    Allows to run Tkinter tests with the specified value of
+                     tkinter.wantobjects.
+
 To enable all resources except one, use '-uall,-<resource>'.  For
 example, to run all the tests except for the gui tests, give the
 option '-uall,-gui'.
@@ -148,7 +155,7 @@ class Namespace(argparse.Namespace):
         self.randomize = False
         self.fromfile = None
         self.fail_env_changed = False
-        self.use_resources = None
+        self.use_resources: dict[str, str | None] = {}
         self.trace = False
         self.coverdir = 'coverage'
         self.runleaks = False
@@ -164,6 +171,7 @@ class Namespace(argparse.Namespace):
         self.match_tests: TestFilter = []
         self.pgo = False
         self.pgo_extended = False
+        self.tsan = False
         self.worker_json = None
         self.start = None
         self.timeout = None
@@ -172,6 +180,8 @@ class Namespace(argparse.Namespace):
         self.fail_rerun = False
         self.tempdir = None
         self._add_python_opts = True
+        self.xmlpath = None
+        self.single_process = False
 
         super().__init__(**kwargs)
 
@@ -256,6 +266,9 @@ def _create_parser():
     group = parser.add_argument_group('Selecting tests')
     group.add_argument('-r', '--randomize', action='store_true',
                        help='randomize test execution order.' + more_details)
+    group.add_argument('--no-randomize', dest='no_randomize', action='store_true',
+                       help='do not randomize test execution order, even if '
+                       'it would be implied by another option')
     group.add_argument('-f', '--fromfile', metavar='FILE',
                        help='read names of tests to run from a file.' +
                             more_details)
@@ -283,7 +296,7 @@ def _create_parser():
     group.add_argument('-G', '--failfast', action='store_true',
                        help='fail as soon as a test fails (only with -v or -W)')
     group.add_argument('-u', '--use', metavar='RES1,RES2,...',
-                       action='append', type=resources_list,
+                       action='extend', type=resources_list,
                        help='specify which special resource intensive tests '
                             'to run.' + more_details)
     group.add_argument('-M', '--memlimit', metavar='LIMIT',
@@ -305,6 +318,12 @@ def _create_parser():
     group.add_argument('-j', '--multiprocess', metavar='PROCESSES',
                        dest='use_mp', type=int,
                        help='run PROCESSES processes at once')
+    group.add_argument('--single-process', action='store_true',
+                       dest='single_process',
+                       help='always run all tests sequentially in '
+                            'a single process, ignore -jN option, '
+                            'and failed tests are also rerun sequentially '
+                            'in the same process')
     group.add_argument('-T', '--coverage', action='store_true',
                        dest='trace',
                        help='turn on code coverage tracing using the trace '
@@ -333,6 +352,8 @@ def _create_parser():
                        help='enable Profile Guided Optimization (PGO) training')
     group.add_argument('--pgo-extended', action='store_true',
                        help='enable extended PGO training (slower training)')
+    group.add_argument('--tsan', dest='tsan', action='store_true',
+                       help='run a subset of test cases that are proper for the TSAN test')
     group.add_argument('--fail-env-changed', action='store_true',
                        help='if a test file alters the environment, mark '
                             'the test as failed')
@@ -347,6 +368,8 @@ def _create_parser():
                        help='override the working directory for the test run')
     group.add_argument('--cleanup', action='store_true',
                        help='remove old test_python_* directories')
+    group.add_argument('--bisect', action='store_true',
+                       help='if some tests fail, run test.bisect_cmd on them')
     group.add_argument('--dont-add-python-opts', dest='_add_python_opts',
                        action='store_false',
                        help="internal option, don't use it")
@@ -371,11 +394,18 @@ def huntrleaks(string):
 
 
 def resources_list(string):
-    u = [x.lower() for x in string.split(',')]
-    for r in u:
+    u = []
+    for x in string.split(','):
+        r, eq, v = x.partition('=')
+        r = r.lower()
+        u.append((r, v if eq else None))
         if r == 'all' or r == 'none':
+            if eq:
+                raise argparse.ArgumentTypeError('invalid resource: ' + x)
             continue
         if r[0] == '-':
+            if eq:
+                raise argparse.ArgumentTypeError('invalid resource: ' + x)
             r = r[1:]
         if r not in RESOURCE_NAMES:
             raise argparse.ArgumentTypeError('invalid resource: ' + r)
@@ -390,8 +420,6 @@ def _parse_args(args, **kwargs):
             raise TypeError('%r is an invalid keyword argument '
                             'for this function' % k)
         setattr(ns, k, v)
-    if ns.use_resources is None:
-        ns.use_resources = []
 
     parser = _create_parser()
     # Issue #14191: argparse doesn't support "intermixed" positional and
@@ -415,20 +443,25 @@ def _parse_args(args, **kwargs):
     # Continuous Integration (CI): common options for fast/slow CI modes
     if ns.slow_ci or ns.fast_ci:
         # Similar to options:
-        #
-        #     -j0 --randomize --fail-env-changed --fail-rerun --rerun
-        #     --slowest --verbose3
+        #   -j0 --randomize --fail-env-changed --rerun --slowest --verbose3
         if ns.use_mp is None:
             ns.use_mp = 0
         ns.randomize = True
         ns.fail_env_changed = True
-        ns.fail_rerun = True
         if ns.python is None:
             ns.rerun = True
         ns.print_slow = True
-        ns.verbose3 = True
+        if not ns.verbose:
+            ns.verbose3 = True
+        else:
+            # --verbose has the priority over --verbose3
+            pass
     else:
         ns._add_python_opts = False
+
+    # --singleprocess overrides -jN option
+    if ns.single_process:
+        ns.use_mp = None
 
     # When both --slow-ci and --fast-ci options are present,
     # --slow-ci has the priority
@@ -436,21 +469,29 @@ def _parse_args(args, **kwargs):
         # Similar to: -u "all" --timeout=1200
         if ns.use is None:
             ns.use = []
-        ns.use.insert(0, ['all'])
+        ns.use[:0] = [('all', None)]
         if ns.timeout is None:
             ns.timeout = 1200  # 20 minutes
     elif ns.fast_ci:
         # Similar to: -u "all,-cpu" --timeout=600
         if ns.use is None:
             ns.use = []
-        ns.use.insert(0, ['all', '-cpu'])
+        ns.use[:0] = [('all', None), ('-cpu', None)]
         if ns.timeout is None:
             ns.timeout = 600  # 10 minutes
 
     if ns.single and ns.fromfile:
         parser.error("-s and -f don't go together!")
-    if ns.use_mp is not None and ns.trace:
-        parser.error("-T and -j don't go together!")
+    if ns.trace:
+        if ns.use_mp is not None:
+            if not Py_DEBUG:
+                parser.error("need --with-pydebug to use -T and -j together")
+        else:
+            print(
+                "Warning: collecting coverage without -j is imprecise. Configure"
+                " --with-pydebug and run -m test -T -j for best results.",
+                file=sys.stderr
+            )
     if ns.python is not None:
         if ns.use_mp is None:
             parser.error("-p requires -j!")
@@ -473,38 +514,36 @@ def _parse_args(args, **kwargs):
         if ns.timeout <= 0:
             ns.timeout = None
     if ns.use:
-        for a in ns.use:
-            for r in a:
-                if r == 'all':
-                    ns.use_resources[:] = ALL_RESOURCES
-                    continue
-                if r == 'none':
-                    del ns.use_resources[:]
-                    continue
-                remove = False
-                if r[0] == '-':
-                    remove = True
-                    r = r[1:]
-                if remove:
-                    if r in ns.use_resources:
-                        ns.use_resources.remove(r)
-                elif r not in ns.use_resources:
-                    ns.use_resources.append(r)
+        for r, v in ns.use:
+            if r == 'all':
+                for r in ALL_RESOURCES:
+                    ns.use_resources[r] = None
+            elif r == 'none':
+                ns.use_resources.clear()
+            elif r[0] == '-':
+                r = r[1:]
+                ns.use_resources.pop(r, None)
+            else:
+                ns.use_resources[r] = v
     if ns.random_seed is not None:
         ns.randomize = True
+    if ns.no_randomize:
+        ns.randomize = False
     if ns.verbose:
         ns.header = True
+
     # When -jN option is used, a worker process does not use --verbose3
     # and so -R 3:3 -jN --verbose3 just works as expected: there is no false
     # alarm about memory leak.
     if ns.huntrleaks and ns.verbose3 and ns.use_mp is None:
-        ns.verbose3 = False
         # run_single_test() replaces sys.stdout with io.StringIO if verbose3
         # is true. In this case, huntrleaks sees an write into StringIO as
         # a memory leak, whereas it is not (gh-71290).
+        ns.verbose3 = False
         print("WARNING: Disable --verbose3 because it's incompatible with "
               "--huntrleaks without -jN option",
               file=sys.stderr)
+
     if ns.forever:
         # --forever implies --failfast
         ns.failfast = True

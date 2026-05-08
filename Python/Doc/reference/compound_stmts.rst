@@ -154,7 +154,7 @@ The :keyword:`for` statement is used to iterate over the elements of a sequence
 (such as a string, tuple or list) or other iterable object:
 
 .. productionlist:: python-grammar
-   for_stmt: "for" `target_list` "in" `starred_list` ":" `suite`
+   for_stmt: "for" `target_list` "in" `!starred_list` ":" `suite`
            : ["else" ":" `suite`]
 
 The ``starred_list`` expression is evaluated once; it should yield an
@@ -245,13 +245,12 @@ handler is started. This search inspects the :keyword:`!except` clauses in turn
 until one is found that matches the exception.
 An expression-less :keyword:`!except` clause, if present, must be last;
 it matches any exception.
-For an :keyword:`!except` clause with an expression,
-that expression is evaluated, and the clause matches the exception
-if the resulting object is "compatible" with the exception.  An object is
-compatible with an exception if the object is the class or a
-:term:`non-virtual base class <abstract base class>` of the exception object,
-or a tuple containing an item that is the class or a non-virtual base class
-of the exception object.
+
+For an :keyword:`!except` clause with an expression, the
+expression must evaluate to an exception type or a tuple of exception types.
+The raised exception matches an :keyword:`!except` clause whose expression evaluates
+to the class or a :term:`non-virtual base class <abstract base class>` of the exception object,
+or to a tuple that contains such a class.
 
 If no :keyword:`!except` clause matches the exception,
 the search for an exception handler
@@ -333,15 +332,29 @@ stored in the :mod:`sys` module is reset to its previous value::
 :keyword:`!except*` clause
 --------------------------
 
-The :keyword:`!except*` clause(s) are used for handling
-:exc:`ExceptionGroup`\s. The exception type for matching is interpreted as in
-the case of :keyword:`except`, but in the case of exception groups we can have
-partial matches when the type matches some of the exceptions in the group.
-This means that multiple :keyword:`!except*` clauses can execute,
-each handling part of the exception group.
-Each clause executes at most once and handles an exception group
-of all matching exceptions.  Each exception in the group is handled by at most
-one :keyword:`!except*` clause, the first that matches it. ::
+The :keyword:`!except*` clause(s) specify one or more handlers for groups of
+exceptions (:exc:`BaseExceptionGroup` instances). A :keyword:`try` statement
+can have either :keyword:`except` or :keyword:`!except*` clauses, but not both.
+The exception type for matching is mandatory in the case of :keyword:`!except*`,
+so ``except*:`` is a syntax error. The type is interpreted as in the case of
+:keyword:`!except`, but matching is performed on the exceptions contained in the
+group that is being handled. An :exc:`TypeError` is raised if a matching
+type is a subclass of :exc:`!BaseExceptionGroup`, because that would have
+ambiguous semantics.
+
+When an exception group is raised in the try block, each :keyword:`!except*`
+clause splits (see :meth:`~BaseExceptionGroup.split`) it into the subgroups
+of matching and non-matching exceptions. If the matching subgroup is not empty,
+it becomes the handled exception (the value returned from :func:`sys.exception`)
+and assigned to the target of the :keyword:`!except*` clause (if there is one).
+Then, the body of the :keyword:`!except*` clause executes. If the non-matching
+subgroup is not empty, it is processed by the next :keyword:`!except*` in the
+same manner. This continues until all exceptions in the group have been matched,
+or the last :keyword:`!except*` clause has run.
+
+After all :keyword:`!except*` clauses execute, the group of unhandled exceptions
+is merged with any exceptions that were raised or re-raised from within
+:keyword:`!except*` clauses. This merged exception group propagates on.::
 
    >>> try:
    ...     raise ExceptionGroup("eg",
@@ -354,34 +367,26 @@ one :keyword:`!except*` clause, the first that matches it. ::
    caught <class 'ExceptionGroup'> with nested (TypeError(2),)
    caught <class 'ExceptionGroup'> with nested (OSError(3), OSError(4))
      + Exception Group Traceback (most recent call last):
-     |   File "<stdin>", line 2, in <module>
-     | ExceptionGroup: eg
+     |   File "<doctest default[0]>", line 2, in <module>
+     |     raise ExceptionGroup("eg",
+     |         [ValueError(1), TypeError(2), OSError(3), OSError(4)])
+     | ExceptionGroup: eg (1 sub-exception)
      +-+---------------- 1 ----------------
        | ValueError: 1
        +------------------------------------
 
-
-Any remaining exceptions that were not handled by any :keyword:`!except*`
-clause are re-raised at the end, along with all exceptions that were
-raised from within the :keyword:`!except*` clauses. If this list contains
-more than one exception to reraise, they are combined into an exception
-group.
-
-If the raised exception is not an exception group and its type matches
-one of the :keyword:`!except*` clauses, it is caught and wrapped by an
-exception group with an empty message string. ::
+If the exception raised from the :keyword:`try` block is not an exception group
+and its type matches one of the :keyword:`!except*` clauses, it is caught and
+wrapped by an exception group with an empty message string. This ensures that the
+type of the target ``e`` is consistently :exc:`BaseExceptionGroup`::
 
    >>> try:
    ...     raise BlockingIOError
    ... except* BlockingIOError as e:
    ...     print(repr(e))
    ...
-   ExceptionGroup('', (BlockingIOError()))
+   ExceptionGroup('', (BlockingIOError(),))
 
-An :keyword:`!except*` clause must have a matching type,
-and this type cannot be a subclass of :exc:`BaseExceptionGroup`.
-It is not possible to mix :keyword:`except` and :keyword:`!except*`
-in the same :keyword:`try`.
 :keyword:`break`, :keyword:`continue` and :keyword:`return`
 cannot appear in an :keyword:`!except*` clause.
 
@@ -412,12 +417,14 @@ clauses.
 --------------------------
 
 If :keyword:`!finally` is present, it specifies a 'cleanup' handler.  The
-:keyword:`try` clause is executed, including any :keyword:`except` and
-:keyword:`else` clauses.  If an exception occurs in any of the clauses and is
-not handled, the exception is temporarily saved. The :keyword:`!finally` clause
-is executed.  If there is a saved exception it is re-raised at the end of the
-:keyword:`!finally` clause.  If the :keyword:`!finally` clause raises another
-exception, the saved exception is set as the context of the new exception.
+:keyword:`try` clause is executed, including any :keyword:`except`
+and :keyword:`else <except_else>` clauses.
+If an exception occurs in any of the clauses and is not handled,
+the exception is temporarily saved.
+The :keyword:`!finally` clause is executed.  If there is a saved exception
+it is re-raised at the end of the :keyword:`!finally` clause.
+If the :keyword:`!finally` clause raises another exception, the saved exception
+is set as the context of the new exception.
 If the :keyword:`!finally` clause executes a :keyword:`return`, :keyword:`break`
 or :keyword:`continue` statement, the saved exception is discarded::
 
@@ -530,9 +537,9 @@ The following code::
 is semantically equivalent to::
 
     manager = (EXPRESSION)
-    enter = type(manager).__enter__
-    exit = type(manager).__exit__
-    value = enter(manager)
+    enter = manager.__enter__
+    exit = manager.__exit__
+    value = enter()
     hit_except = False
 
     try:
@@ -540,11 +547,14 @@ is semantically equivalent to::
         SUITE
     except:
         hit_except = True
-        if not exit(manager, *sys.exc_info()):
+        if not exit(*sys.exc_info()):
             raise
     finally:
         if not hit_except:
-            exit(manager, None, None, None)
+            exit(None, None, None)
+
+except that implicit :ref:`special method lookup <special-lookup>` is used
+for :meth:`~object.__enter__` and :meth:`~object.__exit__`.
 
 With more than one item, the context managers are processed as if multiple
 :keyword:`with` statements were nested::
@@ -580,6 +590,7 @@ the items are surrounded by parentheses. For example::
       statement.
 
 .. _match:
+.. _case:
 
 The :keyword:`!match` statement
 ===============================
@@ -600,9 +611,9 @@ The match statement is used for pattern matching.  Syntax:
 
 .. productionlist:: python-grammar
    match_stmt: 'match' `subject_expr` ":" NEWLINE INDENT `case_block`+ DEDENT
-   subject_expr: `star_named_expression` "," `star_named_expressions`?
-               : | `named_expression`
-   case_block: 'case' `patterns` [`guard`] ":" `block`
+   subject_expr: `!star_named_expression` "," `!star_named_expressions`?
+               : | `!named_expression`
+   case_block: 'case' `patterns` [`guard`] ":" `!block`
 
 .. note::
    This section uses single quotes to denote
@@ -691,7 +702,7 @@ Guards
 .. index:: ! guard
 
 .. productionlist:: python-grammar
-   guard: "if" `named_expression`
+   guard: "if" `!named_expression`
 
 A ``guard`` (which is part of the ``case``) must succeed for code inside
 the ``case`` block to execute.  It takes the form: :keyword:`if` followed by an
@@ -836,11 +847,11 @@ A literal pattern corresponds to most
    literal_pattern: `signed_number`
                   : | `signed_number` "+" NUMBER
                   : | `signed_number` "-" NUMBER
-                  : | `strings`
+                  : | `!strings`
                   : | "None"
                   : | "True"
                   : | "False"
-                  : | `signed_number`: NUMBER | "-" NUMBER
+   signed_number: ["-"] NUMBER
 
 The rule ``strings`` and the token ``NUMBER`` are defined in the
 :doc:`standard Python grammar <./grammar>`.  Triple-quoted strings are
@@ -1005,8 +1016,8 @@ subject value:
       items, as for a fixed-length sequence.
 
    .. note:: The length of the subject sequence is obtained via
-      :func:`len` (i.e. via the :meth:`__len__` protocol).  This length may be
-      cached by the interpreter in a similar manner as
+      :func:`len` (i.e. via the :meth:`~object.__len__` protocol).
+      This length may be cached by the interpreter in a similar manner as
       :ref:`value patterns <value-patterns>`.
 
 
@@ -1057,8 +1068,8 @@ subject value:
 
 .. note:: Key-value pairs are matched using the two-argument form of the mapping
    subject's ``get()`` method.  Matched key-value pairs must already be present
-   in the mapping, and not created on-the-fly via :meth:`__missing__` or
-   :meth:`~object.__getitem__`.
+   in the mapping, and not created on-the-fly via :meth:`~object.__missing__`
+   or :meth:`~object.__getitem__`.
 
 In simple terms ``{KEY1: P1, KEY2: P2, ... }`` matches only if all the following
 happens:
@@ -1216,9 +1227,12 @@ A function definition defines a user-defined function object (see section
                  :   | `parameter_list_no_posonly`
    parameter_list_no_posonly: `defparameter` ("," `defparameter`)* ["," [`parameter_list_starargs`]]
                             : | `parameter_list_starargs`
-   parameter_list_starargs: "*" [`parameter`] ("," `defparameter`)* ["," ["**" `parameter` [","]]]
-                          : | "**" `parameter` [","]
+   parameter_list_starargs: "*" [`star_parameter`] ("," `defparameter`)* ["," [`parameter_star_kwargs`]]
+                          : | "*" ("," `defparameter`)+ ["," [`parameter_star_kwargs`]]
+                          : | `parameter_star_kwargs`
+   parameter_star_kwargs: "**" `parameter` [","]
    parameter: `identifier` [":" `expression`]
+   star_parameter: `identifier` [":" ["*"] `expression`]
    defparameter: `parameter` ["=" `expression`]
    funcname: `identifier`
 
@@ -1325,7 +1339,8 @@ and may only be passed by positional arguments.
 
 Parameters may have an :term:`annotation <function annotation>` of the form "``: expression``"
 following the parameter name.  Any parameter may have an annotation, even those of the form
-``*identifier`` or ``**identifier``.  Functions may have "return" annotation of
+``*identifier`` or ``**identifier``. (As a special case, parameters of the form
+``*identifier`` may have an annotation "``: *expression``".) Functions may have "return" annotation of
 the form "``-> expression``" after the parameter list.  These annotations can be
 any valid Python expression.  The presence of annotations does not change the
 semantics of a function.  The annotation values are available as values of
@@ -1335,6 +1350,10 @@ attribute of the function object.  If the ``annotations`` import from
 enables postponed evaluation.  Otherwise, they are evaluated when the function
 definition is executed.  In this case annotations may be evaluated in
 a different order than they appear in the source code.
+
+.. versionchanged:: 3.11
+   Parameters of the form "``*identifier``" may have an annotation
+   "``: *expression``". See :pep:`646`.
 
 .. index:: pair: lambda; expression
 
@@ -1421,7 +1440,7 @@ dictionary.  The class name is bound to this class object in the original local
 namespace.
 
 The order in which attributes are defined in the class body is preserved
-in the new class's ``__dict__``.  Note that this is reliable only right
+in the new class's :attr:`~type.__dict__`.  Note that this is reliable only right
 after the class is created and only for classes that were defined using
 the definition syntax.
 
@@ -1452,8 +1471,8 @@ decorators.  The result is then bound to the class name.
 A list of :ref:`type parameters <type-params>` may be given in square brackets
 immediately after the class's name.
 This indicates to static type checkers that the class is generic. At runtime,
-the type parameters can be retrieved from the class's ``__type_params__``
-attribute. See :ref:`generic-classes` for more.
+the type parameters can be retrieved from the class's
+:attr:`~type.__type_params__` attribute. See :ref:`generic-classes` for more.
 
 .. versionchanged:: 3.12
    Type parameter lists are new in Python 3.12.
@@ -1546,13 +1565,12 @@ The following code::
 
 Is semantically equivalent to::
 
-    iter = (ITER)
-    iter = type(iter).__aiter__(iter)
+    iter = (ITER).__aiter__()
     running = True
 
     while running:
         try:
-            TARGET = await type(iter).__anext__(iter)
+            TARGET = await iter.__anext__()
         except StopAsyncIteration:
             running = False
         else:
@@ -1560,7 +1578,8 @@ Is semantically equivalent to::
     else:
         SUITE2
 
-See also :meth:`~object.__aiter__` and :meth:`~object.__anext__` for details.
+except that implicit :ref:`special method lookup <special-lookup>` is used
+for :meth:`~object.__aiter__` and :meth:`~object.__anext__`.
 
 It is a :exc:`SyntaxError` to use an ``async for`` statement outside the
 body of a coroutine function.
@@ -1586,9 +1605,9 @@ The following code::
 is semantically equivalent to::
 
     manager = (EXPRESSION)
-    aenter = type(manager).__aenter__
-    aexit = type(manager).__aexit__
-    value = await aenter(manager)
+    aenter = manager.__aenter__
+    aexit = manager.__aexit__
+    value = await aenter()
     hit_except = False
 
     try:
@@ -1596,13 +1615,14 @@ is semantically equivalent to::
         SUITE
     except:
         hit_except = True
-        if not await aexit(manager, *sys.exc_info()):
+        if not await aexit(*sys.exc_info()):
             raise
     finally:
         if not hit_except:
-            await aexit(manager, None, None, None)
+            await aexit(None, None, None)
 
-See also :meth:`~object.__aenter__` and :meth:`~object.__aexit__` for details.
+except that implicit :ref:`special method lookup <special-lookup>` is used
+for :meth:`~object.__aenter__` and :meth:`~object.__aexit__`.
 
 It is a :exc:`SyntaxError` to use an ``async with`` statement outside the
 body of a coroutine function.
@@ -1620,15 +1640,18 @@ Type parameter lists
 
 .. versionadded:: 3.12
 
+.. versionchanged:: 3.13
+   Support for default values was added (see :pep:`696`).
+
 .. index::
    single: type parameters
 
 .. productionlist:: python-grammar
    type_params: "[" `type_param` ("," `type_param`)* "]"
    type_param: `typevar` | `typevartuple` | `paramspec`
-   typevar: `identifier` (":" `expression`)?
-   typevartuple: "*" `identifier`
-   paramspec: "**" `identifier`
+   typevar: `identifier` (":" `expression`)? ("=" `expression`)?
+   typevartuple: "*" `identifier` ("=" `expression`)?
+   paramspec: "**" `identifier` ("=" `expression`)?
 
 :ref:`Functions <def>` (including :ref:`coroutines <async def>`),
 :ref:`classes <class>` and :ref:`type aliases <type>` may
@@ -1663,8 +1686,8 @@ with more precision. The scope of type parameters is modeled with a special
 function (technically, an :ref:`annotation scope <annotation-scopes>`) that
 wraps the creation of the generic object.
 
-Generic functions, classes, and type aliases have a :attr:`!__type_params__`
-attribute listing their type parameters.
+Generic functions, classes, and type aliases have a
+:attr:`~definition.__type_params__` attribute listing their type parameters.
 
 Type parameters come in three kinds:
 
@@ -1694,19 +1717,31 @@ evaluated in a separate :ref:`annotation scope <annotation-scopes>`.
 :data:`typing.TypeVarTuple`\ s and :data:`typing.ParamSpec`\ s cannot have bounds
 or constraints.
 
+All three flavors of type parameters can also have a *default value*, which is used
+when the type parameter is not explicitly provided. This is added by appending
+a single equals sign (``=``) followed by an expression. Like the bounds and
+constraints of type variables, the default value is not evaluated when the
+object is created, but only when the type parameter's ``__default__`` attribute
+is accessed. To this end, the default value is evaluated in a separate
+:ref:`annotation scope <annotation-scopes>`. If no default value is specified
+for a type parameter, the ``__default__`` attribute is set to the special
+sentinel object :data:`typing.NoDefault`.
+
 The following example indicates the full set of allowed type parameter declarations::
 
    def overly_generic[
       SimpleTypeVar,
+      TypeVarWithDefault = int,
       TypeVarWithBound: int,
       TypeVarWithConstraints: (str, bytes),
-      *SimpleTypeVarTuple,
-      **SimpleParamSpec,
+      *SimpleTypeVarTuple = (int, float),
+      **SimpleParamSpec = (str, bytearray),
    ](
       a: SimpleTypeVar,
-      b: TypeVarWithBound,
-      c: Callable[SimpleParamSpec, TypeVarWithConstraints],
-      *d: SimpleTypeVarTuple,
+      b: TypeVarWithDefault,
+      c: TypeVarWithBound,
+      d: Callable[SimpleParamSpec, TypeVarWithConstraints],
+      *e: SimpleTypeVarTuple,
    ): ...
 
 .. _generic-functions:
@@ -1876,5 +1911,5 @@ like ``TYPE_PARAMS_OF_ListOrSet`` are not actually bound at runtime.
    therefore the function's :term:`docstring`.
 
 .. [#] A string literal appearing as the first statement in the class body is
-   transformed into the namespace's ``__doc__`` item and therefore the class's
-   :term:`docstring`.
+   transformed into the namespace's :attr:`~type.__doc__` item and therefore
+   the class's :term:`docstring`.

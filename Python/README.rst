@@ -1,5 +1,5 @@
-This is Python version 3.12.2
-=============================
+This is Python version 3.13.13
+==============================
 
 .. image:: https://github.com/python/cpython/workflows/Tests/badge.svg
    :alt: CPython build status on GitHub Actions
@@ -64,7 +64,7 @@ the executable is called ``python.exe``; elsewhere it's just ``python``.
 Building a complete Python installation requires the use of various
 additional third-party libraries, depending on your build platform and
 configure options.  Not all standard library modules are buildable or
-useable on all platforms.  Refer to the
+usable on all platforms.  Refer to the
 `Install dependencies <https://devguide.python.org/getting-started/setup-building.html#build-dependencies>`_
 section of the `Developer Guide`_ for current detailed information on
 dependencies for various Linux distributions and macOS.
@@ -75,6 +75,9 @@ to macOS framework and universal builds.  Refer to `Mac/README.rst
 
 On Windows, see `PCbuild/readme.txt
 <https://github.com/python/cpython/blob/main/PCbuild/readme.txt>`_.
+
+To build Windows installer, see `Tools/msi/README.txt
+<https://github.com/python/cpython/blob/main/Tools/msi/README.txt>`_.
 
 If you wish, you can create a subdirectory and invoke configure from there.
 For example::
@@ -133,7 +136,7 @@ What's New
 ----------
 
 We have a comprehensive overview of the changes in the `What's New in Python
-3.12 <https://docs.python.org/3.12/whatsnew/3.12.html>`_ document.  For a more
+3.13 <https://docs.python.org/3.13/whatsnew/3.13.html>`_ document.  For a more
 detailed change log, read `Misc/NEWS
 <https://github.com/python/cpython/tree/main/Misc/NEWS.d>`_, but a full
 accounting of changes can only be gleaned from the `commit history
@@ -146,25 +149,16 @@ entitled "Installing multiple versions".
 Documentation
 -------------
 
-`Documentation for Python 3.12 <https://docs.python.org/3.12/>`_ is online,
+`Documentation for Python 3.13 <https://docs.python.org/3.13/>`_ is online,
 updated daily.
 
 It can also be downloaded in many formats for faster access.  The documentation
-is downloadable in HTML, PDF, and reStructuredText formats; the latter version
+is downloadable in HTML, EPUB, and reStructuredText formats; the latter version
 is primarily for documentation authors, translators, and people with special
 formatting requirements.
 
 For information about building Python's documentation, refer to `Doc/README.rst
 <https://github.com/python/cpython/blob/main/Doc/README.rst>`_.
-
-
-Converting From Python 2.x to 3.x
----------------------------------
-
-Significant backward incompatible changes were made for the release of Python
-3.0, which may cause programs written for Python 2 to fail when run with Python
-3.  For more information about porting your code from Python 2 to Python 3, see
-the `Porting HOWTO <https://docs.python.org/3/howto/pyporting.html>`_.
 
 
 Testing
@@ -177,7 +171,7 @@ is printed about a failed test or a traceback or core dump is produced,
 something is wrong.
 
 By default, tests are prevented from overusing resources like disk space and
-memory.  To enable these tests, run ``make testall``.
+memory.  To enable these tests, run ``make buildbottest``.
 
 If any tests fail, you can re-run the failing test(s) in verbose mode.  For
 example, if ``test_os`` and ``test_gdb`` failed, you can run::
@@ -203,18 +197,18 @@ directories installed using ``make altinstall`` contain the major and minor
 version and can thus live side-by-side.  ``make install`` also creates
 ``${prefix}/bin/python3`` which refers to ``${prefix}/bin/python3.X``.  If you
 intend to install multiple versions using the same prefix you must decide which
-version (if any) is your "primary" version.  Install that version using ``make
-install``.  Install all other versions using ``make altinstall``.
+version (if any) is your "primary" version.  Install that version using
+``make install``.  Install all other versions using ``make altinstall``.
 
-For example, if you want to install Python 2.7, 3.6, and 3.12 with 3.12 being the
-primary version, you would execute ``make install`` in your 3.12 build directory
+For example, if you want to install Python 2.7, 3.6, and 3.13 with 3.13 being the
+primary version, you would execute ``make install`` in your 3.13 build directory
 and ``make altinstall`` in the others.
 
 
 Release Schedule
 ----------------
 
-See :pep:`693` for Python 3.12 release details.
+See :pep:`719` for Python 3.13 release details.
 
 
 Copyright and License Information

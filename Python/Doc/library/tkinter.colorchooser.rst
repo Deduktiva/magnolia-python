@@ -1,8 +1,7 @@
-:mod:`tkinter.colorchooser` --- Color choosing dialog
-=====================================================
+:mod:`!tkinter.colorchooser` --- Color choosing dialog
+======================================================
 
 .. module:: tkinter.colorchooser
-   :platform: Tk
    :synopsis: Color choosing dialog
 
 **Source code:** :source:`Lib/tkinter/colorchooser.py`

@@ -17,9 +17,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=build-common.sh
 source "$SCRIPT_DIR/build-common.sh"
 
-# manylinux2014 ships several CPython interpreters under /opt/python.
-# Use cp312 if available; otherwise fall back to whatever python3 is on PATH.
-HOST_PYTHON="/opt/python/cp312-cp312/bin/python3"
+# manylinux_2_28 ships every actively-supported CPython under
+# /opt/python/<tag>-<abitag>/bin/python3 (PEP 425 naming). Use the
+# version matching the imported Python tree so regen-frozen runs the
+# same interpreter the build will produce; fall back to whatever
+# python3 is on PATH if the per-version slot is missing (e.g. when
+# this script runs outside the manylinux container).
+HOST_PYTHON="/opt/python/cp313-cp313/bin/python3"
 [ -x "$HOST_PYTHON" ] || HOST_PYTHON="$(command -v python3)"
 
 # manylinux_2_28 ships patchelf (auditwheel needs it) but not zip; install
@@ -54,17 +58,17 @@ flip_modules_to_static "$BUILD/main"
 log "Building libpython"
 (cd "$BUILD/main" && make -j"$JOBS")
 
-log "Renaming libpython3.12 -> libMagPython"
+log "Renaming libpython$PY_X_Y -> libMagPython"
 (cd "$BUILD/main"
- # The shared lib CPython produces is libpython3.12.so.1.0 with SONAME
- # libpython3.12.so.1.0. Copy to the unversioned MagPython name, rewrite
+ # The shared lib CPython produces is libpython<X.Y>.so.1.0 with SONAME
+ # libpython<X.Y>.so.1.0. Copy to the unversioned MagPython name, rewrite
  # the SONAME so consumers see a single file libMagPython.so (matching
  # MagPython.dll on Windows), and replace the RUNPATH with just $ORIGIN.
  # Without the RUNPATH rewrite, --with-openssl-rpath=auto leaves the
  # build's absolute openssl-out/lib path embedded, which only works on
  # the build machine — $ORIGIN means "look next to libMagPython.so",
  # which is where the artifact zip places libcrypto/libssl.
- cp libpython3.12.so.1.0 "$STAGE/libMagPython.so"
+ cp "libpython$PY_X_Y.so.1.0" "$STAGE/libMagPython.so"
  patchelf --set-soname libMagPython.so "$STAGE/libMagPython.so"
  patchelf --set-rpath '$ORIGIN' "$STAGE/libMagPython.so")
 

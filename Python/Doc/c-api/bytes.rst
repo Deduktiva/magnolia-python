@@ -191,13 +191,48 @@ called with a non-bytes parameter.
 
 .. c:function:: int _PyBytes_Resize(PyObject **bytes, Py_ssize_t newsize)
 
-   A way to resize a bytes object even though it is "immutable". Only use this
-   to build up a brand new bytes object; don't use this if the bytes may already
-   be known in other parts of the code.  It is an error to call this function if
-   the refcount on the input bytes object is not one. Pass the address of an
+   Resize a bytes object. *newsize* will be the new length of the bytes object.
+   You can think of it as creating a new bytes object and destroying the old
+   one, only more efficiently.
+   Pass the address of an
    existing bytes object as an lvalue (it may be written into), and the new size
    desired.  On success, *\*bytes* holds the resized bytes object and ``0`` is
    returned; the address in *\*bytes* may differ from its input value.  If the
    reallocation fails, the original bytes object at *\*bytes* is deallocated,
    *\*bytes* is set to ``NULL``, :exc:`MemoryError` is set, and ``-1`` is
    returned.
+
+
+.. c:function:: PyObject *PyBytes_Repr(PyObject *bytes, int smartquotes)
+
+   Get the string representation of *bytes*. This function is currently used to
+   implement :meth:`!bytes.__repr__` in Python.
+
+   This function does not do type checking; it is undefined behavior to pass
+   *bytes* as a non-bytes object or ``NULL``.
+
+   If *smartquotes* is true, the representation will use a double-quoted string
+   instead of single-quoted string when single-quotes are present in *bytes*.
+   For example, the byte string ``'Python'`` would be represented as
+   ``b"'Python'"`` when *smartquotes* is true, or ``b'\'Python\''`` when it is
+   false.
+
+   On success, this function returns a :term:`strong reference` to a
+   :class:`str` object containing the representation. On failure, this
+   returns ``NULL`` with an exception set.
+
+
+.. c:function:: PyObject *PyBytes_DecodeEscape(const char *s, Py_ssize_t len, const char *errors, Py_ssize_t unicode, const char *recode_encoding)
+
+   Unescape a backslash-escaped string *s*. *s* must not be ``NULL``.
+   *len* must be the size of *s*.
+
+   *errors* must be one of ``"strict"``, ``"replace"``, or ``"ignore"``. If
+   *errors* is ``NULL``, then ``"strict"`` is used by default.
+
+   On success, this function returns a :term:`strong reference` to a Python
+   :class:`bytes` object containing the unescaped string. On failure, this
+   function returns ``NULL`` with an exception set.
+
+   .. versionchanged:: 3.9
+      *unicode* and *recode_encoding* are now unused.

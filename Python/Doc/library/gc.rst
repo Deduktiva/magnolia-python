@@ -1,5 +1,5 @@
-:mod:`gc` --- Garbage Collector interface
-=========================================
+:mod:`!gc` --- Garbage Collector interface
+==========================================
 
 .. module:: gc
    :synopsis: Interface to the cycle-detecting garbage collector.
@@ -42,8 +42,8 @@ The :mod:`gc` module provides the following functions:
 
    With no arguments, run a full collection.  The optional argument *generation*
    may be an integer specifying which generation to collect (from 0 to 2).  A
-   :exc:`ValueError` is raised if the generation number  is invalid. The number of
-   unreachable objects found is returned.
+   :exc:`ValueError` is raised if the generation number is invalid. The sum of
+   collected objects and uncollectable objects is returned.
 
    The free lists maintained for a number of built-in types are cleared
    whenever a full collection or collection of the highest generation (2)
@@ -69,7 +69,7 @@ The :mod:`gc` module provides the following functions:
 .. function:: get_objects(generation=None)
 
    Returns a list of all objects tracked by the collector, excluding the list
-   returned. If *generation* is not None, return only the objects tracked by
+   returned. If *generation* is not ``None``, return only the objects tracked by
    the collector that are in that generation.
 
    .. versionchanged:: 3.8
@@ -96,7 +96,7 @@ The :mod:`gc` module provides the following functions:
    .. versionadded:: 3.4
 
 
-.. function:: set_threshold(threshold0[, threshold1[, threshold2]])
+.. function:: set_threshold(threshold0, [threshold1, [threshold2]])
 
    Set the garbage collection thresholds (the collection frequency). Setting
    *threshold0* to zero disables collection.
@@ -113,7 +113,7 @@ The :mod:`gc` module provides the following functions:
    been examined more than *threshold1* times since generation ``1`` has been
    examined, then generation ``1`` is examined as well.
    With the third generation, things are a bit more complicated,
-   see `Collecting the oldest generation <https://devguide.python.org/garbage_collector/#collecting-the-oldest-generation>`_ for more information.
+   see `Collecting the oldest generation <https://github.com/python/cpython/blob/ff0ef0a54bef26fc507fbf9b7a6009eb7d3f17f5/InternalDocs/garbage_collector.md#collecting-the-oldest-generation>`_ for more information.
 
 
 .. function:: get_count()

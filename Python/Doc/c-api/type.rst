@@ -53,7 +53,8 @@ Type Objects
 .. c:function:: PyObject* PyType_GetDict(PyTypeObject* type)
 
    Return the type object's internal namespace, which is otherwise only
-   exposed via a read-only proxy (``cls.__dict__``).  This is a
+   exposed via a read-only proxy (:attr:`cls.__dict__ <type.__dict__>`).
+   This is a
    replacement for accessing :c:member:`~PyTypeObject.tp_dict` directly.
    The returned dictionary must be treated as read-only.
 
@@ -80,6 +81,9 @@ Type Objects
    which must be passed to future calls to :c:func:`PyType_Watch`. In case of
    error (e.g. no more watcher IDs available), return ``-1`` and set an
    exception.
+
+   In free-threaded builds, :c:func:`PyType_AddWatcher` is not thread-safe,
+   so it must be called at start up (before spawning the first thread).
 
    .. versionadded:: 3.12
 
@@ -112,6 +116,20 @@ Type Objects
    .. versionadded:: 3.12
 
 
+.. c:function:: int PyType_Unwatch(int watcher_id, PyObject *type)
+
+   Mark *type* as not watched. This undoes a previous call to
+   :c:func:`PyType_Watch`. *type* must not be ``NULL``.
+
+   An extension should never call this function with a *watcher_id* that was
+   not returned to it by a previous call to :c:func:`PyType_AddWatcher`.
+
+   On success, this function returns ``0``. On failure, this function returns
+   ``-1`` with an exception set.
+
+   .. versionadded:: 3.12
+
+
 .. c:type:: int (*PyType_WatchCallback)(PyObject *type)
 
    Type of a type-watcher callback function.
@@ -129,6 +147,18 @@ Type Objects
    Type features are denoted by single bit flags.
 
 
+.. c:function:: int PyType_FastSubclass(PyTypeObject *type, int flag)
+
+   Return non-zero if the type object *type* sets the subclass flag *flag*.
+   Subclass flags are denoted by
+   :c:macro:`Py_TPFLAGS_*_SUBCLASS <Py_TPFLAGS_LONG_SUBCLASS>`.
+   This function is used by many ``_Check`` functions for common types.
+
+   .. seealso::
+       :c:func:`PyObject_TypeCheck`, which is used as a slower alternative in
+       ``_Check`` functions for types that don't come with subclass flags.
+
+
 .. c:function:: int PyType_IS_GC(PyTypeObject *o)
 
    Return true if the type object includes support for the cycle detector; this
@@ -140,7 +170,7 @@ Type Objects
    Return true if *a* is a subtype of *b*.
 
    This function only checks for actual subtypes, which means that
-   :meth:`~class.__subclasscheck__` is not called on *b*.  Call
+   :meth:`~type.__subclasscheck__` is not called on *b*.  Call
    :c:func:`PyObject_IsSubclass` to do the same check that :func:`issubclass`
    would do.
 
@@ -151,10 +181,12 @@ Type Objects
    Python's default memory allocation mechanism to allocate a new instance and
    initialize all its contents to ``NULL``.
 
+
 .. c:function:: PyObject* PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
    Generic handler for the :c:member:`~PyTypeObject.tp_new` slot of a type object.  Create a
    new instance using the type's :c:member:`~PyTypeObject.tp_alloc` slot.
+
 
 .. c:function:: int PyType_Ready(PyTypeObject *type)
 
@@ -172,18 +204,38 @@ Type Objects
        GC protocol itself by at least implementing the
        :c:member:`~PyTypeObject.tp_traverse` handle.
 
+
 .. c:function:: PyObject* PyType_GetName(PyTypeObject *type)
 
-   Return the type's name. Equivalent to getting the type's ``__name__`` attribute.
+   Return the type's name. Equivalent to getting the type's
+   :attr:`~type.__name__` attribute.
 
    .. versionadded:: 3.11
+
 
 .. c:function:: PyObject* PyType_GetQualName(PyTypeObject *type)
 
    Return the type's qualified name. Equivalent to getting the
-   type's ``__qualname__`` attribute.
+   type's :attr:`~type.__qualname__` attribute.
 
    .. versionadded:: 3.11
+
+.. c:function:: PyObject* PyType_GetFullyQualifiedName(PyTypeObject *type)
+
+   Return the type's fully qualified name. Equivalent to
+   ``f"{type.__module__}.{type.__qualname__}"``, or :attr:`type.__qualname__`
+   if :attr:`type.__module__` is not a string or is equal to ``"builtins"``.
+
+   .. versionadded:: 3.13
+
+
+.. c:function:: PyObject* PyType_GetModuleName(PyTypeObject *type)
+
+   Return the type's module name. Equivalent to getting the
+   :attr:`type.__module__` attribute.
+
+   .. versionadded:: 3.13
+
 
 .. c:function:: void* PyType_GetSlot(PyTypeObject *type, int slot)
 
@@ -201,10 +253,15 @@ Type Objects
       :c:func:`PyType_GetSlot` can now accept all types.
       Previously, it was limited to :ref:`heap types <heap-types>`.
 
+
 .. c:function:: PyObject* PyType_GetModule(PyTypeObject *type)
 
    Return the module object associated with the given type when the type was
    created using :c:func:`PyType_FromModuleAndSpec`.
+
+   The returned reference is :term:`borrowed <borrowed reference>` from *type*,
+   and will be valid as long as you hold a reference to *type*.
+   Do not release it with :c:func:`Py_DECREF` or similar.
 
    If no module is associated with the given type, sets :py:class:`TypeError`
    and returns ``NULL``.
@@ -220,6 +277,7 @@ Type Objects
 
    .. versionadded:: 3.9
 
+
 .. c:function:: void* PyType_GetModuleState(PyTypeObject *type)
 
    Return the state of the module object associated with the given type.
@@ -234,6 +292,7 @@ Type Objects
 
    .. versionadded:: 3.9
 
+
 .. c:function:: PyObject* PyType_GetModuleByDef(PyTypeObject *type, struct PyModuleDef *def)
 
    Find the first superclass whose module was created from
@@ -247,7 +306,12 @@ Type Objects
    and other places where a method's defining class cannot be passed using the
    :c:type:`PyCMethod` calling convention.
 
+   The returned reference is :term:`borrowed <borrowed reference>` from *type*,
+   and will be valid as long as you hold a reference to *type*.
+   Do not release it with :c:func:`Py_DECREF` or similar.
+
    .. versionadded:: 3.11
+
 
 .. c:function:: int PyUnstable_Type_AssignVersionTag(PyTypeObject *type)
 
@@ -257,6 +321,16 @@ Type Objects
    assigned, or 0 if a new tag could not be assigned.
 
    .. versionadded:: 3.12
+
+
+.. c:function:: int PyType_SUPPORTS_WEAKREFS(PyTypeObject *type)
+
+   Return true if instances of *type* support creating weak references, false
+   otherwise. This function always succeeds. *type* must not be ``NULL``.
+
+   .. seealso::
+      * :ref:`weakrefobjects`
+      * :py:mod:`weakref`
 
 
 Creating Heap-Allocated Types
@@ -311,6 +385,7 @@ The following functions and structs are used to create
 
    .. versionadded:: 3.12
 
+
 .. c:function:: PyObject* PyType_FromModuleAndSpec(PyObject *module, PyType_Spec *spec, PyObject *bases)
 
    Equivalent to ``PyType_FromMetaclass(NULL, module, spec, bases)``.
@@ -333,6 +408,7 @@ The following functions and structs are used to create
       :c:member:`~PyTypeObject.tp_new` is deprecated and in Python 3.14+ it
       will be no longer allowed.
 
+
 .. c:function:: PyObject* PyType_FromSpecWithBases(PyType_Spec *spec, PyObject *bases)
 
    Equivalent to ``PyType_FromMetaclass(NULL, NULL, spec, bases)``.
@@ -349,6 +425,7 @@ The following functions and structs are used to create
       Creating classes whose metaclass overrides
       :c:member:`~PyTypeObject.tp_new` is deprecated and in Python 3.14+ it
       will be no longer allowed.
+
 
 .. c:function:: PyObject* PyType_FromSpec(PyType_Spec *spec)
 
@@ -395,6 +472,9 @@ The following functions and structs are used to create
       class need *in addition* to the superclass.
       Use :c:func:`PyObject_GetTypeData` to get a pointer to subclass-specific
       memory reserved this way.
+      For negative :c:member:`!basicsize`, Python will insert padding when
+      needed to meet :c:member:`~PyTypeObject.tp_basicsize`'s alignment
+      requirements.
 
       .. versionchanged:: 3.12
 
@@ -463,19 +543,19 @@ The following functions and structs are used to create
 
       The following “offset” fields cannot be set using :c:type:`PyType_Slot`:
 
-         * :c:member:`~PyTypeObject.tp_weaklistoffset`
-           (use :c:macro:`Py_TPFLAGS_MANAGED_WEAKREF` instead if possible)
-         * :c:member:`~PyTypeObject.tp_dictoffset`
-           (use :c:macro:`Py_TPFLAGS_MANAGED_DICT` instead if possible)
-         * :c:member:`~PyTypeObject.tp_vectorcall_offset`
-           (use ``"__vectorcalloffset__"`` in
-           :ref:`PyMemberDef <pymemberdef-offsets>`)
+      * :c:member:`~PyTypeObject.tp_weaklistoffset`
+        (use :c:macro:`Py_TPFLAGS_MANAGED_WEAKREF` instead if possible)
+      * :c:member:`~PyTypeObject.tp_dictoffset`
+        (use :c:macro:`Py_TPFLAGS_MANAGED_DICT` instead if possible)
+      * :c:member:`~PyTypeObject.tp_vectorcall_offset`
+        (use ``"__vectorcalloffset__"`` in
+        :ref:`PyMemberDef <pymemberdef-offsets>`)
 
-         If it is not possible to switch to a ``MANAGED`` flag (for example,
-         for vectorcall or to support Python older than 3.12), specify the
-         offset in :c:member:`Py_tp_members <PyTypeObject.tp_members>`.
-         See :ref:`PyMemberDef documentation <pymemberdef-offsets>`
-         for details.
+      If it is not possible to switch to a ``MANAGED`` flag (for example,
+      for vectorcall or to support Python older than 3.12), specify the
+      offset in :c:member:`Py_tp_members <PyTypeObject.tp_members>`.
+      See :ref:`PyMemberDef documentation <pymemberdef-offsets>`
+      for details.
 
       The following fields cannot be set at all when creating a heap type:
 
@@ -495,14 +575,13 @@ The following functions and structs are used to create
       To avoid issues, use the *bases* argument of
       :c:func:`PyType_FromSpecWithBases` instead.
 
-     .. versionchanged:: 3.9
+      .. versionchanged:: 3.9
+         Slots in :c:type:`PyBufferProcs` may be set in the unlimited API.
 
-        Slots in :c:type:`PyBufferProcs` may be set in the unlimited API.
-
-     .. versionchanged:: 3.11
-        :c:member:`~PyBufferProcs.bf_getbuffer` and
-        :c:member:`~PyBufferProcs.bf_releasebuffer` are now available
-        under the :ref:`limited API <limited-c-api>`.
+      .. versionchanged:: 3.11
+         :c:member:`~PyBufferProcs.bf_getbuffer` and
+         :c:member:`~PyBufferProcs.bf_releasebuffer` are now available
+         under the :ref:`limited API <limited-c-api>`.
 
    .. c:member:: void *pfunc
 
