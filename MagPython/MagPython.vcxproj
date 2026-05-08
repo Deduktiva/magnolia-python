@@ -712,4 +712,20 @@
     <Copy SourceFiles="@(IncludeFile)" DestinationFolder="$(OutDir)\include\Python\%(RecursiveDir)" />
     <Copy SourceFiles="@(PythonFiles)" DestinationFolder="$(OutDir)\lib\%(RecursiveDir)" />
   </Target>
+
+  <!-- Capture dumpbin output for the shipped DLLs so toolchain/SDK changes
+       (e.g. runner image, MSVC toolset) can be diffed against a baseline.
+       See PR #29 for the validation checklist that motivated this. -->
+  <Target Name="DumpBinReport" AfterTargets="Build">
+    <ItemGroup>
+      <DumpBinTarget Include="$(OutDir)MagPython.dll" />
+      <DumpBinTarget Include="$(OutDir)libcrypto-1_1.dll" />
+      <DumpBinTarget Include="$(OutDir)libssl-1_1.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)dumpbin" />
+    <Exec Command="dumpbin /headers &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).headers.txt&quot;" />
+    <Exec Command="dumpbin /imports &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).imports.txt&quot;" />
+    <Exec Command="dumpbin /exports &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).exports.txt&quot;" />
+    <Exec Command="dumpbin /loadconfig &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).loadconfig.txt&quot;" />
+  </Target>
 </Project>
