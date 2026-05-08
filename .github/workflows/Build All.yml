@@ -23,7 +23,12 @@ jobs:
       matrix:
         include:
           - platform: windows-x86
-            runs-on: windows-2022
+            # Explicit label, not windows-latest: the build needs the
+            # v142 toolset component (see README), which is only
+            # guaranteed to be present on the explicitly-labelled
+            # images. Don't bump past windows-2025 without confirming
+            # the v142 component is still installed on the new image.
+            runs-on: windows-2025
             artifact-path: MagPython-windows-x86.zip
           - platform: linux-x86_64
             runs-on: ubuntu-22.04
