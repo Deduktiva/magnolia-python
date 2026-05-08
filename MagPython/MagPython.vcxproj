@@ -76,7 +76,7 @@
            ships pyconfig.h.in (template) rather than pyconfig.h, so
            there's nothing to shadow today, but ordering matters if
            upstream restores the .h name in a future bump. -->
-      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)Include\internal\mimalloc;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(PySourcePath)Modules\_hacl\include;$(PySourcePath)Modules\_hacl\internal;$(PySourcePath)Python;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(zlibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <!-- end from python.props -->

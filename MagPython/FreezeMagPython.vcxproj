@@ -61,7 +61,7 @@
       <!-- $(IntDir) precedes $(PySourcePath)PC so the build-time-
            generated pyconfig.h (see magpython-pyconfig-h.targets,
            imported below) shadows anything in PC. -->
-      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)Include\internal\mimalloc;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(PySourcePath)Modules\_hacl\include;$(PySourcePath)Modules\_hacl\internal;$(PySourcePath)Python;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <!-- end from python.props -->
       <CompileAsManaged>false</CompileAsManaged>
