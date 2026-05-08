@@ -92,18 +92,19 @@ build_openssl() {
      make install_sw)
 }
 
-# Regenerate frozen + deepfreeze sources via upstream's make targets,
-# inside the main build dir (so we don't pay for a second configure).
-# Both outputs are gitignored and required before linking libMagPython.
+# Regenerate frozen sources via upstream's make targets, inside the main
+# build dir (so we don't pay for a second configure). The output is
+# gitignored and required before linking libMagPython. CPython 3.13
+# dropped deepfreeze (the .c-pre-baked importlib bootstrap) — frozen
+# modules are now the only path, so we only invoke regen-frozen.
 # $1: build dir (already configured)
-# $2: host python interpreter for deepfreeze.py.
+# $2: host python interpreter for freeze_modules.py.
 regen_frozen() {
     local build_dir="$1"
     local host_python="$2"
-    log "Regenerating frozen + deepfreeze with $host_python"
+    log "Regenerating frozen modules with $host_python"
     (cd "$build_dir"
-     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-frozen
-     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-deepfreeze)
+     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-frozen)
 }
 
 # Drop in the project's Setup.local (disables stdlib modules that aren't in
