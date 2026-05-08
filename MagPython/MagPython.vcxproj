@@ -348,7 +348,6 @@
     <ClInclude Include="$(zlibDir)\inftrees.h" />
     <ClInclude Include="$(zlibDir)\trees.h" />
     <ClInclude Include="$(zlibDir)\zconf.h" />
-    <ClInclude Include="$(zlibDir)\zconf.in.h" />
     <ClInclude Include="$(zlibDir)\zlib.h" />
     <ClInclude Include="$(zlibDir)\zutil.h" />
   </ItemGroup>

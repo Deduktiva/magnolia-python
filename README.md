@@ -12,7 +12,7 @@ standalone Python distribution.
 | --- | --- |
 | `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
 | `openssl/` | Vendored OpenSSL 1.1.1w source. |
-| `zlib/` | Vendored zlib 1.3.1 source. |
+| `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.4.5 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.45.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/` | All of the project's own build glue: MSBuild projects, props, the smoke test, and a few helper scripts. |
@@ -188,6 +188,52 @@ the new tree compiles, then commit with a message like
 require updating `<LibraryFileVersion>`, the `Configure` flags, and
 likely the entire `openssl-makefile-faster` layout. The script refuses
 non-1.1.1 versions for exactly this reason.)
+
+## Updating vendored zlib
+
+`MagPython/update-zlib.sh` is the analogous helper for the zlib tree:
+
+```sh
+MagPython/update-zlib.sh 1.3.1
+```
+
+Same shape as the OpenSSL script (bash 3.2, macOS-friendly), with two
+notable differences in how it behaves:
+
+1. Pinned to the zlib **1.x** line. A 2.x bump would warrant a manual
+   review of the build glue, so the script refuses anything outside
+   `1.*`.
+2. zlib does not publish `.sha256` sidecars on its GitHub releases, so
+   there is no upstream-anchored hash to verify against. The script
+   trusts HTTPS to GitHub plus the immutability of release artifacts,
+   and prints the SHA-256 of the downloaded tarball for the record
+   (paste it into the commit message). If you want stronger assurance,
+   GitHub does publish `.tar.gz.asc` GPG signatures from Mark Adler —
+   verify out of band before running the script.
+
+The drift detector compares the `$(zlibDir)\<name>.c` and
+`$(zlibDir)\<name>.h` references in `MagPython/MagPython.vcxproj`
+against the top-level files in the new tree, with the previous tree's
+intentional exclusions (the `gz*` family — Python's `zlibmodule`
+doesn't use them) subtracted as a baseline. As with OpenSSL, only drift
+introduced by the current upgrade surfaces; **GONE** entries
+(`<ClCompile>` references that no longer exist would break the build,
+`<ClInclude>` ones rot the IDE view) are always reported regardless.
+
+### What else changes on a zlib bump?
+
+Unlike OpenSSL, zlib is statically linked into `MagPython.dll` rather
+than shipped as its own DLL — there are no soname-bearing artifacts.
+So a patch bump only touches:
+
+- `MagPython/MagPython.vcxproj` — the `<ClCompile>` and `<ClInclude>`
+  lists, *if and only if* the drift detector reports new files.
+- The version string in the vendored-libraries table at the top of
+  this README. (zlib's licensing line carries no version because the
+  license terms are stable across the 1.x line, unlike OpenSSL.)
+
+The `<zlibDir>` property and CI workflow have no version-specific
+references and stay as-is.
 
 ## Continuous integration
 
