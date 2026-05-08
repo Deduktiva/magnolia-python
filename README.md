@@ -81,6 +81,10 @@ Notable differences from a stock CPython Windows build:
   iphlpapi.lib;Rpcrt4.lib`.
 - Targets `x86` only (the `Platform` defaults to `Win32` in
   `MagPython/common.props`); `PlatformToolset` is `v142` (VS 2019).
+  Deployment target is Windows 8.1 — `Py_WINVER` is `0x0603` in
+  `Python/PC/pyconfig.h.in`, so `MagPython.dll` statically imports
+  Windows 8.1 APIs (e.g. PSS) and is expected to load on Windows 8.1
+  and newer with the VC++ 2015-2022 redistributable installed.
 - Frozen modules and `Python/deepfreeze/deepfreeze.c` are regenerated as part
   of the build (see below) and are gitignored.
 
