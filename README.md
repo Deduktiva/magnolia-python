@@ -1,6 +1,6 @@
 # magnolia-python
 
-A custom build of CPython 3.12.2 for embedding into a host application,
+A custom build of CPython 3.13.13 for embedding into a host application,
 packaging the interpreter, the standard library extension modules, and the
 supporting crypto/compression/database libraries into a single
 shared library. Three platforms are produced from the same source tree:
@@ -15,7 +15,7 @@ shared library. Three platforms are produced from the same source tree:
 
 | Path | Contents |
 | --- | --- |
-| `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
+| `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
 | `openssl/` | Vendored OpenSSL 1.1.1w source. |
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
@@ -52,9 +52,9 @@ MagPython/
   libcrypto.so.1.1
   libssl.so.1.1
   include/Python/...
-  lib/python3.12/        # stdlib at the path Python's Unix discovery
+  lib/python3.13/        # stdlib at the path Python's Unix discovery
                          # looks for (lib/python<X.Y>/os.py)
-  lib/python3.12/lib-dynload/   # empty (modules are statically linked)
+  lib/python3.13/lib-dynload/   # empty (modules are statically linked)
 ```
 
 macOS arm64 (`MagPython-macos-arm64.zip`):
@@ -65,8 +65,8 @@ MagPython/
   libcrypto.1.1.dylib    # install_name @rpath/libcrypto.1.1.dylib
   libssl.1.1.dylib       # install_name @rpath/libssl.1.1.dylib
   include/Python/...
-  lib/python3.12/
-  lib/python3.12/lib-dynload/
+  lib/python3.13/
+  lib/python3.13/lib-dynload/
 ```
 
 Notable differences from a stock CPython Windows build:
@@ -159,7 +159,7 @@ five-stage shape as the Windows metaproj:
    out of the build entirely we need to drop their stdlib lines.) This
    produces a libpython that contains the same module subset as
    `MagPython/MagPython.vcxproj` does on Windows.
-5. **Rename, stage, smoke test, zip** — `libpython3.12.{so.1.0,dylib}` is
+5. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
    copied to `libMagPython.{so,dylib}` and its SONAME / install name is
    rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
    Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
@@ -172,7 +172,7 @@ five-stage shape as the Windows metaproj:
    fails the build), and the final zip is produced.
 
 The host Python required by `regen-deepfreeze` is
-`/opt/python/cp312-cp312/bin/python3` inside the manylinux_2_28 container
+`/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
 on Linux, and the `macos-14` runner's preinstalled `python3` on macOS.
 
 ## Building locally

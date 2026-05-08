@@ -197,7 +197,7 @@ flip_modules_to_static() {
 }
 
 # Stage headers and pure-Python stdlib into the artifact tree.
-# On Unix the stdlib lives under `lib/python3.12/` so Python's path
+# On Unix the stdlib lives under `lib/python3.13/` so Python's path
 # discovery (which looks for `lib/pythonX.Y/os.py` walking up from the
 # executable) just works without env vars or symlinks. The Windows
 # artifact uses `lib/` directly because Windows discovery looks for
@@ -205,13 +205,13 @@ flip_modules_to_static() {
 stage_headers_and_stdlib() {
     local build_dir="$1"
     log "Staging headers and stdlib"
-    mkdir -p "$STAGE/include/Python" "$STAGE/lib/python3.12/lib-dynload"
+    mkdir -p "$STAGE/include/Python" "$STAGE/lib/python3.13/lib-dynload"
     cp -R "$REPO/Python/Include/." "$STAGE/include/Python/"
     cp "$build_dir/pyconfig.h" "$STAGE/include/Python/pyconfig.h"
     # Only .py files from the stdlib tree. Use a tar pipe so we don't depend
     # on rsync (manylinux_2_28 doesn't ship it) or GNU-specific cp --parents.
     (cd "$REPO/Python/Lib" && find . -name '*.py' -print0 | tar --null -T - -cf -) \
-        | (cd "$STAGE/lib/python3.12" && tar -xf -)
+        | (cd "$STAGE/lib/python3.13" && tar -xf -)
 }
 
 # Build and run the smoke test (MagPython/test.c) against the staged tree.
@@ -227,8 +227,8 @@ run_smoke_test() {
         -o "$STAGE/MagPython_test"
     log "Running smoke test"
     # No PYTHONPATH/PYTHONHOME needed: stage_headers_and_stdlib added a
-    # `lib/python3.12 -> .` symlink so Python's Unix path discovery
-    # finds `lib/python3.12/os.py` next to the executable and computes
+    # `lib/python3.13 -> .` symlink so Python's Unix path discovery
+    # finds `lib/python3.13/os.py` next to the executable and computes
     # the right sys.prefix. Same shape as the Windows test which runs
     # MagPython.dll's smoke test without setting any env vars.
     (cd "$STAGE" && ./MagPython_test)
