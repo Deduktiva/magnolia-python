@@ -165,8 +165,19 @@ mkdir -p "$LIBFFI_DIR"
 ( cd "$SRC" && tar -cf - . ) | ( cd "$LIBFFI_DIR" && tar -xf - )
 
 # Regenerate ffi.h from the upstream template. autoconf's configure
-# normally substitutes these four @VAR@ tokens; for our 32-bit Windows
+# normally substitutes these @VAR@ tokens; for our 32-bit Windows
 # build the values are stable and known.
+#
+# Note on FFI_VERSION_NUMBER: libffi's configure.ac sets it as
+#   FFI_VERSION_NUMBER=<major>*10000 + <minor>*100 + <patch>
+# (e.g. 3.5.2 -> 30502). Older libffi versions (3.4.x) did not yet
+# emit these two tokens, but sed substitutions for absent patterns
+# are no-ops, so applying them unconditionally is safe.
+IFS=. read -r FFI_MAJ FFI_MIN FFI_PAT <<EOF
+$VERSION
+EOF
+FFI_VERSION_NUMBER=$(( FFI_MAJ * 10000 + FFI_MIN * 100 + ${FFI_PAT:-0} ))
+
 FFI_H_TEMPLATE="$LIBFFI_DIR/include/ffi.h.in"
 GEN_FFI_H="$LIBFFI_DIR/$LOCAL_HEADERS_DIR/ffi.h"
 if [ ! -f "$FFI_H_TEMPLATE" ]; then
@@ -177,6 +188,8 @@ fi
 mkdir -p "$LIBFFI_DIR/$LOCAL_HEADERS_DIR"
 sed \
     -e "s/@VERSION@/${VERSION}/g" \
+    -e "s/@FFI_VERSION_STRING@/${VERSION}/g" \
+    -e "s/@FFI_VERSION_NUMBER@/${FFI_VERSION_NUMBER}/g" \
     -e 's/@TARGET@/X86_WIN32/g' \
     -e 's/@HAVE_LONG_DOUBLE@/0/g' \
     -e 's/@FFI_EXEC_TRAMPOLINE_TABLE@/0/g' \
