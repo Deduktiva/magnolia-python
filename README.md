@@ -13,7 +13,7 @@ standalone Python distribution.
 | `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
 | `openssl/` | Vendored OpenSSL 1.1.1w source. |
 | `zlib/` | Vendored zlib 1.3.2 source. |
-| `libffi/` | Vendored libffi 3.4.5 source (used by `_ctypes`). |
+| `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/` | All of the project's own build glue: MSBuild projects, props, the smoke test, and a few helper scripts. |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
