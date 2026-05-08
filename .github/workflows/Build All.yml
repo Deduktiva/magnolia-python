@@ -13,18 +13,48 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: windows-2022
-    timeout-minutes: 15
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x86
+            runs-on: windows-2022
+            artifact-path: MagPython-windows-x86.zip
+          - platform: linux-x86_64
+            runs-on: ubuntu-22.04
+            container: quay.io/pypa/manylinux_2_28_x86_64
+            artifact-path: MagPython-linux-x86_64.zip
+          - platform: macos-arm64
+            runs-on: macos-14
+            artifact-path: MagPython-macos-arm64.zip
     steps:
       - uses: actions/checkout@v6
-      - uses: ilammy/msvc-dev-cmd@v1
+
+      # Windows build (existing logic, unchanged behaviour)
+      - if: matrix.platform == 'windows-x86'
+        uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x86
-      - run: '& msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj'
-      - run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython.zip MagPython'
+      - if: matrix.platform == 'windows-x86'
+        run: '& msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj'
+      - if: matrix.platform == 'windows-x86'
+        run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython-windows-x86.zip MagPython'
+
+      # Linux build (manylinux_2_28 container)
+      - if: matrix.platform == 'linux-x86_64'
+        run: ./MagPython/build-linux.sh
+
+      # macOS build
+      - if: matrix.platform == 'macos-arm64'
+        run: ./MagPython/build-macos.sh
+
       - uses: actions/upload-artifact@v7
         if: success()
         with:
-          name: build-artifacts
+          name: MagPython-${{ matrix.platform }}
           retention-days: 7
-          path: MagPython.zip
+          path: ${{ matrix.artifact-path }}

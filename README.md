@@ -1,10 +1,15 @@
 # magnolia-python
 
-A custom build of CPython 3.12.2 for 32-bit Windows that packages the
-interpreter, the standard library extension modules, and the supporting
-crypto/compression/database libraries into a single `MagPython.dll`. It is
-intended for embedding Python into a host application rather than as a
-standalone Python distribution.
+A custom build of CPython 3.12.2 for embedding into a host application,
+packaging the interpreter, the standard library extension modules, and the
+supporting crypto/compression/database libraries into a single
+shared library. Three platforms are produced from the same source tree:
+
+| Platform        | Runner          | Main library             |
+| ---             | ---             | ---                      |
+| Windows x86     | `windows-2022`  | `MagPython.dll`          |
+| Linux x86_64    | manylinux_2_28  | `libMagPython.so`        |
+| macOS arm64     | `macos-14`      | `libMagPython.dylib`     |
 
 ## What's in here
 
@@ -15,7 +20,7 @@ standalone Python distribution.
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
-| `MagPython/` | All of the project's own build glue: MSBuild projects, props, the smoke test, and a few helper scripts. |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -23,8 +28,12 @@ the project-specific build configuration lives under `MagPython/`.
 
 ## Build outputs
 
-The build produces a self-contained drop with this layout (delivered as
-`MagPython.zip` from CI):
+Each platform produces one zip with the same shape — a `MagPython/`
+directory containing the main shared lib, the OpenSSL libs, the headers,
+and the pure-Python stdlib. zlib, libffi, and sqlite are linked statically
+into the main library on every platform.
+
+Windows (`MagPython-windows-x86.zip`):
 
 ```
 MagPython/
@@ -33,6 +42,31 @@ MagPython/
   libssl-1_1.dll         # OpenSSL
   include/Python/...     # Public + cpython + internal headers, plus PC/pyconfig.h
   lib/...                # Pure-Python stdlib (.py files copied from Python/Lib)
+```
+
+Linux (`MagPython-linux-x86_64.zip`):
+
+```
+MagPython/
+  libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
+  libcrypto.so.1.1
+  libssl.so.1.1
+  include/Python/...
+  lib/python3.12/        # stdlib at the path Python's Unix discovery
+                         # looks for (lib/python<X.Y>/os.py)
+  lib/python3.12/lib-dynload/   # empty (modules are statically linked)
+```
+
+macOS arm64 (`MagPython-macos-arm64.zip`):
+
+```
+MagPython/
+  libMagPython.dylib     # install_name @rpath/libMagPython.dylib
+  libcrypto.1.1.dylib    # install_name @rpath/libcrypto.1.1.dylib
+  libssl.1.1.dylib       # install_name @rpath/libssl.1.1.dylib
+  include/Python/...
+  lib/python3.12/
+  lib/python3.12/lib-dynload/
 ```
 
 Notable differences from a stock CPython Windows build:
@@ -51,6 +85,8 @@ Notable differences from a stock CPython Windows build:
   of the build (see below) and are gitignored.
 
 ## How the build is wired
+
+### Windows
 
 `MagPython/MagPython.metaproj` is the top-level MSBuild project. It runs the
 following sub-projects in order, each `BuildInParallel="True"
@@ -96,7 +132,52 @@ StopOnFirstFailure="True"`:
 `MagPython/common.props` pins the defaults: `Platform=Win32`,
 `Configuration=Release`, `PlatformToolset=v142`.
 
+### Linux and macOS
+
+`MagPython/build-linux.sh` and `MagPython/build-macos.sh` orchestrate the
+Unix builds. Both source `MagPython/build-common.sh` and follow the same
+five-stage shape as the Windows metaproj:
+
+1. **Static deps** — `zlib/libz.a` (built with `CFLAGS=-fPIC`),
+   `libffi/<host-triple>/.libs/libffi.a`, `build-out/sqlite/libsqlite3.a`.
+   All three end up linked into the main library, mirroring the Windows
+   configuration where their sources are compiled directly into
+   `MagPython.dll`.
+2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
+   `make && make install_sw` into `build-out/openssl-out`. Produces
+   `libcrypto.{so.1.1,1.1.dylib}` + `libssl.{so.1.1,1.1.dylib}`.
+3. **Configure libpython** — out-of-tree configure in `build-out/main`
+   with `--enable-shared --without-static-libpython
+   --with-openssl=...build-out/openssl-out`, plus `LIBFFI_*`, `ZLIB_*`,
+   and `LIBSQLITE3_*` env vars pointing at the static libs from stage 1.
+4. **Regen frozen + deepfreeze, then make** — `make regen-frozen
+   regen-deepfreeze` followed by an awk pass that rewrites
+   `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
+   comments out the lines for modules listed under `*disabled*` in
+   `MagPython/Setup.local`. (The `*disabled*` directive on its own only
+   affects runtime registration in `Modules/config.c` — to keep modules
+   out of the build entirely we need to drop their stdlib lines.) This
+   produces a libpython that contains the same module subset as
+   `MagPython/MagPython.vcxproj` does on Windows.
+5. **Rename, stage, smoke test, zip** — `libpython3.12.{so.1.0,dylib}` is
+   copied to `libMagPython.{so,dylib}` and its SONAME / install name is
+   rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
+   Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
+   is relocatable; macOS rewrites OpenSSL `LC_LOAD_DYLIB` paths and
+   absolute `LC_RPATH` entries to `@rpath/...`. Headers and the
+   pure-Python stdlib are staged next to the libs (with a
+   `Python/python.h -> Python.h` symlink so `MagPython/test.c`'s
+   lowercase include resolves on case-sensitive filesystems),
+   `MagPython/test.c` is built and run against the staged tree (failure
+   fails the build), and the final zip is produced.
+
+The host Python required by `regen-deepfreeze` is
+`/opt/python/cp312-cp312/bin/python3` inside the manylinux_2_28 container
+on Linux, and the `macos-14` runner's preinstalled `python3` on macOS.
+
 ## Building locally
+
+### Windows
 
 Requirements:
 
@@ -116,6 +197,27 @@ msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj
 
 This is exactly what the CI invokes. The shipped artifact is built by then
 renaming `MagPython\Release` to `MagPython\MagPython` and zipping it.
+
+### Linux
+
+```sh
+docker run --rm -v "$PWD":/src -w /src \
+    quay.io/pypa/manylinux_2_28_x86_64 ./MagPython/build-linux.sh
+```
+
+(glibc 2.28 baseline — covers RHEL 8 / Ubuntu 20.04+.) Produces
+`MagPython-linux-x86_64.zip` at the repo root. Build artifacts live under
+`build-out/` (gitignored).
+
+### macOS
+
+On an Apple Silicon Mac with Xcode Command Line Tools installed:
+
+```sh
+./MagPython/build-macos.sh
+```
+
+Produces `MagPython-macos-arm64.zip` at the repo root.
 
 ## Updating vendored OpenSSL
 
@@ -355,15 +457,24 @@ A minor bump may surface a non-empty template diff for
 
 ## Continuous integration
 
-`.github/workflows/Build All.yml` runs on `windows-2022`:
+`.github/workflows/Build All.yml` is a single matrix-based workflow that
+fans out across three platforms:
 
-- Triggers: pushes to `main`, PRs to `main`, a weekly schedule (Mondays
-  06:00 UTC, added to catch silent breakages), and `workflow_dispatch`.
-- Concurrency-grouped per `github.ref` with cancel-in-progress.
-- Sets up the MSVC x86 environment via `ilammy/msvc-dev-cmd@v1`.
-- Runs the `msbuild` command above, packages `MagPython\Release` as
-  `MagPython.zip`, and uploads it as the `build-artifacts` artifact with
-  7-day retention.
+- `windows-2022` (x86, MSVC) — runs the existing `msbuild MagPython.metaproj`
+  flow.
+- `ubuntu-22.04` inside the `quay.io/pypa/manylinux_2_28_x86_64` container
+  — runs `MagPython/build-linux.sh`.
+- `macos-14` — runs `MagPython/build-macos.sh`.
+
+`fail-fast: false` so a transient failure on one platform doesn't cancel
+the others. `timeout-minutes: 30` per matrix job. Each job uploads its
+zip as a separate artifact named `MagPython-<platform>` with 7-day
+retention; downstream consumers (the host application's CI) fetch them
+by name.
+
+Triggers: pushes to `main`, PRs to `main`, a weekly schedule (Mondays
+06:00 UTC, to catch silent breakages), and `workflow_dispatch`.
+Concurrency-grouped per `github.ref` with cancel-in-progress.
 
 `.github/dependabot.yaml` keeps the GitHub Actions versions current on a
 monthly cadence.

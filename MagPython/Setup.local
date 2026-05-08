@@ -1,0 +1,45 @@
+# Modules deliberately omitted from libMagPython on Unix.
+#
+# This file is copied to Python/Modules/Setup.local by build-linux.sh and
+# build-macos.sh before configure runs, so its `*disabled*` block wins over
+# Setup.stdlib's defaults. The selection mirrors MagPython/MagPython.vcxproj
+# on Windows, which links a deliberate subset of stdlib extension modules
+# directly into MagPython.dll. We match that subset on Unix so the three
+# platforms ship the same Python surface to the host application.
+#
+# As a side-effect this also avoids the bundled libmpdec ADRP relocation
+# trouble on macOS arm64 (`_decimal` is excluded here).
+
+*disabled*
+_asyncio
+_bz2
+_crypt
+_curses
+_curses_panel
+_dbm
+_decimal
+_elementtree
+_gdbm
+_lzma
+_multiprocessing
+_posixshmem
+_queue
+_scproxy
+_testbuffer
+_testcapi
+_testclinic
+_testimportmultiple
+_testinternalcapi
+_testmultiphase
+_testsinglephase
+_tkinter
+_uuid
+_xxtestfuzz
+_zoneinfo
+nis
+ossaudiodev
+pyexpat
+readline
+spwd
+xxlimited
+xxlimited_35
