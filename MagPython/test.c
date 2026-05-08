@@ -1,5 +1,9 @@
 ﻿#include <Python/Python.h>
+#include <openssl/opensslv.h>
+#include <openssl/crypto.h>
+#include <openssl/ssl.h>
 #include <stdio.h>
+#include <string.h>
 
 static int try_import(const char *module) {
     PyObject *m = PyImport_ImportModule(module);
@@ -10,6 +14,30 @@ static int try_import(const char *module) {
     }
     printf("  %s OK\n", module);
     Py_DECREF(m);
+    return 0;
+}
+
+// Exercise OpenSSL directly (not just through Python's _ssl) so the artifact
+// is validated as a usable OpenSSL SDK: the headers must be present at
+// compile time, the libcrypto/libssl import lib (Windows) or unversioned
+// symlink (Linux/macOS) must be present at link time, and the shared lib
+// must resolve at runtime via the artifact's rpath. Also compares the
+// header's compile-time version against libcrypto's runtime version to
+// catch a header/lib mismatch.
+static int exercise_openssl(void) {
+    const char *header_ver = OPENSSL_VERSION_TEXT;
+    const char *runtime_ver = OpenSSL_version(OPENSSL_VERSION);
+    printf("  OpenSSL header:  %s\n", header_ver);
+    printf("  OpenSSL runtime: %s\n", runtime_ver);
+    if (strcmp(header_ver, runtime_ver) != 0) {
+        fprintf(stderr, "  OpenSSL header/runtime version mismatch\n");
+        return -1;
+    }
+    if (OPENSSL_init_ssl(0, NULL) != 1) {
+        fprintf(stderr, "  OPENSSL_init_ssl FAILED\n");
+        return -1;
+    }
+    printf("  OpenSSL init OK\n");
     return 0;
 }
 
@@ -48,6 +76,9 @@ int main(int argc, char *argv[]) {
     }
 
     int failures = 0;
+    printf("Exercising OpenSSL:\n");
+    failures += exercise_openssl() != 0;
+
     printf("Importing modules:\n");
     failures += try_import("decimal") != 0;
     failures += try_import("ssl") != 0;
