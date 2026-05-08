@@ -11,7 +11,7 @@ standalone Python distribution.
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
-| `openssl/` | Vendored OpenSSL 1.1.1j source. |
+| `openssl/` | Vendored OpenSSL 1.1.1w source. |
 | `zlib/` | Vendored zlib 1.3.1 source. |
 | `libffi/` | Vendored libffi 3.4.5 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.45.1 amalgamation (`sqlite3.c` + headers). |
@@ -117,6 +117,78 @@ msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj
 This is exactly what the CI invokes. The shipped artifact is built by then
 renaming `MagPython\Release` to `MagPython\MagPython` and zipping it.
 
+## Updating vendored OpenSSL
+
+This project intentionally stays on the OpenSSL 1.1.1 branch (the API/ABI
+matters for `_ssl` / `_hashopenssl` against this CPython, and the Windows
+build glue under `MagPython/` is wired up for `libcrypto-1_1.dll` /
+`libssl-1_1.dll`). The script `MagPython/update-openssl.sh` automates a
+patch-level bump within that branch:
+
+```sh
+MagPython/update-openssl.sh 1.1.1w
+```
+
+It is a portable bash script (no bashisms beyond bash 3.2, so it works on
+macOS as well as Linux). What it does:
+
+1. Refuses any version that is not on the `1.1.1` branch — keeps us on the
+   line where the build glue is known to work.
+2. Downloads `openssl-<version>.tar.gz` and its `.sha256` from the GitHub
+   release for the matching `OpenSSL_1_1_1<letter>` tag (with openssl.org's
+   `/source/old/1.1.1/` as a fallback). Verifies the SHA-256 with `shasum`
+   or `sha256sum`.
+3. Replaces the contents of `openssl/` in place with the extracted tree.
+   The OpenSSL tree has no project-local patches — all build customisation
+   lives in `MagPython/openssl.vcxproj` and `MagPython/openssl-makefile-faster`
+   — so a clean replacement is the correct strategy. Re-importing the
+   currently-vendored version produces a byte-identical tree (`git status`
+   shows no changes).
+4. Reports drift between `MagPython/openssl-makefile-faster` and the new
+   source tree:
+   - **GONE** files (referenced by the faster makefile but missing from
+     the new tree) are always reported and must be fixed — they will
+     break the build.
+   - **NEW** files: the script snapshots the previous tree's set of
+     "in covered dirs but not listed" files before replacing, then
+     subtracts that baseline from the post-replace report. So only files
+     added *by this upgrade* in directories the makefile covers (≥50%
+     coverage) surface; the standing exclusions (assembly-replaced
+     variants, `no-mdc2`/`no-idea`, alt implementations like
+     `crypto/sha/keccak1600.c`) stay quiet.
+
+### What else changes on an OpenSSL bump?
+
+For a patch-level bump *within* the 1.1.1 branch (the only kind of bump
+this script supports), the **Windows build projects need no changes** —
+they all key off the soname `1_1`, which is stable for the entire 1.1.x
+line. Concretely:
+
+- `MagPython/openssl.vcxproj` — `<LibraryFileVersion>1_1</LibraryFileVersion>`
+  drives the `libcrypto-1_1.dll` / `libssl-1_1.dll` paths and stays as-is.
+- `MagPython/MagPython.vcxproj` — links `libcrypto.lib` / `libssl.lib`
+  (import-lib names stable).
+- `MagPython/MagPython.metaproj`, `.github/workflows/Build All.yml`,
+  `.gitignore` — contain no version-specific references.
+- The `perl Configure VC-WIN32-ONECORE no-idea no-mdc2` invocation and
+  the `MY_*` file lists in `MagPython/openssl-makefile-faster` are valid
+  for any 1.1.1 release (the script verifies the latter on every run).
+
+The only places that need a manual edit on a patch bump are the two
+human-readable version strings in this file:
+
+- The vendored-libraries table (`Vendored OpenSSL 1.1.1<letter> source.`)
+- The Licensing section (`OpenSSL 1.1.1<letter> — dual …`)
+
+After updating those two lines, run the full Windows build to confirm
+the new tree compiles, then commit with a message like
+`Import unpacked OpenSSL 1.1.1w`.
+
+(A major version change — e.g. moving to OpenSSL 3.x — would also
+require updating `<LibraryFileVersion>`, the `Configure` flags, and
+likely the entire `openssl-makefile-faster` layout. The script refuses
+non-1.1.1 versions for exactly this reason.)
+
 ## Continuous integration
 
 `.github/workflows/Build All.yml` runs on `windows-2022`:
@@ -137,7 +209,7 @@ monthly cadence.
 The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
-- OpenSSL 1.1.1j — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
+- OpenSSL 1.1.1w — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
 - zlib — zlib license (`zlib/README`)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain
