@@ -20,7 +20,7 @@ shared library. Three platforms are produced from the same source tree:
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -454,6 +454,89 @@ the libffi 3.x line as long as the drift detector reports nothing.
 A minor bump may surface a non-empty template diff for
 `fficonfig.h.in` — review it and decide whether the project-local
 `fficonfig.h` needs to be regenerated as described above.
+
+## Updating vendored Python
+
+`MagPython/update-python.sh` is the analogous helper for the CPython
+source tree:
+
+```sh
+MagPython/update-python.sh 3.13.3
+```
+
+Same overall shape as the OpenSSL/zlib/SQLite/libffi scripts (bash
+3.2, macOS-friendly, no upstream-anchored hash so just prints the
+SHA-256 of the downloaded tarball for the record). What's
+Python-specific:
+
+1. Pinned to the CPython **3.x** line. A 4.x bump would warrant a
+   manual review of every piece of build glue, so the script refuses
+   anything outside `3.*`. Note that *cross-minor* bumps (e.g. 3.12 →
+   3.13) routinely add or rename C source files and tweak APIs
+   `MagPython.vcxproj` references — the drift detector flags those,
+   but reconciling them is part of the upgrade work.
+2. Downloads `cpython-<version>.tar.gz` from
+   `https://github.com/python/cpython/archive/refs/tags/v<version>.tar.gz`.
+   We use the GitHub tag archive rather than python.org's release
+   tarball because the GitHub archive is also signed-by-HTTPS,
+   immutable per-tag, and the only material content differences are
+   files the build doesn't use anyway.
+3. After extracting, the script drops files the build never references
+   and that python.org's release tarball also omits, so the imported
+   tree stays minimal:
+
+   - `.azure-pipelines/`, `.github/` — CI for python/cpython itself.
+   - `.gitignore`, `.gitattributes` — git metadata.
+   - `Misc/NEWS.d/` — per-version changelog fragments.
+   - `PC/icons/` — icons for the `python.exe` / `launcher.exe` GUI
+     executables that we don't ship.
+
+   The unpacked `Include/patchlevel.h`'s embedded `PY_VERSION` is
+   cross-checked against the requested version as a sanity guard.
+4. Replaces the contents of `Python/` in place. The wipe-and-replace
+   intentionally removes any project-local patches sitting on top of
+   the previous import (e.g. the Windows-API-baseline tweak in
+   `PC/pyconfig.h`, the static-module hookups in `PC/config.c`).
+   Re-apply those in *separate* follow-up commits so the import
+   commit is purely the upstream tree:
+
+   ```sh
+   git log --oneline <prev-import-sha>..HEAD -- Python/
+   ```
+
+   shows the project-local commits to replay against the new tree.
+
+### Drift detection
+
+Drift between `MagPython/MagPython.vcxproj`'s
+`$(PythonSourceDir)\<path>\<name>.c|h` references and the new tree
+is scoped to the directories the vcxproj substantially curates
+(≥50% of the directory's `.c`/`.h` files referenced) — otherwise
+CPython's much larger module/test/doc tree would drown the report
+in noise. The previous tree's intentional exclusions in those
+covered directories are subtracted as a baseline so each run only
+surfaces drift introduced by *this* upgrade. As elsewhere, **GONE**
+entries (vcxproj refs that no longer exist in the new tree) are
+always reported regardless — `<ClInclude>` ones rot the IDE view,
+`<ClCompile>` ones break the build.
+
+### What else changes on a Python bump?
+
+- `README.md` — the intro paragraph (`A custom build of CPython
+  X.Y.Z`), the vendored-libraries table (`Vendored CPython X.Y.Z
+  source tree.`), and the `lib/python<X.Y>/` paths in the Linux /
+  macOS build-output examples (these track the minor version, so
+  patch-only bumps within the same minor leave them alone).
+- `MagPython/MagPython.vcxproj` — the `<ClCompile>`/`<ClInclude>`
+  lists, *if and only if* the drift detector reports new or gone
+  files. Patch-level bumps within a minor line generally stay quiet;
+  cross-minor bumps usually need fixups.
+- The Linux/macOS build scripts hardcode `python3.<minor>`-shaped
+  paths in a few places (the libpython soname, the staged
+  `lib/python<X.Y>/` directory). Those need a manual edit on a
+  cross-minor bump.
+- Any project-local Python-tree patches that the wipe-and-replace
+  removed (re-apply in separate commits, as above).
 
 ## Continuous integration
 
