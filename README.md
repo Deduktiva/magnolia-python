@@ -12,7 +12,7 @@ standalone Python distribution.
 | --- | --- |
 | `Python/` | Vendored CPython 3.12.2 source tree (upstream `python/cpython`). |
 | `openssl/` | Vendored OpenSSL 1.1.1w source. |
-| `zlib/` | Vendored zlib 1.3.1 source. |
+| `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.4.5 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.45.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/` | All of the project's own build glue: MSBuild projects, props, the smoke test, and a few helper scripts. |
@@ -228,8 +228,9 @@ So a patch bump only touches:
 
 - `MagPython/MagPython.vcxproj` — the `<ClCompile>` and `<ClInclude>`
   lists, *if and only if* the drift detector reports new files.
-- The two human-readable version strings in this README (the
-  vendored-libraries table and the Licensing section).
+- The version string in the vendored-libraries table at the top of
+  this README. (zlib's licensing line carries no version because the
+  license terms are stable across the 1.x line, unlike OpenSSL.)
 
 The `<zlibDir>` property and CI workflow have no version-specific
 references and stay as-is.
