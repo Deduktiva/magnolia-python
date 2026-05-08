@@ -82,30 +82,47 @@ ssl_libdir="$BUILD/openssl-out/lib"
 cp -P "$ssl_libdir"/libcrypto.*.dylib "$STAGE/"
 cp -P "$ssl_libdir"/libssl.*.dylib    "$STAGE/"
 # Rewrite OpenSSL install names to @rpath so the host application's @rpath
-# controls resolution, and rewrite libMagPython's references to them.
+# controls resolution, and rewrite cross-references between the staged
+# dylibs (libMagPython -> libssl/libcrypto, libssl -> libcrypto) the same way.
 log "Rewriting install names to @rpath"
 for f in "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib; do
     base="$(basename "$f")"
     install_name_tool -id "@rpath/$base" "$f"
 done
-# libMagPython links against libcrypto/libssl with absolute paths from
-# $BUILD/openssl-out; rewrite each to @rpath/<basename>.
-otool -L "$STAGE/libMagPython.dylib" \
-    | awk -v root="$BUILD/openssl-out" '$1 ~ root {print $1}' \
-    | while read -r path; do
-        base="$(basename "$path")"
-        install_name_tool -change "$path" "@rpath/$base" "$STAGE/libMagPython.dylib"
-    done
-# Drop any absolute LC_RPATH entries that point at the build's openssl-out
-# (added by --with-openssl-rpath=auto). @loader_path was already added via
-# LDFLAGS_NODIST, so removing the absolutes makes the artifact relocatable.
-otool -l "$STAGE/libMagPython.dylib" \
-    | awk -v root="$BUILD/openssl-out" '
-        /^ +cmd LC_RPATH/   { in_rpath=1; next }
-        in_rpath && /path / { if (index($2, root) == 1) print $2; in_rpath=0 }
-    ' | while read -r rpath; do
-        install_name_tool -delete_rpath "$rpath" "$STAGE/libMagPython.dylib"
-    done
+# libMagPython links against libcrypto/libssl, and libssl links against
+# libcrypto, all with absolute paths from $BUILD/openssl-out. Without
+# rewriting libssl's reference too, a host running the artifact directly
+# (no DYLD_FALLBACK_LIBRARY_PATH) hits a dyld error pointing at the
+# runner's build dir. Apply the same rewrite + rpath cleanup uniformly.
+for f in "$STAGE/libMagPython.dylib" "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib; do
+    otool -L "$f" \
+        | awk -v root="$BUILD/openssl-out" '$1 ~ root {print $1}' \
+        | while read -r path; do
+            base="$(basename "$path")"
+            install_name_tool -change "$path" "@rpath/$base" "$f"
+        done
+    # Drop any absolute LC_RPATH entries that point at the build's
+    # openssl-out (added by --with-openssl-rpath=auto and by OpenSSL's
+    # own link rules) so the artifact is relocatable.
+    otool -l "$f" \
+        | awk -v root="$BUILD/openssl-out" '
+            /^ +cmd LC_RPATH/   { in_rpath=1; next }
+            in_rpath && /path / { if (index($2, root) == 1) print $2; in_rpath=0 }
+        ' | while read -r rpath; do
+            install_name_tool -delete_rpath "$rpath" "$f"
+        done
+done
+# Add @loader_path to LC_RPATH on libssl/libcrypto so the @rpath/libcrypto
+# reference inside libssl resolves to its sibling regardless of what
+# rpaths the loading binary supplies. libMagPython already has this via
+# LDFLAGS_NODIST in configure_libmagpython.
+for f in "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib; do
+    if ! otool -l "$f" \
+            | awk '/^ +cmd LC_RPATH/{r=1;next} r && /path /{print $2;r=0}' \
+            | grep -qx "@loader_path"; then
+        install_name_tool -add_rpath "@loader_path" "$f"
+    fi
+done
 
 log "Stripping debug symbols from shared libs"
 # CPython builds with -g -O3 by default; the embedded debug info adds
@@ -120,8 +137,15 @@ stage_headers_and_stdlib "$BUILD/main"
 run_smoke_test '@loader_path'
 
 # Sanity: only @rpath/* and system libs should remain in the LC_LOAD_DYLIB
-# entries of libMagPython.
+# entries of any shipped dylib. libssl in particular must not retain the
+# absolute libcrypto reference baked in at OpenSSL build time.
 log "otool sanity"
-otool -L "$STAGE/libMagPython.dylib"
+for f in "$STAGE"/libMagPython.dylib "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib; do
+    otool -L "$f"
+    if otool -L "$f" | awk -v root="$BUILD/openssl-out" 'NR>1 && $1 ~ root {found=1} END {exit !found}'; then
+        echo "ERROR: $f still references $BUILD/openssl-out" >&2
+        exit 1
+    fi
+done
 
 zip_artifact macos-arm64
