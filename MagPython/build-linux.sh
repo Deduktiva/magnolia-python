@@ -99,6 +99,7 @@ for f in "$STAGE"/libMagPython.so "$STAGE"/libcrypto.so.1.1 "$STAGE"/libssl.so.1
 done
 
 stage_headers_and_stdlib "$BUILD/main"
+stage_openssl_headers
 run_smoke_test '$ORIGIN'
 
 # Sanity: ensure no surprise glibc-only-recent symbols. manylinux2014 ships

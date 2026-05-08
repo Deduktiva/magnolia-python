@@ -81,6 +81,14 @@ log "Copying OpenSSL dylibs"
 ssl_libdir="$BUILD/openssl-out/lib"
 cp -P "$ssl_libdir"/libcrypto.*.dylib "$STAGE/"
 cp -P "$ssl_libdir"/libssl.*.dylib    "$STAGE/"
+# install_sw also creates unversioned symlinks (libcrypto.dylib ->
+# libcrypto.<ver>.dylib, same for libssl). The libcrypto.*.dylib glob above
+# requires at least one char between the dots, so it doesn't pick those up.
+# Copy them with -P so consumers can link against -lcrypto / -lssl, mirroring
+# the libssl.so / libcrypto.so symlinks already shipped on Linux and the
+# libssl.lib / libcrypto.lib import libs shipped on Windows.
+cp -P "$ssl_libdir"/libcrypto.dylib "$STAGE/"
+cp -P "$ssl_libdir"/libssl.dylib    "$STAGE/"
 # Rewrite OpenSSL install names to @rpath so the host application's @rpath
 # controls resolution, and rewrite cross-references between the staged
 # dylibs (libMagPython -> libssl/libcrypto, libssl -> libcrypto) the same way.
@@ -134,6 +142,7 @@ for f in "$STAGE"/libMagPython.dylib "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.
 done
 
 stage_headers_and_stdlib "$BUILD/main"
+stage_openssl_headers
 run_smoke_test '@loader_path'
 
 # Sanity: only @rpath/* and system libs should remain in the LC_LOAD_DYLIB

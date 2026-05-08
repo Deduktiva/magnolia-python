@@ -212,6 +212,25 @@ flip_modules_to_static() {
     (cd "$build_dir" && make -j1 Makefile Modules/config.c)
 }
 
+# Stage OpenSSL development files (public + internal headers) into the artifact
+# tree, mirroring the Windows artifact shape produced by openssl.vcxproj's
+# CopyArtifacts target. The public include/openssl/ tree comes from the
+# install_sw output (includes Configure-generated headers like opensslconf.h);
+# the internal include/crypto/ tree isn't installed by install_sw, so we copy
+# .h files straight from the post-Configure source tree (which is where
+# Configure materialises bn_conf.h / dso_conf.h from their .h.in templates).
+# Linux/macOS link against libssl/libcrypto via the unversioned symlinks
+# install_sw creates next to the real shared libs, so no platform-specific
+# import library is needed here — that part is handled by the per-platform
+# library copy step.
+stage_openssl_headers() {
+    log "Staging OpenSSL headers"
+    mkdir -p "$STAGE/include/openssl" "$STAGE/include/crypto"
+    cp -R "$BUILD/openssl-out/include/openssl/." "$STAGE/include/openssl/"
+    find "$REPO/openssl/include/crypto" -maxdepth 1 -type f -iname '*.h' \
+        -exec cp {} "$STAGE/include/crypto/" \;
+}
+
 # Stage headers and pure-Python stdlib into the artifact tree.
 # On Unix the stdlib lives under `lib/python$PY_X_Y/` so Python's path
 # discovery (which looks for `lib/pythonX.Y/os.py` walking up from the
