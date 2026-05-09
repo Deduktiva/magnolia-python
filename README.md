@@ -16,7 +16,7 @@ shared library. Three platforms are produced from the same source tree:
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
-| `openssl/` | Vendored OpenSSL 1.1.1w source. |
+| `openssl/` | Vendored OpenSSL 3.5.6 source. |
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
@@ -38,8 +38,8 @@ Windows (`MagPython-windows-x86.zip`):
 ```
 MagPython/
   MagPython.dll          # Python core + builtin modules + zlib + sqlite + libffi
-  libcrypto-1_1.dll      # OpenSSL
-  libssl-1_1.dll         # OpenSSL
+  libcrypto-3.dll        # OpenSSL
+  libssl-3.dll           # OpenSSL
   include/Python/...     # Public + cpython + internal headers, plus PC/pyconfig.h
   lib/...                # Pure-Python stdlib (.py files copied from Python/Lib)
 ```
@@ -49,8 +49,8 @@ Linux (`MagPython-linux-x86_64.zip`):
 ```
 MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
-  libcrypto.so.1.1
-  libssl.so.1.1
+  libcrypto.so.3
+  libssl.so.3
   include/Python/...
   lib/python3.13/        # stdlib at the path Python's Unix discovery
                          # looks for (lib/python<X.Y>/os.py)
@@ -62,8 +62,8 @@ macOS arm64 (`MagPython-macos-arm64.zip`):
 ```
 MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
-  libcrypto.1.1.dylib    # install_name @rpath/libcrypto.1.1.dylib
-  libssl.1.1.dylib       # install_name @rpath/libssl.1.1.dylib
+  libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
+  libssl.3.dylib         # install_name @rpath/libssl.3.dylib
   include/Python/...
   lib/python3.13/
   lib/python3.13/lib-dynload/
@@ -100,15 +100,20 @@ StopOnFirstFailure="True"`:
    `X86_WIN32` using libffi's own pre-generated MSVC headers
    (`libffi/msvc_build/x86_win32/include`).
 2. **`openssl.vcxproj`** — a `Makefile`-type project that runs
-   `perl Configure VC-WIN32-ONECORE no-idea no-mdc2` and then
-   `nmake -f openssl-makefile-faster prep build_libs` inside `openssl/`.
-   The `download-nasm.ps1` target fetches NASM 2.16.01 from nasm.us before
-   the build (NASM is required by OpenSSL's x86 assembly). The custom
-   `openssl-makefile-faster` overrides OpenSSL's per-file compile rules to
-   compile each `crypto/<dir>` in a single `cl.exe` invocation, which is
-   substantially faster than the stock makefile. Outputs: `libcrypto-1_1.dll`,
-   `libssl-1_1.dll`, import libs, `applink.c`, and the headers, all copied
-   into `MagPython/Release/`.
+   `perl Configure VC-WIN32-ONECORE <no-* set>` and then
+   `jom -j%NUMBER_OF_PROCESSORS% build_libs` inside `openssl/`.
+   `download-nasm.ps1` fetches NASM 2.16.01 from nasm.us before the build
+   (NASM is required by OpenSSL's x86 assembly). `download-jom.ps1`
+   fetches jom — Qt's drop-in `nmake` replacement that supports parallel
+   jobs (`-j`); Microsoft's nmake is single-threaded, so this cuts the
+   OpenSSL build from sequential `cl.exe` spawns down to one process per
+   core. Outputs: `libcrypto-<N>.dll`, `libssl-<N>.dll` (where `<N>` is
+   the soname auto-detected from `openssl/VERSION.dat`), import libs,
+   `applink.c`, and the headers, all copied into `MagPython/Release/`.
+   A `VerifyOpenSSL` post-build target compiles + runs
+   `MagPython/openssl-verify.c` against the staged libs to catch a
+   misconfigured `no-*` set or a missing soname here, with a clear error,
+   instead of surfacing later as a baffling `MagPython.dll` link failure.
 3. **`FreezeMagPython.vcxproj`** — builds `FreezeMagPython.exe` from
    CPython's `Programs/_freeze_module.c`. After it builds, post-build targets
    re-freeze the Python modules listed in the project (importlib bootstrap,
@@ -149,7 +154,7 @@ five-stage shape as the Windows metaproj:
    `MagPython.dll`.
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
-   `libcrypto.{so.1.1,1.1.dylib}` + `libssl.{so.1.1,1.1.dylib}`.
+   `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
 3. **Configure libpython** — out-of-tree configure in `build-out/main`
    with `--enable-shared --without-static-libpython
    --with-openssl=...build-out/openssl-out`, plus `LIBFFI_*`, `ZLIB_*`,
@@ -225,75 +230,60 @@ Produces `MagPython-macos-arm64.zip` at the repo root.
 
 ## Updating vendored OpenSSL
 
-This project intentionally stays on the OpenSSL 1.1.1 branch (the API/ABI
-matters for `_ssl` / `_hashopenssl` against this CPython, and the Windows
-build glue under `MagPython/` is wired up for `libcrypto-1_1.dll` /
-`libssl-1_1.dll`). The script `MagPython/update-openssl.sh` automates a
-patch-level bump within that branch:
+The script `MagPython/update-openssl.sh` automates a patch-level bump on
+the 3.x line:
 
 ```sh
-MagPython/update-openssl.sh 1.1.1w
+MagPython/update-openssl.sh 3.5.6
 ```
 
 It is a portable bash script (no bashisms beyond bash 3.2, so it works on
 macOS as well as Linux). What it does:
 
-1. Refuses any version that is not on the `1.1.1` branch — keeps us on the
-   line where the build glue is known to work.
+1. Validates the version is on the 3.x line (`3.<minor>.<patch>`). Other
+   forms are refused.
 2. Downloads `openssl-<version>.tar.gz` and its `.sha256` from the GitHub
-   release for the matching `OpenSSL_1_1_1<letter>` tag (with openssl.org's
-   `/source/old/1.1.1/` as a fallback). Verifies the SHA-256 with `shasum`
-   or `sha256sum`.
+   release for the matching `openssl-<v>` tag, with openssl.org as a
+   fallback. Verifies the SHA-256 with `shasum` or `sha256sum`.
 3. Replaces the contents of `openssl/` in place with the extracted tree.
    The OpenSSL tree has no project-local patches — all build customisation
-   lives in `MagPython/openssl.vcxproj` and `MagPython/openssl-makefile-faster`
-   — so a clean replacement is the correct strategy. Re-importing the
-   currently-vendored version produces a byte-identical tree (`git status`
-   shows no changes).
-4. Reports drift between `MagPython/openssl-makefile-faster` and the new
-   source tree:
-   - **GONE** files (referenced by the faster makefile but missing from
-     the new tree) are always reported and must be fixed — they will
-     break the build.
-   - **NEW** files: the script snapshots the previous tree's set of
-     "in covered dirs but not listed" files before replacing, then
-     subtracts that baseline from the post-replace report. So only files
-     added *by this upgrade* in directories the makefile covers (≥50%
-     coverage) surface; the standing exclusions (assembly-replaced
-     variants, `no-mdc2`/`no-idea`, alt implementations like
-     `crypto/sha/keccak1600.c`) stay quiet.
+   lives in `MagPython/openssl.vcxproj` and the platform-specific build
+   scripts. Re-importing the currently vendored version produces a
+   byte-identical tree (`git status` shows no changes).
 
 ### What else changes on an OpenSSL bump?
 
-For a patch-level bump *within* the 1.1.1 branch (the only kind of bump
-this script supports), the **Windows build projects need no changes** —
-they all key off the soname `1_1`, which is stable for the entire 1.1.x
-line. Concretely:
+For a patch-level bump within the 3.x line, the build glue needs **no
+version-specific edits**:
 
-- `MagPython/openssl.vcxproj` — `<LibraryFileVersion>1_1</LibraryFileVersion>`
-  drives the `libcrypto-1_1.dll` / `libssl-1_1.dll` paths and stays as-is.
-- `MagPython/MagPython.vcxproj` — links `libcrypto.lib` / `libssl.lib`
-  (import-lib names stable).
-- `MagPython/MagPython.metaproj`, `.github/workflows/Build All.yml`,
-  `.gitignore` — contain no version-specific references.
-- The `perl Configure VC-WIN32-ONECORE no-idea no-mdc2` invocation and
-  the `MY_*` file lists in `MagPython/openssl-makefile-faster` are valid
-  for any 1.1.1 release (the script verifies the latter on every run).
+- The Windows soname suffix (`3` today) is auto-detected from the
+  vendored tree by `MagPython/common.props` — it parses
+  `openssl/VERSION.dat`'s `SHLIB_VERSION=` line into
+  `$(OpenSslDllSuffix)`, which feeds the
+  `libcrypto-$(OpenSslDllSuffix).dll` / `libssl-$(OpenSslDllSuffix).dll`
+  paths in `MagPython/openssl.vcxproj` and `MagPython/MagPython.vcxproj`.
+- The Unix soname (`3` today) is auto-detected by
+  `MagPython/build-common.sh:openssl_shlib_version()` and threaded into
+  the `patchelf` / `install_name_tool` calls in `build-linux.sh` /
+  `build-macos.sh` (most macOS code paths use `*.dylib` globs already).
+- The `Configure` flag set lives in
+  `MagPython/build-common.sh:build_openssl()` (Unix) and
+  `MagPython/openssl.vcxproj`'s `NMakeBuildCommandLine` (Windows). It
+  trims the build to the surface CPython's `_ssl` / `_hashopenssl`
+  actually use — see the comments in `build_openssl` for the per-flag
+  rationale.
+- `MagPython/MagPython.metaproj`, `.github/workflows/Build All.yml` —
+  contain no version-specific references.
 
 The only places that need a manual edit on a patch bump are the two
 human-readable version strings in this file:
 
-- The vendored-libraries table (`Vendored OpenSSL 1.1.1<letter> source.`)
-- The Licensing section (`OpenSSL 1.1.1<letter> — dual …`)
+- The vendored-libraries table (`Vendored OpenSSL X.Y.Z source.`)
+- The Licensing section (`OpenSSL X.Y.Z — Apache-2.0 …`).
 
-After updating those two lines, run the full Windows build to confirm
-the new tree compiles, then commit with a message like
-`Import unpacked OpenSSL 1.1.1w`.
-
-(A major version change — e.g. moving to OpenSSL 3.x — would also
-require updating `<LibraryFileVersion>`, the `Configure` flags, and
-likely the entire `openssl-makefile-faster` layout. The script refuses
-non-1.1.1 versions for exactly this reason.)
+After updating those two lines, run the full Windows + Linux + macOS
+build to confirm the new tree compiles, then commit with a message like
+`Import unpacked OpenSSL 3.5.6`.
 
 ## Updating vendored zlib
 
@@ -571,7 +561,7 @@ monthly cadence.
 The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
-- OpenSSL 1.1.1w — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
+- OpenSSL 3.5.6 — Apache-2.0 license (`openssl/LICENSE.txt`)
 - zlib — zlib license (`zlib/README`)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain

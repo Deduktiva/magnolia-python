@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|Win32">
@@ -14,18 +14,21 @@
   <PropertyGroup>
     <ProjectName>openssl</ProjectName>
     <ConfigurationType>Makefile</ConfigurationType>
-    <MakefileName>openssl-makefile-faster</MakefileName>
     <BuildDir>$(MSBuildProjectDirectory)\..\openssl</BuildDir>
     <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
-    <LibraryFileVersion>1_1</LibraryFileVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <NMakeBuildCommandLine>
       cd /D "$(BuildDir)"
-      set PATH=$(MSBuildProjectDirectory)\nasm;%PATH%
-      perl Configure no-makedepend VC-WIN32-ONECORE no-idea no-mdc2
-      nmake -f "$(MSBuildProjectDirectory)\$(MakefileName)" prep build_libs
+      set PATH=$(MSBuildProjectDirectory)\nasm;$(MSBuildProjectDirectory)\jom;%PATH%
+      rem /FS serialises cl's writes to ossl_static.pdb so the parallel
+      rem jobs jom spawns don't collide on it (without /FS the build dies
+      rem with "cannot open program database ... if multiple CL.EXE write
+      rem to the same .PDB file, please use /FS").
+      set CL=/FS
+      perl Configure no-makedepend VC-WIN32-ONECORE no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests no-async no-fips no-docs no-legacy no-cmp no-apps
+      jom -j%NUMBER_OF_PROCESSORS% build_libs
     </NMakeBuildCommandLine>
     <NMakeOutput />
   </PropertyGroup>
@@ -33,15 +36,18 @@
   <Target Name="Download nasm" BeforeTargets="Build">
     <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-nasm.ps1" />
   </Target>
+  <Target Name="Download jom" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-jom.ps1" />
+  </Target>
   <Target Name="CopyArtifacts" AfterTargets="Build">
     <ItemGroup>
       <!-- Contents of include\... changes after nmake. This ItemGroup must be INSIDE the CopyArtifacts Target,
            otherwise it gets evaluated too early. -->
       <BuiltIncludeCrypto Include="$(BuildDir)\include\crypto\**\*.h" />
       <BuiltIncludeOpenSSL Include="$(BuildDir)\include\openssl\**\*.h" />
-      <LibraryFiles Include="$(BuildDir)\libcrypto-$(LibraryFileVersion).dll" />
+      <LibraryFiles Include="$(BuildDir)\libcrypto-$(OpenSslDllSuffix).dll" />
       <LibraryFiles Include="$(BuildDir)\libcrypto.lib" />
-      <LibraryFiles Include="$(BuildDir)\libssl-$(LibraryFileVersion).dll" />
+      <LibraryFiles Include="$(BuildDir)\libssl-$(OpenSslDllSuffix).dll" />
       <LibraryFiles Include="$(BuildDir)\libssl.lib" />
       <LibraryFiles Include="$(BuildDir)\ms\applink.c" />
     </ItemGroup>
@@ -52,6 +58,18 @@
     <Copy SourceFiles="@(BuiltIncludeCrypto)" DestinationFolder="$(OutDir)\include\crypto\%(RecursiveDir)" />
     <MakeDir Directories="$(OutDir)\include\openssl" />
     <Copy SourceFiles="@(BuiltIncludeOpenSSL)" DestinationFolder="$(OutDir)\include\openssl\%(RecursiveDir)" />
+  </Target>
+  <!--
+    Sanity-check the staged OpenSSL install (libssl-N.dll / libcrypto-N.dll
+    + import libs + headers in $(OutDir)) by compiling and running
+    MagPython/openssl-verify.c against it. Catches a misconfigured no-* set
+    or a missing soname here, with a clear error, instead of surfacing later
+    as a baffling MagPython.dll link failure.
+  -->
+  <Target Name="VerifyOpenSSL" AfterTargets="CopyArtifacts">
+    <Exec Command="cl /nologo /MD /I &quot;$(OutDir)include&quot; &quot;$(MSBuildProjectDirectory)\openssl-verify.c&quot; /Fe&quot;$(OutDir)openssl-verify.exe&quot; /Fo&quot;$(OutDir)openssl-verify.obj&quot; /link &quot;$(OutDir)libssl.lib&quot; &quot;$(OutDir)libcrypto.lib&quot;" />
+    <Exec Command="&quot;$(OutDir)openssl-verify.exe&quot;" WorkingDirectory="$(OutDir)" />
+    <Delete Files="$(OutDir)openssl-verify.exe;$(OutDir)openssl-verify.obj" />
   </Target>
   <Target Name="Clean">
     <RemoveDir Directories="$(OutDir)" />

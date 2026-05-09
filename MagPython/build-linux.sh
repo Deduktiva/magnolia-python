@@ -6,8 +6,8 @@
 #   MagPython/
 #     libMagPython.so.1.0
 #     libMagPython.so -> libMagPython.so.1.0
-#     libcrypto.so.1.1
-#     libssl.so.1.1
+#     libcrypto.so.<openssl-shlib-version>     # 3 on the 3.x line
+#     libssl.so.<openssl-shlib-version>
 #     include/Python/...
 #     lib/...
 
@@ -26,17 +26,23 @@ source "$SCRIPT_DIR/build-common.sh"
 HOST_PYTHON="/opt/python/cp313-cp313/bin/python3"
 [ -x "$HOST_PYTHON" ] || HOST_PYTHON="$(command -v python3)"
 
-# manylinux_2_28 doesn't ship zip; install it on demand. Keep the install line
-# idempotent so re-runs are cheap.
-if ! command -v zip >/dev/null; then
+# manylinux_2_28 doesn't ship zip, and OpenSSL 3.x's Configure pulls in core
+# Perl modules (IPC::Cmd, Time::Piece, ...) the AlmaLinux 8 base perl
+# package omits — NOTES-PERL.md documents that RPM-based distros need
+# perl-core for the full set. Install both on demand. Keep idempotent so
+# re-runs are cheap.
+if ! command -v zip >/dev/null \
+   || ! perl -MIPC::Cmd -e1 >/dev/null 2>&1 \
+   || ! perl -MTime::Piece -e1 >/dev/null 2>&1; then
     if command -v dnf >/dev/null; then
-        dnf install -y zip
+        dnf install -y zip perl-core
     elif command -v yum >/dev/null; then
-        yum install -y zip
+        yum install -y zip perl-core
     elif command -v apt-get >/dev/null; then
         apt-get update && apt-get install -y zip
+        # Debian/Ubuntu's `perl` package already includes the core modules.
     else
-        echo "no supported package manager to install zip"; exit 1
+        echo "no supported package manager to install zip / perl-core"; exit 1
     fi
 fi
 command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
@@ -73,9 +79,10 @@ log "Renaming libpython$PY_X_Y -> libMagPython"
  patchelf --set-rpath '$ORIGIN' "$STAGE/libMagPython.so")
 
 log "Copying OpenSSL shared libs"
-# install_sw places .so.1.1 (real) + unversioned symlink in lib (or lib64).
+# install_sw places libcrypto.so.<shlib-version> (real) + unversioned symlink
+# in lib (we forced --libdir=lib in build_openssl).
+OPENSSL_SO_VERSION="$(openssl_shlib_version)"
 ssl_libdir="$BUILD/openssl-out/lib"
-[ -d "$ssl_libdir" ] || ssl_libdir="$BUILD/openssl-out/lib64"
 cp -P "$ssl_libdir"/libcrypto.so* "$STAGE/"
 cp -P "$ssl_libdir"/libssl.so*    "$STAGE/"
 # OpenSSL's link rules embed DT_RUNPATH=<install-prefix>/lib into the
@@ -85,7 +92,7 @@ cp -P "$ssl_libdir"/libssl.so*    "$STAGE/"
 # directly would resolve libcrypto via that stale RUNPATH and fail.
 # Reset both to $ORIGIN so they find each other as siblings, matching
 # what libMagPython.so already does.
-for f in "$STAGE"/libcrypto.so.1.1 "$STAGE"/libssl.so.1.1; do
+for f in "$STAGE/libcrypto.so.$OPENSSL_SO_VERSION" "$STAGE/libssl.so.$OPENSSL_SO_VERSION"; do
     patchelf --set-rpath '$ORIGIN' "$f"
 done
 
@@ -94,7 +101,7 @@ log "Stripping debug symbols from shared libs"
 # tens of MB to libMagPython.so and is useless to consumers of the
 # artifact. `strip` (no flags) keeps dynamic symbols intact, which is
 # what shared-library consumers need.
-for f in "$STAGE"/libMagPython.so "$STAGE"/libcrypto.so.1.1 "$STAGE"/libssl.so.1.1; do
+for f in "$STAGE/libMagPython.so" "$STAGE/libcrypto.so.$OPENSSL_SO_VERSION" "$STAGE/libssl.so.$OPENSSL_SO_VERSION"; do
     strip "$f"
 done
 

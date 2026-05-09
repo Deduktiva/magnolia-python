@@ -93,18 +93,59 @@ libffi_static_lib() {
     printf '%s' "$d"
 }
 
+# Detect the vendored OpenSSL's SHLIB_VERSION ("3" today). Threaded into the
+# patchelf / install_name_tool calls below so soname-bearing filenames adapt
+# automatically when openssl/ is replaced.
+openssl_shlib_version() {
+    awk -F= '/^SHLIB_VERSION=/ { gsub(/[ \t\r]/, "", $2); print $2; exit }' \
+        "$REPO/openssl/VERSION.dat"
+}
+
 # Build vendored OpenSSL as shared libs at $BUILD/openssl-out.
 # $1: OpenSSL Configure target (linux-x86_64, darwin64-arm64-cc, ...)
+#
+# --libdir=lib pins the install path so x86_64 doesn't auto-pick lib64/;
+# CPython's configure looks for $prefix/lib/, not lib64/.
+#
+# The no-* set trims the build to the surface CPython's _ssl /
+# _hashopenssl actually use. Each was verified by greping the relevant
+# CPython sources (no callers, or already #ifdef'd):
+#   no-fips no-docs no-legacy no-cmp no-apps no-cms no-comp no-ct
+#   no-engine no-dso no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests
+#   no-async no-uplink no-idea no-mdc2
 build_openssl() {
     local target="$1"
     log "Building OpenSSL ($target)"
     (cd "$REPO/openssl"
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
-     ./Configure "$target" shared no-idea no-mdc2 no-tests \
+     ./Configure "$target" shared --libdir=lib \
+         no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso \
+         no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests no-async \
+         no-uplink no-fips no-docs no-legacy no-cmp no-apps \
          --prefix="$BUILD/openssl-out" \
          --openssldir="$BUILD/openssl-out/ssl"
      make -j"$JOBS"
      make install_sw)
+
+    verify_openssl_install
+}
+
+# Sanity-check the staged OpenSSL install with MagPython/openssl-verify.c
+# before we hand it to CPython's configure, so a misconfigured no-* set or a
+# missing soname doesn't surface 50 layers deep as a silent
+#   "checking whether OpenSSL provides required ssl module APIs... no".
+# Same source is reused on Windows from openssl.vcxproj.
+verify_openssl_install() {
+    local out="$BUILD/openssl-out"
+    log "Verifying OpenSSL install at $out"
+    cc "$REPO/MagPython/openssl-verify.c" \
+        -I"$out/include" -L"$out/lib" -Wl,-rpath,"$out/lib" \
+        -lssl -lcrypto \
+        -o "$BUILD/openssl-verify" \
+        || { echo "OpenSSL link-check FAILED — CPython configure will reject this build" >&2; exit 1; }
+    "$BUILD/openssl-verify" \
+        || { echo "OpenSSL run-check FAILED" >&2; exit 1; }
+    rm -f "$BUILD/openssl-verify"
 }
 
 # Regenerate frozen sources via upstream's make targets, inside the main

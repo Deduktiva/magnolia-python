@@ -719,8 +719,8 @@
   <Target Name="DumpBinReport" AfterTargets="Build">
     <ItemGroup>
       <DumpBinTarget Include="$(OutDir)MagPython.dll" />
-      <DumpBinTarget Include="$(OutDir)libcrypto-1_1.dll" />
-      <DumpBinTarget Include="$(OutDir)libssl-1_1.dll" />
+      <DumpBinTarget Include="$(OutDir)libcrypto-$(OpenSslDllSuffix).dll" />
+      <DumpBinTarget Include="$(OutDir)libssl-$(OpenSslDllSuffix).dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)dumpbin" />
     <Exec Command="dumpbin /headers &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).headers.txt&quot;" />

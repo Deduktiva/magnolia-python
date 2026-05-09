@@ -5,8 +5,8 @@
 #
 #   MagPython/
 #     libMagPython.dylib
-#     libcrypto.1.1.dylib
-#     libssl.1.1.dylib
+#     libcrypto.<openssl-shlib-version>.dylib  # 3 on the 3.x line
+#     libssl.<openssl-shlib-version>.dylib
 #     include/Python/...
 #     lib/...
 

@@ -1,8 +1,8 @@
 /*
- * Copyright 2017 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2017-2021 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2017, Oracle and/or its affiliates.  All rights reserved.
  *
- * Licensed under the OpenSSL license (the "License").  You may not use
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
@@ -61,23 +61,23 @@ static int test_int_stack(int reserve)
         int sorted;
         int ex;
     } finds[] = {
-        { 2,    1,  5,  5   },
-        { 9,    7,  6,  6   },
-        { -173, 5,  0,  0   },
-        { 999,  3,  8,  8   },
-        { 0,   -1, -1,  1   }
+        { 2, 1, 5, 5 },
+        { 9, 7, 6, 6 },
+        { -173, 5, 0, 0 },
+        { 999, 3, 8, 8 },
+        { 0, -1, -1, 1 }
     };
     const int n_finds = OSSL_NELEM(finds);
     static struct {
         int value;
         int ex;
     } exfinds[] = {
-        { 3,    5   },
-        { 1000, 8   },
-        { 20,   8   },
-        { -999, 0   },
-        { -5,   0   },
-        { 8,    5   }
+        { 3, 5 },
+        { 1000, 8 },
+        { 20, 8 },
+        { -999, 0 },
+        { -5, 0 },
+        { 8, 5 }
     };
     const int n_exfinds = OSSL_NELEM(exfinds);
     STACK_OF(sint) *s = sk_sint_new_null();
@@ -131,7 +131,7 @@ static int test_int_stack(int reserve)
     /* sorting */
     if (!TEST_false(sk_sint_is_sorted(s)))
         goto end;
-    sk_sint_set_cmp_func(s, &int_compare);
+    (void)sk_sint_set_cmp_func(s, &int_compare);
     sk_sint_sort(s);
     if (!TEST_true(sk_sint_is_sorted(s)))
         goto end;
@@ -150,7 +150,7 @@ static int test_int_stack(int reserve)
             goto end;
         }
     for (i = 0; i < n_exfinds; i++)
-        if (!TEST_int_eq(sk_sint_find_ex(s, &exfinds[i].value), exfinds[i].ex)){
+        if (!TEST_int_eq(sk_sint_find_ex(s, &exfinds[i].value), exfinds[i].ex)) {
             TEST_info("int sorted find_ex absent %d", i);
             goto end;
         }
@@ -166,7 +166,7 @@ end:
 }
 
 static int uchar_compare(const unsigned char *const *a,
-                         const unsigned char *const *b)
+    const unsigned char *const *b)
 {
     return **a - (signed int)**b;
 }
@@ -195,6 +195,10 @@ static int test_uchar_stack(int reserve)
         goto end;
 
     /* dup */
+    r = sk_uchar_dup(NULL);
+    if (sk_uchar_num(r) != 0)
+        goto end;
+    sk_uchar_free(r);
     r = sk_uchar_dup(s);
     if (!TEST_int_eq(sk_uchar_num(r), n))
         goto end;
@@ -237,7 +241,7 @@ static int test_uchar_stack(int reserve)
         goto end;
 
     /* set */
-    sk_uchar_set(r, 1, v + 1);
+    (void)sk_uchar_set(r, 1, v + 1);
     for (i = 0; i < 2; i++)
         if (!TEST_ptr_eq(sk_uchar_value(r, i), v + i)) {
             TEST_info("uchar set %d", i);
@@ -260,7 +264,8 @@ static SS *SS_copy(const SS *p)
     return q;
 }
 
-static void SS_free(SS *p) {
+static void SS_free(SS *p)
+{
     OPENSSL_free(p);
 }
 
@@ -291,6 +296,10 @@ static int test_SS_stack(void)
         goto end;
 
     /* deepcopy */
+    r = sk_SS_deep_copy(NULL, &SS_copy, &SS_free);
+    if (sk_SS_num(r) != 0)
+        goto end;
+    sk_SS_free(r);
     r = sk_SS_deep_copy(s, &SS_copy, &SS_free);
     if (!TEST_ptr(r))
         goto end;
@@ -321,8 +330,8 @@ static int test_SS_stack(void)
     SS_free(p);
     if (!TEST_int_eq(sk_SS_num(s), n - 1))
         goto end;
-    for (i = 0; i < n-1; i++)
-        if (!TEST_ptr_eq(sk_SS_value(s, i), v[i<3 ? i : 1+i])) {
+    for (i = 0; i < n - 1; i++)
+        if (!TEST_ptr_eq(sk_SS_value(s, i), v[i < 3 ? i : 1 + i])) {
             TEST_info("SS delete ptr item %d", i);
             goto end;
         }
@@ -359,7 +368,7 @@ static int test_SU_stack(void)
 
     /* check the pointers are correct */
     for (i = 0; i < n; i++)
-        if (!TEST_ptr_eq(sk_SU_value(s, i),  v + i)) {
+        if (!TEST_ptr_eq(sk_SU_value(s, i), v + i)) {
             TEST_info("SU pointer check %d", i);
             goto end;
         }

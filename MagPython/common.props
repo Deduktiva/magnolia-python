@@ -5,4 +5,17 @@
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <PlatformToolset Condition="'$(PlatformToolset)' == ''">v142</PlatformToolset>
   </PropertyGroup>
+
+  <!--
+    Auto-detect the OpenSSL soversion from the vendored tree's VERSION.dat
+    (e.g. "SHLIB_VERSION=3" on the 3.x line) so the DLL filenames adapt
+    automatically when openssl/ is replaced. OpenSslDllSuffix is the
+    dot-stripped form embedded in Windows DLL names ("3" today, "4" in a
+    hypothetical future major bump).
+  -->
+  <PropertyGroup>
+    <_OpenSslVersionDat>$(MSBuildThisFileDirectory)..\openssl\VERSION.dat</_OpenSslVersionDat>
+    <_OpenSslShlibVersion>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_OpenSslVersionDat)')), 'SHLIB_VERSION=([0-9.]+)').Groups[1].Value)</_OpenSslShlibVersion>
+    <OpenSslDllSuffix>$(_OpenSslShlibVersion.Replace('.', '_'))</OpenSslDllSuffix>
+  </PropertyGroup>
 </Project>
