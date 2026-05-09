@@ -1,7 +1,7 @@
 /*
- * Copyright 2017-2018 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Licensed under the OpenSSL license (the "License").  You may not use
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
@@ -9,7 +9,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include "ssltestlib.h"
+#include "helpers/ssltestlib.h"
 #include "testutil.h"
 #include <string.h>
 
@@ -28,9 +28,9 @@ static int test_fatalerr(void)
         0x17, 0x03, 0x03, 0x00, 0x05, 'D', 'u', 'm', 'm', 'y'
     };
 
-    if (!TEST_true(create_ssl_ctx_pair(TLS_method(), TLS_method(),
-                                       TLS1_VERSION, TLS_MAX_VERSION,
-                                       &sctx, &cctx, cert, privkey)))
+    if (!TEST_true(create_ssl_ctx_pair(NULL, TLS_method(), TLS_method(),
+            TLS1_VERSION, 0,
+            &sctx, &cctx, cert, privkey)))
         goto err;
 
     /*
@@ -38,13 +38,13 @@ static int test_fatalerr(void)
      * to force a handshake failure.
      */
     if (!TEST_true(SSL_CTX_set_cipher_list(sctx, "AES128-SHA"))
-            || !TEST_true(SSL_CTX_set_cipher_list(cctx, "AES256-SHA"))
-            || !TEST_true(SSL_CTX_set_ciphersuites(sctx,
-                                                   "TLS_AES_128_GCM_SHA256"))
-            || !TEST_true(SSL_CTX_set_ciphersuites(cctx,
-                                                   "TLS_AES_256_GCM_SHA384"))
-            || !TEST_true(create_ssl_objects(sctx, cctx, &sssl, &cssl, NULL,
-                          NULL)))
+        || !TEST_true(SSL_CTX_set_cipher_list(cctx, "AES256-SHA"))
+        || !TEST_true(SSL_CTX_set_ciphersuites(sctx,
+            "TLS_AES_128_GCM_SHA256"))
+        || !TEST_true(SSL_CTX_set_ciphersuites(cctx,
+            "TLS_AES_256_GCM_SHA384"))
+        || !TEST_true(create_ssl_objects(sctx, cctx, &sssl, &cssl, NULL,
+            NULL)))
         goto err;
 
     wbio = SSL_get_wbio(cssl);
@@ -73,7 +73,7 @@ static int test_fatalerr(void)
         goto err;
 
     ret = 1;
- err:
+err:
     SSL_free(sssl);
     SSL_free(cssl);
     SSL_CTX_free(sctx);
@@ -82,10 +82,17 @@ static int test_fatalerr(void)
     return ret;
 }
 
+OPT_TEST_DECLARE_USAGE("certfile privkeyfile\n")
+
 int setup_tests(void)
 {
+    if (!test_skip_common_options()) {
+        TEST_error("Error parsing test options\n");
+        return 0;
+    }
+
     if (!TEST_ptr(cert = test_get_argument(0))
-            || !TEST_ptr(privkey = test_get_argument(1)))
+        || !TEST_ptr(privkey = test_get_argument(1)))
         return 0;
 
     ADD_TEST(test_fatalerr);
