@@ -606,14 +606,6 @@ between major lines, so you'll likely need to revisit the
 `CONFIG_32;PPRO` defines on the `_decimal.c` ClCompile in
 `MagPython.vcxproj`.
 
-### Why no `update-libmpdec.sh`
-
-The other vendored libraries each have an `update-*.sh` helper that
-replaces the source tree in place. libmpdec doesn't have one because
-there is no source tree to replace — the only in-repo state is the
-two-line pin (`libmpdec-version` + `libmpdec-sha256`), so editing
-those two files by hand is the entire update procedure.
-
 ## Continuous integration
 
 `.github/workflows/Build All.yml` is a single matrix-based workflow that
