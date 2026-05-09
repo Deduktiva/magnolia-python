@@ -46,18 +46,24 @@ missing=0
 total=0
 while IFS= read -r path; do
     total=$((total + 1))
+    # NOTE: single quotes preserve a literal single backslash. The
+    # vcxproj source uses one backslash between the variable and the
+    # path component (Include="$(VAR)\foo.h") — earlier versions of
+    # this script used '\\' which is two literal backslashes inside
+    # single quotes and silently never matched, falling through to
+    # the *) default and reporting a false-positive "all refs OK".
     case "$path" in
-        '$(LibFFITargetPregeneratedIncludeDir)\\'*)
-            ref="$PREGEN_DIR/${path#'$(LibFFITargetPregeneratedIncludeDir)\\'}"
+        '$(LibFFITargetPregeneratedIncludeDir)\'*)
+            ref="$PREGEN_DIR/${path#'$(LibFFITargetPregeneratedIncludeDir)\'}"
             ;;
-        '$(LibFFITargetSourceDir)\\'*)
-            ref="$SOURCE_DIR/src/x86/${path#'$(LibFFITargetSourceDir)\\'}"
+        '$(LibFFITargetSourceDir)\'*)
+            ref="$SOURCE_DIR/src/x86/${path#'$(LibFFITargetSourceDir)\'}"
             ;;
-        '$(LibFFISourceDir)\\'*)
-            ref="$SOURCE_DIR/src/${path#'$(LibFFISourceDir)\\'}"
+        '$(LibFFISourceDir)\'*)
+            ref="$SOURCE_DIR/src/${path#'$(LibFFISourceDir)\'}"
             ;;
-        '$(SourceDir)\\'*)
-            ref="$SOURCE_DIR/${path#'$(SourceDir)\\'}"
+        '$(SourceDir)\'*)
+            ref="$SOURCE_DIR/${path#'$(SourceDir)\'}"
             ;;
         *)
             # Skip ClCompile/ClInclude items that don't point into our
