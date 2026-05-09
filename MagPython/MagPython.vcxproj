@@ -656,6 +656,28 @@
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\PC\dl_nt.c" />
   </ItemGroup>
+  <!-- _decimal: links against the libmpdec.lib produced by
+       LibMpdec.vcxproj (which ran nmake /f Makefile.vc MACHINE=ppro on
+       the build-time-downloaded mpdecimal source). CONFIG_32 / PPRO
+       must match the flavour LibMpdec was built with so mpdecimal.h
+       picks the 32-bit typedef + x87 inline-asm code paths in this
+       module's source — same as CPython's bundled
+       _decimal.vcxproj on Win32.
+
+       BUILD_LIBMPDEC is needed because mpdecimal32vc.h decorates every
+       mpd_* prototype with __declspec(dllimport) when _DLL is defined
+       (which MSVC sets automatically under /MD) and BUILD_LIBMPDEC is
+       not. Without this define, _decimal.obj emits __imp__mpd_* IAT
+       references that the static libmpdec.lib (no import library) can't
+       satisfy, and the link fails with "unresolved external symbol
+       __imp__mpd_sign" et al. CPython's own _decimal.vcxproj sets
+       BUILD_LIBMPDEC for the same reason. -->
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Modules\_decimal\_decimal.c">
+      <PreprocessorDefinitions>BUILD_LIBMPDEC;CONFIG_32;PPRO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClInclude Include="$(PythonSourceDir)\Modules\_decimal\docstrings.h" />
+  </ItemGroup>
   <!-- from sqlite3.vcxproj -->
   <ItemGroup>
     <ClInclude Include="$(sqlite3Dir)\sqlite3.h" />
@@ -692,6 +714,7 @@
     <Library Include="$(OutDir)\libcrypto.lib" />
     <Library Include="$(OutDir)\libssl.lib" />
     <Library Include="$(OutDir)\libffi.lib" />
+    <Library Include="$(OutDir)\libmpdec.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

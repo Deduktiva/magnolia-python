@@ -29,6 +29,17 @@ if [ -z "$PY_X_Y" ]; then
     exit 1
 fi
 
+# libmpdec is downloaded at build time rather than vendored. The version
+# pin lives in MagPython/libmpdec-version (also read by common.props on
+# Windows) so a bump is one file edit shared by all three platforms.
+LIBMPDEC_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-version")"
+if [ -z "$LIBMPDEC_VERSION" ]; then
+    echo "Failed to read libmpdec version from MagPython/libmpdec-version" >&2
+    exit 1
+fi
+LIBMPDEC_CACHE="$REPO/MagPython/libmpdec"
+LIBMPDEC_SRC="$LIBMPDEC_CACHE/mpdecimal-$LIBMPDEC_VERSION"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -67,6 +78,72 @@ build_static_deps() {
        -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
        "$REPO/sqlite/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
     ar rcs "$BUILD/sqlite/libsqlite3.a" "$BUILD/sqlite/sqlite3.o"
+}
+
+# Download + verify + extract the upstream mpdecimal tarball into
+# $LIBMPDEC_CACHE/mpdecimal-$LIBMPDEC_VERSION/. Idempotent — the cache
+# lives outside $BUILD so re-runs of the build script (which wipes
+# $BUILD via prep_build_tree) reuse the already-fetched tarball.
+#
+# Verification follows the update-openssl.sh pattern: trust HTTPS to
+# bytereef.org for the .sha256 sidecar plus per-release tarball
+# immutability. No hardcoded hash so a version bump is just editing
+# MagPython/libmpdec-version.
+setup_libmpdec() {
+    if [ -d "$LIBMPDEC_SRC" ]; then return 0; fi
+
+    log "Fetching libmpdec $LIBMPDEC_VERSION"
+    mkdir -p "$LIBMPDEC_CACHE"
+    local base="https://www.bytereef.org/software/mpdecimal/releases"
+    local tarball="$LIBMPDEC_CACHE/mpdecimal-$LIBMPDEC_VERSION.tar.gz"
+    local sidecar="$tarball.sha256"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$base/mpdecimal-$LIBMPDEC_VERSION.tar.gz"
+    fi
+    curl --fail --silent --show-error --location \
+        -o "$sidecar" "$base/mpdecimal-$LIBMPDEC_VERSION.tar.gz.sha256"
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local expected actual
+    expected="$(awk '{print $1; exit}' "$sidecar")"
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$expected" != "$actual" ]; then
+        echo "libmpdec SHA-256 mismatch: expected $expected, got $actual" >&2
+        exit 1
+    fi
+
+    tar -xzf "$tarball" -C "$LIBMPDEC_CACHE"
+}
+
+# Build libmpdec as a static lib at $BUILD/libmpdec-out via upstream's
+# autoconf. Mirrors zlib/sqlite/libffi handling — the .a is consumed by
+# CPython's _decimal via LIBMPDEC_CFLAGS/LIBMPDEC_LIBS in
+# configure_libmagpython.
+#
+# --disable-cxx skips libmpdec++ which we don't ship. CPython's
+# configure.ac treats Darwin specially with libmpdec_machine=universal
+# ("use the compiler's default arch flags") because mpdecimal's
+# x64-specific inline asm doesn't apply to arm64 — pass the same flag
+# through to upstream's configure on macOS.
+#
+# Args: optional extra args appended to ./configure (e.g. machine override).
+build_libmpdec() {
+    setup_libmpdec
+    log "Building libmpdec $LIBMPDEC_VERSION"
+    (cd "$LIBMPDEC_SRC"
+     [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
+     ./configure \
+         --prefix="$BUILD/libmpdec-out" \
+         --disable-cxx \
+         CFLAGS="-O2 -fPIC" \
+         "$@"
+     make -j"$JOBS"
+     make install)
 }
 
 # Locate the libffi build's generated include dir (host triple subdir).
@@ -180,12 +257,19 @@ configure_libmagpython() {
     local libffi_inc libffi_lib
     libffi_inc="$(libffi_include_dir)"
     libffi_lib="$(libffi_static_lib)"
+    # CPython's configure has --with-system-libmpdec on by default and
+    # uses pkg-config; with no .pc on PATH it falls back to "-lmpdec -lm"
+    # ELSE the user-supplied LIBMPDEC_CFLAGS / LIBMPDEC_LIBS. Pointing the
+    # latter at the static .a we just built mirrors how zlib / sqlite /
+    # libffi are wired in, and stops _decimal from picking up a system
+    # libmpdec instead.
     "$REPO/Python/configure" \
         --enable-shared \
         --without-static-libpython \
         --with-openssl="$BUILD/openssl-out" \
         --with-openssl-rpath=auto \
         --with-system-ffi \
+        --with-system-libmpdec \
         --disable-test-modules \
         --without-pymalloc-debug \
         LIBFFI_CFLAGS="-I$libffi_inc -I$REPO/libffi/include" \
@@ -194,6 +278,8 @@ configure_libmagpython() {
         ZLIB_LIBS="$REPO/zlib/libz.a" \
         LIBSQLITE3_CFLAGS="-I$REPO/sqlite" \
         LIBSQLITE3_LIBS="$BUILD/sqlite/libsqlite3.a" \
+        LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \
+        LIBMPDEC_LIBS="$BUILD/libmpdec-out/lib/libmpdec.a -lm" \
         CFLAGS_NODIST="-fPIC" \
         LDFLAGS_NODIST="$extra_ldflags" \
         "$@"

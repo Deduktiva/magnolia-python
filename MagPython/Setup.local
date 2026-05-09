@@ -6,9 +6,6 @@
 # on Windows, which links a deliberate subset of stdlib extension modules
 # directly into MagPython.dll. We match that subset on Unix so the three
 # platforms ship the same Python surface to the host application.
-#
-# As a side-effect this also avoids the bundled libmpdec ADRP relocation
-# trouble on macOS arm64 (`_decimal` is excluded here).
 
 *disabled*
 _asyncio
@@ -17,7 +14,6 @@ _crypt
 _curses
 _curses_panel
 _dbm
-_decimal
 _elementtree
 _gdbm
 _lzma

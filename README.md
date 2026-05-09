@@ -20,7 +20,8 @@ shared library. Three platforms are produced from the same source tree:
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`). |
+| `MagPython/libmpdec-version` | Pinned version of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix) and cached under `MagPython/libmpdec/`; not vendored. |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -30,14 +31,14 @@ the project-specific build configuration lives under `MagPython/`.
 
 Each platform produces one zip with the same shape — a `MagPython/`
 directory containing the main shared lib, the OpenSSL libs, the headers,
-and the pure-Python stdlib. zlib, libffi, and sqlite are linked statically
-into the main library on every platform.
+and the pure-Python stdlib. zlib, libffi, sqlite, and libmpdec are linked
+statically into the main library on every platform.
 
 Windows (`MagPython-windows-x86.zip`):
 
 ```
 MagPython/
-  MagPython.dll          # Python core + builtin modules + zlib + sqlite + libffi
+  MagPython.dll          # Python core + builtin modules + zlib + sqlite + libffi + libmpdec
   libcrypto-3.dll        # OpenSSL
   libssl-3.dll           # OpenSSL
   include/Python/...     # Public + cpython + internal headers, plus PC/pyconfig.h
@@ -73,8 +74,9 @@ Notable differences from a stock CPython Windows build:
 
 - A single `MagPython.dll` instead of `python312.dll` plus a forest of `.pyd`
   files. Modules that upstream ships as separate `.pyd`s (`_ssl`, `_socket`,
-  `select`, `_sqlite3`, `unicodedata`, `_ctypes`, …) are linked directly into
-  the DLL — see the `<ClCompile>` items in `MagPython/MagPython.vcxproj`.
+  `select`, `_sqlite3`, `unicodedata`, `_ctypes`, `_decimal`, …) are linked
+  directly into the DLL — see the `<ClCompile>` items in
+  `MagPython/MagPython.vcxproj`.
 - `SubSystem` is `Windows` (no console), `GenerateManifest` is off,
   `Py_BUILD_CORE_BUILTIN` is defined for everything in the DLL, and the link
   uses `version.lib;Crypt32.lib;winmm.lib;pathcch.lib;bcrypt.lib;ws2_32.lib;
@@ -114,7 +116,17 @@ StopOnFirstFailure="True"`:
    `MagPython/openssl-verify.c` against the staged libs to catch a
    misconfigured `no-*` set or a missing soname here, with a clear error,
    instead of surfacing later as a baffling `MagPython.dll` link failure.
-3. **`FreezeMagPython.vcxproj`** — builds `FreezeMagPython.exe` from
+3. **`LibMpdec.vcxproj`** — a `Makefile`-type project that, before
+   building, runs `download-libmpdec.ps1` to fetch
+   `mpdecimal-<version>.tar.gz` from bytereef.org (version pinned in
+   `MagPython/libmpdec-version`), verifies it against the upstream
+   `.sha256` sidecar, and extracts the source into
+   `MagPython/libmpdec/`. Then `nmake /f Makefile.vc MACHINE=ppro` in
+   the `libmpdec/` subdirectory of the extracted tree produces
+   `libmpdec-<version>.lib`, which `CopyArtifacts` renames to
+   `libmpdec.lib` and stages alongside `mpdecimal.h` under
+   `MagPython/Release/` (and `Release/include/`).
+4. **`FreezeMagPython.vcxproj`** — builds `FreezeMagPython.exe` from
    CPython's `Programs/_freeze_module.c`. After it builds, post-build targets
    re-freeze the Python modules listed in the project (importlib bootstrap,
    `os`, `site`, `runpy`, the `__phello__` modules, etc.) into
@@ -124,15 +136,16 @@ StopOnFirstFailure="True"`:
    `Python/Python/deepfreeze/deepfreeze.c`. Both generated trees are
    gitignored. Note: the freezer binary is built but not shipped (commit
    `3afe7fc`).
-4. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
+5. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
    `Objects/`, `Parser/`, selected `Modules/`, `PC/` glue, `zlib`, the
-   amalgamated `sqlite3.c`, `_sqlite/*`, `_ssl`, `_hashopenssl`, `_socket`,
-   `select`, `unicodedata`, and `_ctypes`. Links against the `libcrypto.lib`,
-   `libssl.lib`, and `libffi.lib` produced by the earlier steps. The
-   `CopyArtifacts` target then stages headers and the pure-Python stdlib
-   into `Release/include/Python/` and `Release/lib/` so the output directory
+   amalgamated `sqlite3.c`, `_sqlite/*`, `_decimal/_decimal.c`, `_ssl`,
+   `_hashopenssl`, `_socket`, `select`, `unicodedata`, and `_ctypes`. Links
+   against the `libcrypto.lib`, `libssl.lib`, `libffi.lib`, and
+   `libmpdec.lib` produced by the earlier steps. The `CopyArtifacts`
+   target then stages headers and the pure-Python stdlib into
+   `Release/include/Python/` and `Release/lib/` so the output directory
    is a complete SDK drop.
-5. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
+6. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
    that calls `Py_Initialize`, prints the compiler string, and runs an
    `import sys` line), copies the DLLs and `lib/` next to it, and **executes
    `test.exe`** as part of the build via an `<Exec>` task. A failed smoke
@@ -145,7 +158,7 @@ StopOnFirstFailure="True"`:
 
 `MagPython/build-linux.sh` and `MagPython/build-macos.sh` orchestrate the
 Unix builds. Both source `MagPython/build-common.sh` and follow the same
-five-stage shape as the Windows metaproj:
+shape as the Windows metaproj:
 
 1. **Static deps** — `zlib/libz.a` (built with `CFLAGS=-fPIC`),
    `libffi/<host-triple>/.libs/libffi.a`, `build-out/sqlite/libsqlite3.a`.
@@ -155,11 +168,21 @@ five-stage shape as the Windows metaproj:
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
    `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
-3. **Configure libpython** — out-of-tree configure in `build-out/main`
+3. **libmpdec** — `setup_libmpdec` fetches
+   `mpdecimal-<version>.tar.gz` from bytereef.org (version pinned in
+   `MagPython/libmpdec-version`), verifies its `.sha256` sidecar, and
+   extracts under `MagPython/libmpdec/` (cached across `prep_build_tree`
+   wipes since it lives outside `build-out/`). `build_libmpdec` then
+   runs upstream's `./configure --disable-cxx --enable-static
+   --disable-shared` (with `--with-machine=universal` on macOS to
+   match what CPython's own configure picks for arm64) and installs
+   into `build-out/libmpdec-out/`.
+4. **Configure libpython** — out-of-tree configure in `build-out/main`
    with `--enable-shared --without-static-libpython
-   --with-openssl=...build-out/openssl-out`, plus `LIBFFI_*`, `ZLIB_*`,
-   and `LIBSQLITE3_*` env vars pointing at the static libs from stage 1.
-4. **Regen frozen + deepfreeze, then make** — `make regen-frozen
+   --with-openssl=...build-out/openssl-out --with-system-libmpdec`,
+   plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, and `LIBMPDEC_*` env
+   vars pointing at the static libs from the earlier stages.
+5. **Regen frozen + deepfreeze, then make** — `make regen-frozen
    regen-deepfreeze` followed by an awk pass that rewrites
    `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
    comments out the lines for modules listed under `*disabled*` in
@@ -168,7 +191,7 @@ five-stage shape as the Windows metaproj:
    out of the build entirely we need to drop their stdlib lines.) This
    produces a libpython that contains the same module subset as
    `MagPython/MagPython.vcxproj` does on Windows.
-5. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
+6. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
    copied to `libMagPython.{so,dylib}` and its SONAME / install name is
    rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
    Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
@@ -531,6 +554,58 @@ always reported regardless — `<ClInclude>` ones rot the IDE view,
   cross-minor bump.
 - Any project-local Python-tree patches that the wipe-and-replace
   removed (re-apply in separate commits, as above).
+
+## Updating pinned libmpdec
+
+`libmpdec` (the C library behind `_decimal`) is the one dependency that
+isn't checked in. Its version is pinned in a single text file —
+`MagPython/libmpdec-version` — and the source tarball is downloaded
+from bytereef.org at build time, verified against the upstream
+`.sha256` sidecar, and cached under `MagPython/libmpdec/` (gitignored).
+
+### Why not vendored
+
+CPython 3.13 still ships a bundled libmpdec but plans to remove it in
+3.16; on macOS arm64 the bundled copy hits ADRP relocation issues that
+this repo previously worked around by disabling `_decimal` entirely
+(see commit history of `MagPython/Setup.local`). Pulling upstream
+mpdecimal at build time and linking it as a static archive sidesteps
+both: we get a `_decimal` that works on all three platforms, and we
+don't carry the ~40-file libmpdec source tree in this repo.
+
+### How a bump works
+
+1. Edit `MagPython/libmpdec-version` to the new version (a single line,
+   e.g. `2.5.1`).
+2. Run a full Windows + Linux + macOS build. The download scripts'
+   first action is to fetch the tarball + `.sha256` sidecar from
+   `https://www.bytereef.org/software/mpdecimal/releases/` and compare
+   hashes; a tampered or misnamed tarball fails the build immediately.
+3. Commit `MagPython/libmpdec-version` (no other file changes are
+   expected on a patch bump).
+
+### What else changes on a libmpdec bump?
+
+For a patch-level bump within the same minor line, nothing else
+should need editing — `LibMpdec.vcxproj`, `setup_libmpdec` /
+`build_libmpdec` in `build-common.sh`, and `common.props` all
+substitute the version from `libmpdec-version`.
+
+A cross-minor bump (e.g. 2.5.x → 4.x) is a different kind of
+upgrade: mpdecimal's ABI and `MACHINE=` flavours have changed
+between major lines, so you'll likely need to revisit the
+`MACHINE=ppro` flag in `LibMpdec.vcxproj`, the
+`--with-machine=universal` flag in `build-macos.sh`, and the
+`CONFIG_32;PPRO` defines on the `_decimal.c` ClCompile in
+`MagPython.vcxproj`.
+
+### Why no `update-libmpdec.sh`
+
+The other vendored libraries each have an `update-*.sh` helper that
+replaces the source tree in place. libmpdec doesn't have one because
+there is no source tree to replace — the version pin is the only
+in-repo state, so `$EDITOR MagPython/libmpdec-version` is the entire
+update procedure.
 
 ## Continuous integration
 

@@ -1,6 +1,10 @@
 /.idea
 /MagPython/jom/
 /MagPython/jom.zip
+# libmpdec is downloaded + extracted at build time (see
+# download-libmpdec.ps1 / setup_libmpdec in build-common.sh). Pinned
+# version lives in MagPython/libmpdec-version.
+/MagPython/libmpdec/
 /openssl/**/*.dll
 /openssl/**/*.lib
 /openssl/**/*.obj
