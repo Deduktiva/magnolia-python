@@ -16,7 +16,7 @@ shared library. Three platforms are produced from the same source tree:
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
-| `openssl/` | Vendored OpenSSL 1.1.1w source. |
+| `openssl/` | Vendored OpenSSL 3.5.6 source. |
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
@@ -38,8 +38,8 @@ Windows (`MagPython-windows-x86.zip`):
 ```
 MagPython/
   MagPython.dll          # Python core + builtin modules + zlib + sqlite + libffi
-  libcrypto-1_1.dll      # OpenSSL
-  libssl-1_1.dll         # OpenSSL
+  libcrypto-3.dll        # OpenSSL
+  libssl-3.dll           # OpenSSL
   include/Python/...     # Public + cpython + internal headers, plus PC/pyconfig.h
   lib/...                # Pure-Python stdlib (.py files copied from Python/Lib)
 ```
@@ -49,8 +49,8 @@ Linux (`MagPython-linux-x86_64.zip`):
 ```
 MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
-  libcrypto.so.1.1
-  libssl.so.1.1
+  libcrypto.so.3
+  libssl.so.3
   include/Python/...
   lib/python3.13/        # stdlib at the path Python's Unix discovery
                          # looks for (lib/python<X.Y>/os.py)
@@ -62,8 +62,8 @@ macOS arm64 (`MagPython-macos-arm64.zip`):
 ```
 MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
-  libcrypto.1.1.dylib    # install_name @rpath/libcrypto.1.1.dylib
-  libssl.1.1.dylib       # install_name @rpath/libssl.1.1.dylib
+  libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
+  libssl.3.dylib         # install_name @rpath/libssl.3.dylib
   include/Python/...
   lib/python3.13/
   lib/python3.13/lib-dynload/
@@ -154,7 +154,7 @@ five-stage shape as the Windows metaproj:
    `MagPython.dll`.
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
-   `libcrypto.{so.1.1,1.1.dylib}` + `libssl.{so.1.1,1.1.dylib}`.
+   `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
 3. **Configure libpython** — out-of-tree configure in `build-out/main`
    with `--enable-shared --without-static-libpython
    --with-openssl=...build-out/openssl-out`, plus `LIBFFI_*`, `ZLIB_*`,
@@ -561,7 +561,7 @@ monthly cadence.
 The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
-- OpenSSL 1.1.1w — dual OpenSSL/SSLeay license (`openssl/LICENSE`)
+- OpenSSL 3.5.6 — Apache-2.0 license (`openssl/LICENSE.txt`)
 - zlib — zlib license (`zlib/README`)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain
