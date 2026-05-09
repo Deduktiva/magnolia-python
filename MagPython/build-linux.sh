@@ -48,6 +48,7 @@ fi
 command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
 
 prep_build_tree
+setup_python
 install_setup_local
 build_static_deps ""
 build_openssl linux-x86_64

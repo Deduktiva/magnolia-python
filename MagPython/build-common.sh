@@ -14,18 +14,26 @@ BUILD="$REPO/build-out"
 STAGE="$BUILD/stage/MagPython"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
-# Derive the imported tree's <major>.<minor> version from the upstream
-# header so the build scripts don't have to hardcode it — every spot
-# that previously named libpython3.13 or lib/python3.13 reads $PY_X_Y
-# instead, and a future update-python.sh run to 3.14+ flows through
-# automatically.
-PY_X_Y="$(awk '
-    /^#define PY_MAJOR_VERSION[ \t]+/ { maj=$3 }
-    /^#define PY_MINOR_VERSION[ \t]+/ { min=$3 }
-    END { if (maj!="" && min!="") printf "%s.%s\n", maj, min }
-' "$REPO/Python/Include/patchlevel.h")"
+# CPython is downloaded at build time rather than vendored. Same shape
+# as the other devendored deps. PY_X_Y is the major.minor pair every
+# spot that previously named libpython3.13 or lib/python3.13 reads —
+# derive it from the version pin so a future bump to 3.14+ flows
+# through with no code change.
+PYTHON_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/python-version")"
+if [ -z "$PYTHON_VERSION" ]; then
+    echo "Failed to read Python version from MagPython/python-version" >&2
+    exit 1
+fi
+PYTHON_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/python-sha256")"
+if [ -z "$PYTHON_SHA256" ]; then
+    echo "Failed to read Python sha256 from MagPython/python-sha256" >&2
+    exit 1
+fi
+PYTHON_CACHE="$REPO/MagPython/python"
+PYTHON_SRC="$PYTHON_CACHE/python-$PYTHON_VERSION"
+PY_X_Y="$(printf '%s' "$PYTHON_VERSION" | awk -F. '{ printf "%s.%s\n", $1, $2 }')"
 if [ -z "$PY_X_Y" ]; then
-    echo "Failed to parse PY_MAJOR_VERSION/PY_MINOR_VERSION from Python/Include/patchlevel.h" >&2
+    echo "Failed to derive PY_X_Y from $PYTHON_VERSION" >&2
     exit 1
 fi
 
@@ -158,6 +166,53 @@ build_static_deps() {
        -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
        "$SQLITE_SRC/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
     ar rcs "$BUILD/sqlite/libsqlite3.a" "$BUILD/sqlite/sqlite3.o"
+}
+
+# Download + verify + extract the upstream CPython tag archive into
+# $PYTHON_CACHE/python-$PYTHON_VERSION/. Idempotent — the cache lives
+# outside $BUILD so re-runs of the build script (which wipes $BUILD via
+# prep_build_tree) reuse the already-fetched tarball.
+#
+# python.org publishes a release tarball with .sigstore signatures, but
+# the GitHub tag archive is what the previous in-tree update-python.sh
+# used (and is signed-by-HTTPS plus immutable per-tag), so we keep
+# fetching from there.
+#
+# Upstream extracts to cpython-<version>/. Renamed to python-<version>/
+# so the vcxproj's $(PythonSourceDir) substitution keeps a clean
+# python-$(PythonVersion)/ shape.
+setup_python() {
+    if [ -d "$PYTHON_SRC" ]; then return 0; fi
+
+    log "Fetching CPython $PYTHON_VERSION"
+    mkdir -p "$PYTHON_CACHE"
+    local url="https://github.com/python/cpython/archive/refs/tags/v$PYTHON_VERSION.tar.gz"
+    local tarball="$PYTHON_CACHE/cpython-$PYTHON_VERSION.tar.gz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$url"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$PYTHON_SHA256" != "$actual" ]; then
+        echo "CPython SHA-256 mismatch: expected $PYTHON_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/python-sha256 — regenerate via" >&2
+        echo "   MagPython/update-python.sh before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xzf "$tarball" -C "$PYTHON_CACHE"
+    # Upstream tag archive extracts to cpython-<version>/. Rename for
+    # path symmetry with the other devendored deps (and so $PYTHON_SRC
+    # stays a clean python-<version>/ path).
+    mv "$PYTHON_CACHE/cpython-$PYTHON_VERSION" "$PYTHON_SRC"
 }
 
 # Download + verify + extract the upstream zlib tarball into
@@ -519,8 +574,8 @@ regen_frozen() {
 # subset on every platform). Run before configure so the file is in place
 # when makesetup processes it.
 install_setup_local() {
-    log "Installing MagPython/Setup.local -> Python/Modules/Setup.local"
-    cp "$REPO/MagPython/Setup.local" "$REPO/Python/Modules/Setup.local"
+    log "Installing MagPython/Setup.local -> python-$PYTHON_VERSION/Modules/Setup.local"
+    cp "$REPO/MagPython/Setup.local" "$PYTHON_SRC/Modules/Setup.local"
 }
 
 # Configure CPython for the libMagPython build. Caller cd's into a build dir.
@@ -537,7 +592,7 @@ configure_libmagpython() {
     # latter at the static .a we just built mirrors how zlib / sqlite /
     # libffi are wired in, and stops _decimal from picking up a system
     # libmpdec instead.
-    "$REPO/Python/configure" \
+    "$PYTHON_SRC/configure" \
         --enable-shared \
         --without-static-libpython \
         --with-openssl="$BUILD/openssl-out" \
@@ -642,11 +697,11 @@ stage_headers_and_stdlib() {
     local build_dir="$1"
     log "Staging headers and stdlib"
     mkdir -p "$STAGE/include/Python" "$STAGE/lib/python$PY_X_Y/lib-dynload"
-    cp -R "$REPO/Python/Include/." "$STAGE/include/Python/"
+    cp -R "$PYTHON_SRC/Include/." "$STAGE/include/Python/"
     cp "$build_dir/pyconfig.h" "$STAGE/include/Python/pyconfig.h"
     # Only .py files from the stdlib tree. Use a tar pipe so we don't depend
     # on rsync (manylinux_2_28 doesn't ship it) or GNU-specific cp --parents.
-    (cd "$REPO/Python/Lib" && find . -name '*.py' -print0 | tar --null -T - -cf -) \
+    (cd "$PYTHON_SRC/Lib" && find . -name '*.py' -print0 | tar --null -T - -cf -) \
         | (cd "$STAGE/lib/python$PY_X_Y" && tar -xf -)
 }
 

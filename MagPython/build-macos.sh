@@ -28,6 +28,7 @@ HOST_PYTHON="$(command -v python3)"
 command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 
 prep_build_tree
+setup_python
 install_setup_local
 build_static_deps aarch64-apple-darwin
 build_openssl darwin64-arm64-cc

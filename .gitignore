@@ -25,9 +25,11 @@
 # version + year + expected SHA-256 live in MagPython/sqlite-version,
 # MagPython/sqlite-year and MagPython/sqlite-sha256.
 /MagPython/sqlite/
-/Python/Python/deepfreeze/deepfreeze.c
-/Python/Python/frozen_modules/*.h
-/Python/Tools/build/__pycache__/
+# CPython is downloaded + extracted at build time (see
+# download-python.ps1 / setup_python in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/python-version and
+# MagPython/python-sha256.
+/MagPython/python/
 
 # Unix build outputs (build-linux.sh / build-macos.sh)
 /build-out/
@@ -38,5 +40,3 @@
 /MagPython-windows-x86.md
 /MagPython-linux-x86_64.md
 /MagPython-macos-arm64.md
-/Python/Modules/Setup.local
-/Python/Lib/**/__pycache__/

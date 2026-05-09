@@ -25,11 +25,13 @@ jobs:
 
       # Name is v<python>-<run#>, e.g. v3.13.13-5. github.run_number
       # auto-increments per workflow, so each Release run gets a unique
-      # tag without manual input.
+      # tag without manual input. PY_VERSION reads from the in-tree pin
+      # file (CPython is downloaded at build time — no Python/ tree on
+      # a fresh checkout to read patchlevel.h from).
       - name: Derive release name
         id: name
         run: |
-          PY_VERSION=$(awk '/^#define PY_VERSION[[:space:]]/ { gsub(/"/, "", $3); print $3; exit }' Python/Include/patchlevel.h)
+          PY_VERSION=$(tr -d '[:space:]' < MagPython/python-version)
           echo "name=v${PY_VERSION}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       # Logic lives in MagPython/release.sh so the notes-composition step
