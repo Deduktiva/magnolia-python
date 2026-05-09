@@ -10,33 +10,6 @@
 # version + expected SHA-256 live in MagPython/openssl-version and
 # MagPython/openssl-sha256.
 /MagPython/openssl/
-/openssl/**/*.dll
-/openssl/**/*.lib
-/openssl/**/*.obj
-/openssl/**/*.pdb
-/openssl/**/*586.asm
-/openssl/**/*-x86.asm
-/openssl/apps/libssl-*.dll
-/openssl/configdata.pm
-/openssl/crypto/bn/x86-gf2m.asm
-/openssl/crypto/bn/x86-mont.asm
-/openssl/crypto/buildinf.h
-/openssl/crypto/whrlpool/wp-mmx.asm
-/openssl/crypto/x86cpuid.asm
-/openssl/include/crypto/bn_conf.h
-/openssl/include/crypto/dso_conf.h
-/openssl/include/openssl/configuration.h
-/openssl/libcrypto-*.ilk
-/openssl/libcrypto.def
-/openssl/libcrypto.exp
-/openssl/libcrypto.rc
-/openssl/libcrypto.res
-/openssl/libssl-*.ilk
-/openssl/libssl.def
-/openssl/libssl.exp
-/openssl/libssl.rc
-/openssl/libssl.res
-/openssl/makefile
 /Python/Python/deepfreeze/deepfreeze.c
 /Python/Python/frozen_modules/*.h
 /Python/Tools/build/__pycache__/
@@ -61,24 +34,5 @@
 /libffi/include/Makefile
 /libffi/include/Makefile.in
 /libffi/makefile.sed*
-/openssl/Makefile
-/openssl/**/*.o
-/openssl/**/*.d
-# `*.d` above matches the .ctags.d directory too, which would silently
-# swallow the OpenSSL 3.x tooling under openssl/.ctags.d/. Un-ignore it.
-!/openssl/.ctags.d/
-/openssl/**/*.s
-/openssl/**/*.a
-/openssl/**/*.so
-/openssl/**/*.so.*
-/openssl/**/*.dylib
-/openssl/**/*.map
-/openssl/**/*.pc
-/openssl/apps/CA.pl
-/openssl/apps/openssl
-/openssl/apps/progs.h
-/openssl/apps/tsget.pl
-/openssl/tools/c_rehash
-/openssl/util/shlib_wrap.sh
 /Python/Modules/Setup.local
 /Python/Lib/**/__pycache__/
