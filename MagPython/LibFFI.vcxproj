@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" InitialTargets="DownloadLibffi" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
@@ -99,7 +99,18 @@
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <Target Name="Download libffi" BeforeTargets="Build">
+  <!-- Download libffi runs as InitialTargets on the Project root rather
+       than BeforeTargets="Build" because LibFFI.vcxproj is a
+       StaticLibrary type project: its Build is implemented as a chain
+       (BuildGenerateSources -> BuildCompile -> BuildLink), and CustomBuild
+       items (sysv_intel.S below) execute under BuildGenerateSources
+       before BeforeTargets="Build" hooks fire. InitialTargets runs
+       unconditionally as the first thing for any MSBuild invocation of
+       this project, so the cache is populated before any source-file
+       reference is resolved. The Makefile-type vcxprojs (openssl, ZLib,
+       LibMpdec) get away with BeforeTargets="Build" because their Build
+       is monolithic. -->
+  <Target Name="DownloadLibffi">
     <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-libffi.ps1" />
   </Target>
   <ItemGroup>
