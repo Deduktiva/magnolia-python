@@ -18,6 +18,8 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir 'sha256.ps1')
+
 $Version = (Get-Content (Join-Path $ScriptDir 'libmpdec-version') -Raw).Trim()
 $ExpectedSha256 = (Get-Content (Join-Path $ScriptDir 'libmpdec-sha256') -Raw).Trim().ToLower()
 $BaseUrl = "https://www.bytereef.org/software/mpdecimal/releases"
@@ -35,23 +37,7 @@ try {
 
         Invoke-WebRequest -OutFile $Tarball -Uri "$BaseUrl/$Tarball"
 
-        # Use System.Security.Cryptography directly rather than
-        # Get-FileHash: on the windows-2025 GitHub runner, MSBuild's
-        # `powershell.exe -NonInteractive -file ...` invocation reports
-        # Get-FileHash as "not recognized as a cmdlet". The .NET API
-        # has no module-loading dependency and works under any
-        # PowerShell/runner combination. Build an absolute path via
-        # $PWD (an automatic variable, no cmdlet) since .NET APIs use
-        # the .NET CWD, not PowerShell's Push-Location-tracked CWD.
-        $tarballPath = Join-Path $PWD.Path $Tarball
-        $sha = [System.Security.Cryptography.SHA256]::Create()
-        $stream = [System.IO.File]::OpenRead($tarballPath)
-        try {
-            $hashBytes = $sha.ComputeHash($stream)
-        } finally {
-            $stream.Dispose()
-        }
-        $actual = ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLower()
+        $actual = Get-Sha256Hex (Join-Path $PWD.Path $Tarball)
         if ($ExpectedSha256 -ne $actual) {
             Remove-Item -Force $Tarball
             throw "SHA-256 mismatch for ${Tarball}: expected $ExpectedSha256, got $actual (pinned in MagPython/libmpdec-sha256 -- confirm against the table at https://www.bytereef.org/mpdecimal/download.html before changing)"
