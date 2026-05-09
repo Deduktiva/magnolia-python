@@ -20,7 +20,7 @@ shared library. Three platforms are produced from the same source tree:
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
-| `MagPython/libmpdec-version` | Pinned version of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix) and cached under `MagPython/libmpdec/`; not vendored. |
+| `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
 | `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
@@ -119,8 +119,8 @@ StopOnFirstFailure="True"`:
 3. **`LibMpdec.vcxproj`** — a `Makefile`-type project that, before
    building, runs `download-libmpdec.ps1` to fetch
    `mpdecimal-<version>.tar.gz` from bytereef.org (version pinned in
-   `MagPython/libmpdec-version`), verifies it against the upstream
-   `.sha256` sidecar, and extracts the source into
+   `MagPython/libmpdec-version`), verifies it against the SHA-256 hash
+   pinned in `MagPython/libmpdec-sha256`, and extracts the source into
    `MagPython/libmpdec/`. Then `nmake /f Makefile.vc MACHINE=ppro` in
    the `libmpdec/` subdirectory of the extracted tree produces
    `libmpdec-<version>.lib`, which `CopyArtifacts` renames to
@@ -170,8 +170,9 @@ shape as the Windows metaproj:
    `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
 3. **libmpdec** — `setup_libmpdec` fetches
    `mpdecimal-<version>.tar.gz` from bytereef.org (version pinned in
-   `MagPython/libmpdec-version`), verifies its `.sha256` sidecar, and
-   extracts under `MagPython/libmpdec/` (cached across `prep_build_tree`
+   `MagPython/libmpdec-version`), verifies it against the SHA-256 hash
+   pinned in `MagPython/libmpdec-sha256`, and extracts under
+   `MagPython/libmpdec/` (cached across `prep_build_tree`
    wipes since it lives outside `build-out/`). `build_libmpdec` then
    runs upstream's `./configure --disable-cxx --enable-static
    --disable-shared` (with `--with-machine=universal` on macOS to
@@ -558,10 +559,14 @@ always reported regardless — `<ClInclude>` ones rot the IDE view,
 ## Updating pinned libmpdec
 
 `libmpdec` (the C library behind `_decimal`) is the one dependency that
-isn't checked in. Its version is pinned in a single text file —
-`MagPython/libmpdec-version` — and the source tarball is downloaded
-from bytereef.org at build time, verified against the upstream
-`.sha256` sidecar, and cached under `MagPython/libmpdec/` (gitignored).
+isn't checked in. Its version is pinned in `MagPython/libmpdec-version`
+and the expected tarball SHA-256 in `MagPython/libmpdec-sha256`; the
+tarball itself is downloaded from bytereef.org at build time, verified
+against that pinned hash, and cached under `MagPython/libmpdec/`
+(gitignored). bytereef.org doesn't publish per-tarball `.sha256`
+sidecars — the hashes live only in the table at
+<https://www.bytereef.org/mpdecimal/download.html> — which is why the
+hash is pinned in-tree alongside the version.
 
 ### Why not vendored
 
@@ -575,13 +580,19 @@ don't carry the ~40-file libmpdec source tree in this repo.
 
 ### How a bump works
 
-1. Edit `MagPython/libmpdec-version` to the new version (a single line,
+1. Open <https://www.bytereef.org/mpdecimal/download.html> and copy
+   the SHA-256 listed for `mpdecimal-<new-version>.tar.gz`.
+2. Edit `MagPython/libmpdec-version` to the new version (a single line,
    e.g. `2.5.1`).
-2. Run a full Windows + Linux + macOS build. The download scripts'
-   first action is to fetch the tarball + `.sha256` sidecar from
-   `https://www.bytereef.org/software/mpdecimal/releases/` and compare
-   hashes; a tampered or misnamed tarball fails the build immediately.
-3. Commit `MagPython/libmpdec-version` (no other file changes are
+3. Edit `MagPython/libmpdec-sha256` with the hash from step 1 (a
+   single line of lowercase hex).
+4. Run a full Windows + Linux + macOS build. The download scripts
+   fetch the tarball from
+   `https://www.bytereef.org/software/mpdecimal/releases/`, hash it,
+   and compare against `libmpdec-sha256`; any mismatch deletes the
+   downloaded file and fails the build immediately.
+5. Commit both `MagPython/libmpdec-version` and
+   `MagPython/libmpdec-sha256` together (no other file changes are
    expected on a patch bump).
 
 ### What else changes on a libmpdec bump?
@@ -589,7 +600,8 @@ don't carry the ~40-file libmpdec source tree in this repo.
 For a patch-level bump within the same minor line, nothing else
 should need editing — `LibMpdec.vcxproj`, `setup_libmpdec` /
 `build_libmpdec` in `build-common.sh`, and `common.props` all
-substitute the version from `libmpdec-version`.
+substitute the version from `libmpdec-version`, and the verification
+step reads the new hash from `libmpdec-sha256`.
 
 A cross-minor bump (e.g. 2.5.x → 4.x) is a different kind of
 upgrade: mpdecimal's ABI and `MACHINE=` flavours have changed
@@ -603,9 +615,9 @@ between major lines, so you'll likely need to revisit the
 
 The other vendored libraries each have an `update-*.sh` helper that
 replaces the source tree in place. libmpdec doesn't have one because
-there is no source tree to replace — the version pin is the only
-in-repo state, so `$EDITOR MagPython/libmpdec-version` is the entire
-update procedure.
+there is no source tree to replace — the only in-repo state is the
+two-line pin (`libmpdec-version` + `libmpdec-sha256`), so editing
+those two files by hand is the entire update procedure.
 
 ## Continuous integration
 

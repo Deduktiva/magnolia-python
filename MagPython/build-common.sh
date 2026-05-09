@@ -31,10 +31,17 @@ fi
 
 # libmpdec is downloaded at build time rather than vendored. The version
 # pin lives in MagPython/libmpdec-version (also read by common.props on
-# Windows) so a bump is one file edit shared by all three platforms.
+# Windows); the expected SHA-256 of the upstream tarball lives next to
+# it in MagPython/libmpdec-sha256. Both files together are the bump
+# input shared by all three platforms.
 LIBMPDEC_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-version")"
 if [ -z "$LIBMPDEC_VERSION" ]; then
     echo "Failed to read libmpdec version from MagPython/libmpdec-version" >&2
+    exit 1
+fi
+LIBMPDEC_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-sha256")"
+if [ -z "$LIBMPDEC_SHA256" ]; then
+    echo "Failed to read libmpdec sha256 from MagPython/libmpdec-sha256" >&2
     exit 1
 fi
 LIBMPDEC_CACHE="$REPO/MagPython/libmpdec"
@@ -85,10 +92,12 @@ build_static_deps() {
 # lives outside $BUILD so re-runs of the build script (which wipes
 # $BUILD via prep_build_tree) reuse the already-fetched tarball.
 #
-# Verification follows the update-openssl.sh pattern: trust HTTPS to
-# bytereef.org for the .sha256 sidecar plus per-release tarball
-# immutability. No hardcoded hash so a version bump is just editing
-# MagPython/libmpdec-version.
+# bytereef.org publishes hashes only in an HTML table on
+# https://www.bytereef.org/mpdecimal/download.html — there is no per-
+# tarball .sha256 sidecar to fetch. The expected hash is therefore
+# pinned in-tree at MagPython/libmpdec-sha256 and checked against the
+# downloaded bytes. A version bump means updating libmpdec-version AND
+# libmpdec-sha256 together (see README's "Updating pinned libmpdec").
 setup_libmpdec() {
     if [ -d "$LIBMPDEC_SRC" ]; then return 0; fi
 
@@ -96,24 +105,23 @@ setup_libmpdec() {
     mkdir -p "$LIBMPDEC_CACHE"
     local base="https://www.bytereef.org/software/mpdecimal/releases"
     local tarball="$LIBMPDEC_CACHE/mpdecimal-$LIBMPDEC_VERSION.tar.gz"
-    local sidecar="$tarball.sha256"
 
     if [ ! -f "$tarball" ]; then
         curl --fail --silent --show-error --location \
             -o "$tarball" "$base/mpdecimal-$LIBMPDEC_VERSION.tar.gz"
     fi
-    curl --fail --silent --show-error --location \
-        -o "$sidecar" "$base/mpdecimal-$LIBMPDEC_VERSION.tar.gz.sha256"
 
     local sha256_cmd
     if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
     elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
     else echo "Need shasum or sha256sum" >&2; exit 1; fi
-    local expected actual
-    expected="$(awk '{print $1; exit}' "$sidecar")"
+    local actual
     actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
-    if [ "$expected" != "$actual" ]; then
-        echo "libmpdec SHA-256 mismatch: expected $expected, got $actual" >&2
+    if [ "$LIBMPDEC_SHA256" != "$actual" ]; then
+        echo "libmpdec SHA-256 mismatch: expected $LIBMPDEC_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/libmpdec-sha256 — confirm against the table at" >&2
+        echo "   https://www.bytereef.org/mpdecimal/download.html before changing)" >&2
+        rm -f "$tarball"
         exit 1
     fi
 

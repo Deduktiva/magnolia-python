@@ -2,13 +2,24 @@
 # idempotent extract-once pattern: subsequent runs no-op when the cache is
 # warm, so MSBuild incremental builds don't re-fetch the tarball.
 #
-# The version is read from MagPython/libmpdec-version so common.props,
-# build-common.sh (Linux/macOS), and this script all share one source of
-# truth — bumping the pin is a one-file edit.
+# The version + expected SHA-256 are read from sibling files
+# (libmpdec-version, libmpdec-sha256) so common.props, build-common.sh
+# (Linux/macOS), and this script all share one source of truth.
+# bytereef.org doesn't publish per-tarball .sha256 sidecars (the hashes
+# live only in the HTML table at
+# https://www.bytereef.org/mpdecimal/download.html), so the pin is
+# in-tree.
+#
+# Keep this file ASCII-only. Without a UTF-8 BOM, powershell.exe on
+# Windows reads .ps1 sources as Windows-1252; a UTF-8 em-dash (0xE2 0x80
+# 0x94) decodes to "a..." with 0x94 as a right-double-quote that
+# prematurely terminates whatever string it's inside, and the parser
+# blows up several lines later with a misleading error.
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Version = (Get-Content (Join-Path $ScriptDir 'libmpdec-version') -Raw).Trim()
+$ExpectedSha256 = (Get-Content (Join-Path $ScriptDir 'libmpdec-sha256') -Raw).Trim().ToLower()
 $BaseUrl = "https://www.bytereef.org/software/mpdecimal/releases"
 $Tarball = "mpdecimal-$Version.tar.gz"
 $ExtractDir = Join-Path $ScriptDir "libmpdec\mpdecimal-$Version"
@@ -21,16 +32,29 @@ try {
     Push-Location libmpdec
     try {
         if (Test-Path $Tarball) { Remove-Item -Force $Tarball }
-        if (Test-Path "$Tarball.sha256") { Remove-Item -Force "$Tarball.sha256" }
 
-        Invoke-WebRequest -OutFile $Tarball         -Uri "$BaseUrl/$Tarball"
-        Invoke-WebRequest -OutFile "$Tarball.sha256" -Uri "$BaseUrl/$Tarball.sha256"
+        Invoke-WebRequest -OutFile $Tarball -Uri "$BaseUrl/$Tarball"
 
-        # SHA-256 sidecar format: "<hex>  <filename>" (GNU coreutils).
-        $expected = (Get-Content "$Tarball.sha256" -First 1).Split()[0].ToLower()
-        $actual = (Get-FileHash -Algorithm SHA256 $Tarball).Hash.ToLower()
-        if ($expected -ne $actual) {
-            throw "SHA-256 mismatch for ${Tarball}: expected $expected, got $actual"
+        # Use System.Security.Cryptography directly rather than
+        # Get-FileHash: on the windows-2025 GitHub runner, MSBuild's
+        # `powershell.exe -NonInteractive -file ...` invocation reports
+        # Get-FileHash as "not recognized as a cmdlet". The .NET API
+        # has no module-loading dependency and works under any
+        # PowerShell/runner combination. Build an absolute path via
+        # $PWD (an automatic variable, no cmdlet) since .NET APIs use
+        # the .NET CWD, not PowerShell's Push-Location-tracked CWD.
+        $tarballPath = Join-Path $PWD.Path $Tarball
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $stream = [System.IO.File]::OpenRead($tarballPath)
+        try {
+            $hashBytes = $sha.ComputeHash($stream)
+        } finally {
+            $stream.Dispose()
+        }
+        $actual = ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLower()
+        if ($ExpectedSha256 -ne $actual) {
+            Remove-Item -Force $Tarball
+            throw "SHA-256 mismatch for ${Tarball}: expected $ExpectedSha256, got $actual (pinned in MagPython/libmpdec-sha256 -- confirm against the table at https://www.bytereef.org/mpdecimal/download.html before changing)"
         }
 
         # tar.exe ships in modern Windows (10 1803+, Server 2019+) and is
