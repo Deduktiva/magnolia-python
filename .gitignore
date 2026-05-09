@@ -19,6 +19,10 @@
 /MagPython-windows-x86.zip
 /MagPython-linux-x86_64.zip
 /MagPython-macos-arm64.zip
+# build-details.sh output (per-platform release-notes fragment).
+/MagPython-windows-x86.md
+/MagPython-linux-x86_64.md
+/MagPython-macos-arm64.md
 /zlib/Makefile
 /zlib/libz.a
 /zlib/zconf.h
