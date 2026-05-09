@@ -54,7 +54,6 @@
     <PyArchExt Condition="'$(ArchName)' == 'arm64'">-arm64</PyArchExt>
     <PySourcePath>$(PythonSourceDir)</PySourcePath>
     <PyVPath>$(PythonSourceDir)\\..\\..</PyVPath>
-    <zlibDir>$(TopDir)\zlib\</zlibDir>
     <sqlite3Dir>$(TopDir)\sqlite\</sqlite3Dir>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -78,7 +77,12 @@
            upstream restores the .h name in a future bump. -->
       <AdditionalIncludeDirectories>$(PySourcePath)Include;$(PySourcePath)Include\internal;$(PySourcePath)Include\internal\mimalloc;$(IntDir);$(PySourcePath)PC;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(PySourcePath)Modules\_hacl\include;$(PySourcePath)Modules\_hacl\internal;$(PySourcePath)Python;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories>$(zlibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- zlib's headers (zlib.h, zconf.h) are staged into $(OutDir)\include
+           by ZLib.vcxproj's CopyArtifacts target. They share the include
+           path with the staged OpenSSL / sqlite / libmpdec headers (see
+           the $(OutDir)\include entry on line 68). zlib.lib itself is
+           linked via the <Library Include="$(OutDir)\zlib.lib"/> entry
+           further down. -->
       <!-- end from python.props -->
       <CompileAsManaged>false</CompileAsManaged>
       <CompileAsWinRT>false</CompileAsWinRT>
@@ -351,18 +355,6 @@
     <ClInclude Include="$(PythonSourceDir)\Python\thread_nt.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(zlibDir)\crc32.h" />
-    <ClInclude Include="$(zlibDir)\deflate.h" />
-    <ClInclude Include="$(zlibDir)\inffast.h" />
-    <ClInclude Include="$(zlibDir)\inffixed.h" />
-    <ClInclude Include="$(zlibDir)\inflate.h" />
-    <ClInclude Include="$(zlibDir)\inftrees.h" />
-    <ClInclude Include="$(zlibDir)\trees.h" />
-    <ClInclude Include="$(zlibDir)\zconf.h" />
-    <ClInclude Include="$(zlibDir)\zlib.h" />
-    <ClInclude Include="$(zlibDir)\zutil.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\_abc.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_bisectmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_blake2\blake2module.c" />
@@ -599,21 +591,12 @@
     <ClCompile Include="$(PythonSourceDir)\Python\traceback.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\tracemalloc.c" />
   </ItemGroup>
+  <!-- CPython's zlibmodule.c is the only zlib-adjacent source compiled
+       directly into MagPython.dll. zlib itself is built as a separate
+       static lib by ZLib.vcxproj and linked via the
+       <Library Include="$(OutDir)\zlib.lib"/> entry below. -->
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\zlibmodule.c" />
-    <ClCompile Include="$(zlibDir)\adler32.c" />
-    <ClCompile Include="$(zlibDir)\compress.c" />
-    <ClCompile Include="$(zlibDir)\crc32.c" />
-    <ClCompile Include="$(zlibDir)\deflate.c">
-      <DisableSpecificWarnings>4244</DisableSpecificWarnings>
-    </ClCompile>
-    <ClCompile Include="$(zlibDir)\infback.c" />
-    <ClCompile Include="$(zlibDir)\inffast.c" />
-    <ClCompile Include="$(zlibDir)\inflate.c" />
-    <ClCompile Include="$(zlibDir)\inftrees.c" />
-    <ClCompile Include="$(zlibDir)\trees.c" />
-    <ClCompile Include="$(zlibDir)\uncompr.c" />
-    <ClCompile Include="$(zlibDir)\zutil.c" />
   </ItemGroup>
   <ItemGroup>
     <!-- _hashlib -->
@@ -715,6 +698,7 @@
     <Library Include="$(OutDir)\libssl.lib" />
     <Library Include="$(OutDir)\libffi.lib" />
     <Library Include="$(OutDir)\libmpdec.lib" />
+    <Library Include="$(OutDir)\zlib.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

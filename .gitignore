@@ -10,6 +10,16 @@
 # version + expected SHA-256 live in MagPython/openssl-version and
 # MagPython/openssl-sha256.
 /MagPython/openssl/
+# zlib is downloaded + extracted at build time (see
+# download-zlib.ps1 / setup_zlib in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/zlib-version and
+# MagPython/zlib-sha256.
+/MagPython/zlib/
+# libffi is downloaded + extracted at build time (see
+# download-libffi.ps1 / setup_libffi in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/libffi-version and
+# MagPython/libffi-sha256.
+/MagPython/libffi/
 /Python/Python/deepfreeze/deepfreeze.c
 /Python/Python/frozen_modules/*.h
 /Python/Tools/build/__pycache__/
@@ -23,20 +33,5 @@
 /MagPython-windows-x86.md
 /MagPython-linux-x86_64.md
 /MagPython-macos-arm64.md
-/zlib/Makefile
-/zlib/libz.a
-/zlib/zconf.h
-/zlib/*.o
-/zlib/configure.log
-/zlib/zlib.pc
-/libffi/Makefile
-/libffi/.libs/
-/libffi/*-pc-linux-gnu/
-/libffi/*-apple-darwin*/
-/libffi/include/ffi.h
-/libffi/include/ffitarget.h
-/libffi/include/Makefile
-/libffi/include/Makefile.in
-/libffi/makefile.sed*
 /Python/Modules/Setup.local
 /Python/Lib/**/__pycache__/
