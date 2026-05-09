@@ -33,14 +33,5 @@
 /MagPython-windows-x86.md
 /MagPython-linux-x86_64.md
 /MagPython-macos-arm64.md
-/libffi/Makefile
-/libffi/.libs/
-/libffi/*-pc-linux-gnu/
-/libffi/*-apple-darwin*/
-/libffi/include/ffi.h
-/libffi/include/ffitarget.h
-/libffi/include/Makefile
-/libffi/include/Makefile.in
-/libffi/makefile.sed*
 /Python/Modules/Setup.local
 /Python/Lib/**/__pycache__/
