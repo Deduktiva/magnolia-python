@@ -16,6 +16,9 @@
 #                                     opensslv.h from a template at
 #                                     ./Configure time, so VERSION.dat is
 #                                     the only file present pre-build)
+#   MagPython/libmpdec-version     -> LIBMPDEC_VERSION (downloaded at
+#                                     build time, see build-common.sh /
+#                                     download-libmpdec.ps1)
 #   MagPython/common.props         -> MSVC toolset       [windows-x86]
 #   MagPython/build-macos.sh       -> MACOSX_DEPLOYMENT_TARGET [macos-arm64]
 #
@@ -58,8 +61,11 @@ OPENSSL_VERSION="$(awk -F= '
     }
 ' "$REPO/openssl/VERSION.dat")"
 
+LIBMPDEC_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-version")"
+
 require PY_VERSION
 require OPENSSL_VERSION
+require LIBMPDEC_VERSION
 
 # Read a `<field>:` value out of the matrix entry whose `platform:` matches
 # $PLATFORM. Used as the local-dev fallback when CI hasn't injected the
@@ -93,6 +99,7 @@ case "$PLATFORM" in
 ### Windows x86
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
+- mpdecimal ${LIBMPDEC_VERSION}
 - MSVC Toolset ${MSVC_TOOLSET}
 EOF
         ;;
@@ -105,6 +112,7 @@ EOF
 ### Linux x86_64
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
+- mpdecimal ${LIBMPDEC_VERSION}
 - ${MANYLINUX_TAG}
 EOF
         ;;
@@ -119,6 +127,7 @@ EOF
 ### macOS arm64
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
+- mpdecimal ${LIBMPDEC_VERSION}
 - ${RUNNER} runner, MACOSX_DEPLOYMENT_TARGET=${MACOS_DEPLOY_TARGET}
 EOF
         ;;
