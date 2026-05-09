@@ -21,7 +21,8 @@ source "$SCRIPT_DIR/build-common.sh"
 export MACOSX_DEPLOYMENT_TARGET=11.0
 
 # The runner's preinstalled python3 is recent enough for freeze_modules.py
-# and deepfreeze.py.
+# (CPython 3.13 dropped deepfreeze.py — frozen modules are now the only
+# regen step).
 HOST_PYTHON="$(command -v python3)"
 
 command -v zip >/dev/null || { echo "zip not found"; exit 1; }

@@ -87,8 +87,8 @@ Notable differences from a stock CPython Windows build:
   `Python/PC/pyconfig.h.in`, so `MagPython.dll` statically imports
   Windows 8.1 APIs (e.g. PSS) and is expected to load on Windows 8.1
   and newer with the VC++ 2015-2022 redistributable installed.
-- Frozen modules and `Python/deepfreeze/deepfreeze.c` are regenerated as part
-  of the build (see below) and are gitignored.
+- Frozen modules under `Python/Python/frozen_modules/` are regenerated
+  as part of the build (see below) and are gitignored.
 
 ## How the build is wired
 
@@ -135,12 +135,11 @@ StopOnFirstFailure="True"`:
    CPython's `Programs/_freeze_module.c`. After it builds, post-build targets
    re-freeze the Python modules listed in the project (importlib bootstrap,
    `os`, `site`, `runpy`, the `__phello__` modules, etc.) into
-   `Python/Python/frozen_modules/*.h`, freeze `getpath.py` separately, and
-   then call `Python/Tools/build/deepfreeze.py` (using a host Python found
-   via `Python/PCbuild/find_python.bat`) to regenerate
-   `Python/Python/deepfreeze/deepfreeze.c`. Both generated trees are
-   gitignored. Note: the freezer binary is built but not shipped (commit
-   `3afe7fc`).
+   `Python/Python/frozen_modules/*.h` and freeze `getpath.py` separately.
+   The generated tree is gitignored. CPython 3.13 removed deepfreeze
+   entirely (the pre-3.13 deep-baked importlib bootstrap as a generated
+   `.c` file), so frozen modules are now the only regen step. The
+   freezer binary is built but not shipped (commit `3afe7fc`).
 5. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
    `Objects/`, `Parser/`, selected `Modules/`, `PC/` glue, `zlib`, the
    amalgamated `sqlite3.c`, `_sqlite/*`, `_decimal/_decimal.c`, `_ssl`,
@@ -191,8 +190,8 @@ shape as the Windows metaproj:
    --with-openssl=...build-out/openssl-out --with-system-libmpdec`,
    plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, and `LIBMPDEC_*` env
    vars pointing at the static libs from the earlier stages.
-5. **Regen frozen + deepfreeze, then make** — `make regen-frozen
-   regen-deepfreeze` followed by an awk pass that rewrites
+5. **Regen frozen, then make** — `make regen-frozen` followed by an
+   awk pass that rewrites
    `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
    comments out the lines for modules listed under `*disabled*` in
    `MagPython/Setup.local`. (The `*disabled*` directive on its own only
@@ -212,7 +211,7 @@ shape as the Windows metaproj:
    `MagPython/test.c` is built and run against the staged tree (failure
    fails the build), and the final zip is produced.
 
-The host Python required by `regen-deepfreeze` is
+The host Python required by `regen-frozen` is
 `/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
 on Linux, and the `macos-14` runner's preinstalled `python3` on macOS.
 
@@ -226,7 +225,7 @@ Requirements:
   Windows 8.1 SDK baseline — see commit `1bbd920`).
 - Perl in `PATH` (for OpenSSL `Configure`).
 - A host Python in `PATH` or one discoverable by
-  `Python/PCbuild/find_python.bat` (used by `deepfreeze.py`).
+  `Python/PCbuild/find_python.bat` (used by the frozen-modules regen).
 - Network access on the first build (NASM is downloaded by
   `MagPython/download-nasm.ps1`).
 
