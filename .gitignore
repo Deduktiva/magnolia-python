@@ -5,6 +5,11 @@
 # download-libmpdec.ps1 / setup_libmpdec in build-common.sh). Pinned
 # version lives in MagPython/libmpdec-version.
 /MagPython/libmpdec/
+# OpenSSL is downloaded + extracted at build time (see
+# download-openssl.ps1 / setup_openssl in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/openssl-version and
+# MagPython/openssl-sha256.
+/MagPython/openssl/
 /openssl/**/*.dll
 /openssl/**/*.lib
 /openssl/**/*.obj
