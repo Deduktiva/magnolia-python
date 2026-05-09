@@ -29,14 +29,11 @@ jobs:
             # images. Don't bump past windows-2025 without confirming
             # the v142 component is still installed on the new image.
             runs-on: windows-2025
-            artifact-path: MagPython-windows-x86.zip
           - platform: linux-x86_64
             runs-on: ubuntu-22.04
             container: quay.io/pypa/manylinux_2_28_x86_64
-            artifact-path: MagPython-linux-x86_64.zip
           - platform: macos-arm64
             runs-on: macos-14
-            artifact-path: MagPython-macos-arm64.zip
     steps:
       - uses: actions/checkout@v6
 
@@ -58,9 +55,21 @@ jobs:
       - if: matrix.platform == 'macos-arm64'
         run: ./MagPython/build-macos.sh
 
+      # Per-platform release-notes fragment. Logic lives in the script so it
+      # can be exercised locally (./MagPython/build-details.sh <platform>)
+      # without standing up a workflow run.
+      - name: Generate build details
+        shell: bash
+        env:
+          CONTAINER_IMAGE: ${{ matrix.container }}
+          RUNNER_LABEL: ${{ matrix.runs-on }}
+        run: bash MagPython/build-details.sh ${{ matrix.platform }}
+
       - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: MagPython-${{ matrix.platform }}
           retention-days: 7
-          path: ${{ matrix.artifact-path }}
+          path: |
+            MagPython-${{ matrix.platform }}.zip
+            MagPython-${{ matrix.platform }}.md
