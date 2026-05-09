@@ -7,78 +7,40 @@
   </PropertyGroup>
 
   <!--
-    OpenSSL is downloaded at build time (see download-openssl.ps1 /
-    openssl.vcxproj on Windows, build-common.sh on Unix) rather than
-    vendored; the version pin lives in MagPython/openssl-version so
-    every consumer reads the same value. OpenSslDllSuffix is the
+    Version pins for the build-time-downloaded deps. Each dep has a
+    single-line MagPython/<dep>-version pin that this file slurps into
+    a $(...Version) property; the vcxprojs (and via them the metaproj)
+    substitute it into cache paths like
+    $(MSBuildThisFileDirectory)\<dep>\<dep>-$(...Version)\. The matching
+    SHA-256 pin and the actual download/extract logic live in
+    download-<dep>.ps1 (Windows) and setup_<dep> in build-common.sh
+    (Unix); see README's "Updating pinned <dep>" sections for per-dep
+    specifics.
+
+    OpenSslDllSuffix is the only computed property here — it's the
     soname suffix embedded in Windows DLL names (libcrypto-3.dll on
-    the 3.x line, libcrypto-4.dll in a hypothetical future major bump).
-    On the 3.x line OpenSSL's SHLIB_VERSION always equals MAJOR, so we
-    derive the suffix from the major component of the pinned version
-    rather than parsing VERSION.dat (which doesn't exist before the
-    download has run).
+    the 3.x line). On the 3.x line OpenSSL's SHLIB_VERSION always
+    equals MAJOR, so we derive the suffix from the major component
+    of the pinned version rather than parsing VERSION.dat (which
+    doesn't exist before the download has run).
   -->
   <PropertyGroup>
     <_OpenSslVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)openssl-version'))</_OpenSslVersionRaw>
     <OpenSslVersion>$(_OpenSslVersionRaw.Trim())</OpenSslVersion>
     <OpenSslDllSuffix>$([System.Text.RegularExpressions.Regex]::Match('$(OpenSslVersion)', '^([0-9]+)').Groups[1].Value)</OpenSslDllSuffix>
-  </PropertyGroup>
 
-  <!--
-    libmpdec is downloaded at build time (see download-libmpdec.ps1 /
-    LibMpdec.vcxproj on Windows, build-common.sh on Unix) rather than
-    vendored; the version pin lives in MagPython/libmpdec-version so
-    every consumer reads the same value.
-  -->
-  <PropertyGroup>
     <_LibMpdecVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libmpdec-version'))</_LibMpdecVersionRaw>
     <LibMpdecVersion>$(_LibMpdecVersionRaw.Trim())</LibMpdecVersion>
-  </PropertyGroup>
 
-  <!--
-    zlib is downloaded at build time (see download-zlib.ps1 /
-    ZLib.vcxproj on Windows, build-common.sh on Unix) rather than
-    vendored; the version pin lives in MagPython/zlib-version so
-    every consumer reads the same value.
-  -->
-  <PropertyGroup>
     <_ZlibVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)zlib-version'))</_ZlibVersionRaw>
     <ZlibVersion>$(_ZlibVersionRaw.Trim())</ZlibVersion>
-  </PropertyGroup>
 
-  <!--
-    libffi is downloaded at build time (see download-libffi.ps1 /
-    LibFFI.vcxproj on Windows, build-common.sh on Unix) rather than
-    vendored; the version pin lives in MagPython/libffi-version so
-    every consumer reads the same value.
-  -->
-  <PropertyGroup>
     <_LibFFIVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libffi-version'))</_LibFFIVersionRaw>
     <LibFFIVersion>$(_LibFFIVersionRaw.Trim())</LibFFIVersion>
-  </PropertyGroup>
 
-  <!--
-    SQLite is downloaded at build time (see download-sqlite.ps1 /
-    SQLite.vcxproj on Windows, build-common.sh on Unix) rather than
-    vendored; the version pin lives in MagPython/sqlite-version. The
-    sqlite-year and sqlite-sha256 pins are read by the download
-    scripts directly; only the version is needed here for
-    SQLite.vcxproj's BuildDir path.
-  -->
-  <PropertyGroup>
     <_SQLiteVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)sqlite-version'))</_SQLiteVersionRaw>
     <SQLiteVersion>$(_SQLiteVersionRaw.Trim())</SQLiteVersion>
-  </PropertyGroup>
 
-  <!--
-    CPython is downloaded at build time (see download-python.ps1 +
-    DownloadPython InitialTargets in MagPython.vcxproj /
-    FreezeMagPython.vcxproj on Windows, build-common.sh on Unix)
-    rather than vendored; the version pin lives in MagPython/python-version.
-    Used by both vcxprojs to substitute $(PythonSourceDir) at the
-    cache path MagPython/python/python-$(PythonVersion)/.
-  -->
-  <PropertyGroup>
     <_PythonVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)python-version'))</_PythonVersionRaw>
     <PythonVersion>$(_PythonVersionRaw.Trim())</PythonVersion>
   </PropertyGroup>
