@@ -15,13 +15,13 @@ shared library. Three platforms are produced from the same source tree:
 
 | Path | Contents |
 | --- | --- |
-| `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
+| `MagPython/python-version`, `MagPython/python-sha256` | Pinned version + expected SHA-256 of the CPython source tag archive. The tarball is downloaded from `python/cpython` GitHub at build time (`MagPython/download-python.ps1` on Windows, `setup_python` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/python/`; not vendored. |
 | `MagPython/openssl-version`, `MagPython/openssl-sha256` | Pinned version + expected tarball SHA-256 of OpenSSL. The source is downloaded from openssl/openssl GitHub Releases at build time (`MagPython/download-openssl.ps1` on Windows, `setup_openssl` in `build-common.sh` on Unix), verified against the pinned hash *and* the upstream `.sha256` sidecar, and cached under `MagPython/openssl/`; not vendored. |
 | `MagPython/zlib-version`, `MagPython/zlib-sha256` | Pinned version + expected tarball SHA-256 of zlib. The source is downloaded from madler/zlib GitHub Releases at build time (`MagPython/download-zlib.ps1` on Windows, `setup_zlib` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/zlib/`; not vendored. |
 | `MagPython/libffi-version`, `MagPython/libffi-sha256` | Pinned version + expected tarball SHA-256 of libffi (used by `_ctypes`). The source is downloaded from libffi/libffi GitHub Releases at build time (`MagPython/download-libffi.ps1` on Windows, `setup_libffi` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libffi/`; not vendored. The project-local pregenerated MSVC headers (`ffi.h`, `fficonfig.h`) live under `MagPython/libffi-msvc-include/`. |
 | `MagPython/sqlite-version`, `MagPython/sqlite-year`, `MagPython/sqlite-sha256` | Pinned version + release-year + expected SHA-256 of the SQLite amalgamation zip. The zip is downloaded from sqlite.org at build time (`MagPython/download-sqlite.ps1` on Windows, `setup_sqlite` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/sqlite/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `update-libmpdec.sh`, `update-nasm.sh`, `update-jom.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-sqlite.ps1`, `download-libmpdec.ps1`, `download-jom.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `update-libmpdec.sh`, `update-nasm.sh`, `update-jom.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-sqlite.ps1`, `download-libmpdec.ps1`, `download-jom.ps1`, `download-python.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -517,88 +517,73 @@ build failure on the new version.
 A cross-major bump (e.g. 3.x → 4.x) is a different kind of upgrade
 and the script refuses anything outside the 3.x line.
 
-## Updating vendored Python
+## Updating pinned Python
 
-`MagPython/update-python.sh` is the analogous helper for the CPython
-source tree:
+CPython's version is pinned in `MagPython/python-version` and the
+expected SHA-256 of the upstream tag archive in
+`MagPython/python-sha256`; the tarball itself is downloaded from
+`https://github.com/python/cpython/archive/refs/tags/v<version>.tar.gz`
+at build time (`download-python.ps1` on Windows, `setup_python` in
+`build-common.sh` on Unix), verified against the pinned hash, and
+cached under `MagPython/python/` (gitignored).
+
+We use the GitHub tag archive rather than python.org's release
+tarball because the GitHub archive is also signed-by-HTTPS,
+immutable per-tag, and the only material content differences are
+files the build doesn't use anyway. python.org has `.sigstore`
+signatures we could fold in later — for now, the in-tree SHA-256
+pin (verified at build time AND on every PR by the cache key)
+provides equivalent integrity.
+
+### How a bump works
 
 ```sh
-MagPython/update-python.sh 3.13.3
+MagPython/update-python.sh 3.13.14
 ```
 
-Same overall shape as the OpenSSL/zlib/SQLite/libffi scripts (bash
-3.2, macOS-friendly, no upstream-anchored hash so just prints the
-SHA-256 of the downloaded tarball for the record). What's
-Python-specific:
+The script validates the version is on the 3.x line, downloads the
+tag archive, computes SHA-256 locally, and rewrites
+`MagPython/python-version` and `MagPython/python-sha256`.
 
-1. Pinned to the CPython **3.x** line. A 4.x bump would warrant a
-   manual review of every piece of build glue, so the script refuses
-   anything outside `3.*`. Note that *cross-minor* bumps (e.g. 3.12 →
-   3.13) routinely add or rename C source files and tweak APIs
-   `MagPython.vcxproj` references — the drift detector flags those,
-   but reconciling them is part of the upgrade work.
-2. Downloads `cpython-<version>.tar.gz` from
-   `https://github.com/python/cpython/archive/refs/tags/v<version>.tar.gz`.
-   We use the GitHub tag archive rather than python.org's release
-   tarball because the GitHub archive is also signed-by-HTTPS,
-   immutable per-tag, and the only material content differences are
-   files the build doesn't use anyway.
-3. After extracting, the script drops files the build never references
-   and that python.org's release tarball also omits, so the imported
-   tree stays minimal:
+After running:
 
-   - `.azure-pipelines/`, `.github/` — CI for python/cpython itself.
-   - `.gitignore`, `.gitattributes` — git metadata.
-   - `Misc/NEWS.d/` — per-version changelog fragments.
-   - `PC/icons/` — icons for the `python.exe` / `launcher.exe` GUI
-     executables that we don't ship.
-
-   The unpacked `Include/patchlevel.h`'s embedded `PY_VERSION` is
-   cross-checked against the requested version as a sanity guard.
-4. Replaces the contents of `Python/` in place. The wipe-and-replace
-   intentionally removes any project-local patches sitting on top of
-   the previous import (e.g. the Windows-API-baseline tweak in
-   `PC/pyconfig.h`, the static-module hookups in `PC/config.c`).
-   Re-apply those in *separate* follow-up commits so the import
-   commit is purely the upstream tree:
+1. Run a full Windows + Linux + macOS build. The download scripts
+   re-fetch the tarball, hash it, and compare against `python-sha256`;
+   any mismatch deletes the downloaded file and fails the build
+   immediately.
+2. The "Verify python drift" CI workflow (`.github/workflows/Verify
+   python drift.yml`) downloads the new tarball on Linux and confirms
+   every `$(PythonSourceDir)\<path>\<name>.c|h` ref in
+   `MagPython/MagPython.vcxproj` and `FreezeMagPython.vcxproj` exists
+   in the new tree. *Cross-minor bumps* (e.g. 3.13 → 3.14) routinely
+   surface MISSING refs here — reconciling them is part of the
+   upgrade work and may need `<ClCompile>` additions / removals.
+3. Commit both pin files (and any vcxproj edits) together:
 
    ```sh
-   git log --oneline <prev-import-sha>..HEAD -- Python/
+   git add MagPython/python-version MagPython/python-sha256
+   git commit -m 'Bump python pin to 3.13.14'
    ```
-
-   shows the project-local commits to replay against the new tree.
-
-### Drift detection
-
-Drift between `MagPython/MagPython.vcxproj`'s
-`$(PythonSourceDir)\<path>\<name>.c|h` references and the new tree
-is scoped to the directories the vcxproj substantially curates
-(≥50% of the directory's `.c`/`.h` files referenced) — otherwise
-CPython's much larger module/test/doc tree would drown the report
-in noise. The previous tree's intentional exclusions in those
-covered directories are subtracted as a baseline so each run only
-surfaces drift introduced by *this* upgrade. As elsewhere, **GONE**
-entries (vcxproj refs that no longer exist in the new tree) are
-always reported regardless — `<ClInclude>` ones rot the IDE view,
-`<ClCompile>` ones break the build.
 
 ### What else changes on a Python bump?
 
-- `README.md` — the intro paragraph (`A custom build of CPython
-  X.Y.Z`), the vendored-libraries table (`Vendored CPython X.Y.Z
-  source tree.`), and the `lib/python<X.Y>/` paths in the Linux /
-  macOS build-output examples (these track the minor version, so
-  patch-only bumps within the same minor leave them alone).
-- `MagPython/MagPython.vcxproj` — the `<ClCompile>`/`<ClInclude>`
-  lists, *if and only if* the drift detector reports new or gone
-  files. Patch-level bumps within a minor line generally stay quiet;
-  cross-minor bumps usually need fixups.
-- The Linux/macOS build scripts hardcode `python3.<minor>`-shaped
-  paths in a few places (the libpython soname, the staged
-  `lib/python<X.Y>/` directory). Those need a manual edit on a
-  cross-minor bump.
-- Any project-local Python-tree patches that the wipe-and-replace
-  removed (re-apply in separate commits, as above).
+For a patch-level bump within the same minor line, no other files
+need editing — `MagPython.vcxproj`, `FreezeMagPython.vcxproj`, and
+`build-common.sh` all substitute the version from `python-version`,
+and the verification step reads the new hash from `python-sha256`.
+
+For a *cross-minor* bump (e.g. 3.13 → 3.14):
+
+- `MagPython.vcxproj` — the per-file `<ClCompile>`/`<ClInclude>`
+  lists may need fixups for upstream renames or additions; the
+  drift workflow flags GONE refs.
+- `MagPython/Setup.local` — verify the disabled-modules list still
+  matches the upstream `Modules/Setup.stdlib` shape.
+- The Linux/macOS build scripts derive `python3.<minor>` paths from
+  `PY_X_Y` (computed from the pin), so the libpython soname and
+  staged `lib/python<X.Y>/` directory follow automatically.
+- A 4.x bump would warrant a manual review of every piece of build
+  glue, so `update-python.sh` refuses anything outside the 3.x line.
 
 ## Updating pinned libmpdec
 
@@ -752,7 +737,7 @@ check protects against a stale SHA being merged.
 
 The vendored sources keep their upstream licenses:
 
-- CPython — PSF License (`Python/LICENSE`)
+- CPython — PSF License (downloaded at build time; license ships in the upstream tarball)
 - OpenSSL — Apache-2.0 license (downloaded at build time; license ships in the upstream tarball)
 - zlib — zlib license (downloaded at build time; license ships in the upstream tarball)
 - libffi — MIT (downloaded at build time; license ships in the upstream tarball)
