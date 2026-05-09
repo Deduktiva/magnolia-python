@@ -21,7 +21,7 @@ shared library. Three platforms are produced from the same source tree:
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/openssl-version`, `MagPython/openssl-sha256` | Pinned version + expected tarball SHA-256 of OpenSSL. The source is downloaded from openssl/openssl GitHub Releases at build time (`MagPython/download-openssl.ps1` on Windows, `setup_openssl` in `build-common.sh` on Unix), verified against the pinned hash *and* the upstream `.sha256` sidecar, and cached under `MagPython/openssl/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-libmpdec.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -265,17 +265,24 @@ cross-checked against the upstream `.sha256` sidecar, and cached under
 
 ### How a bump works
 
-1. Open `https://github.com/openssl/openssl/releases/download/openssl-<new-version>/openssl-<new-version>.tar.gz.sha256`
-   in a browser (or `curl`) and copy the SHA-256.
-2. Edit `MagPython/openssl-version` to the new version (a single line
-   on the 3.x line, e.g. `3.5.6`).
-3. Edit `MagPython/openssl-sha256` with the hash from step 1 (a single
-   line of lowercase hex).
-4. Run a full Windows + Linux + macOS build. The download scripts fetch
-   the tarball, hash it, and compare against `openssl-sha256` *and*
-   the upstream sidecar; any mismatch deletes the downloaded file and
-   fails the build immediately.
-5. Commit both `MagPython/openssl-version` and
+```sh
+MagPython/update-openssl.sh 3.5.7
+```
+
+The script validates the version is on the 3.x line, fetches the
+upstream `.sha256` sidecar, validates it as a 64-char hex digest, and
+rewrites `MagPython/openssl-version` and `MagPython/openssl-sha256`
+in place. It deliberately does NOT download the tarball itself — the
+build does that with the same hash check, so duplicating it here would
+just slow down the bump.
+
+After running:
+
+1. Run a full Windows + Linux + macOS build. The download scripts fetch
+   the tarball, hash it, and compare against `openssl-sha256` *and* the
+   upstream sidecar; any mismatch deletes the downloaded file and fails
+   the build immediately.
+2. Commit both `MagPython/openssl-version` and
    `MagPython/openssl-sha256` together (no other file changes are
    expected on a patch bump within the 3.x line).
 
