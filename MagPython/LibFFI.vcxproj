@@ -21,7 +21,14 @@
     <TopDir>$(MSBuildProjectDirectory)\..\</TopDir>
     <IntDir>$(MSBuildProjectDirectory)\$(Configuration)-Int-libffi\</IntDir>
     <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
-    <SourceDir>$(TopDir)\libffi\</SourceDir>
+    <!-- libffi source is downloaded at build time (see
+         download-libffi.ps1 / setup_libffi in build-common.sh) into
+         the per-version cache dir below. The Download libffi target
+         declared further down runs before any C/asm compile, so the
+         <ClCompile> + <CustomBuild> items resolve their files at
+         build time even though they reference paths that don't exist
+         on a fresh clone. -->
+    <SourceDir>$(MSBuildProjectDirectory)\libffi\libffi-$(LibFFIVersion)\</SourceDir>
     <LibFFITarget>X86_WIN32</LibFFITarget>
     <LibFFISourceDir>$(SourceDir)\src</LibFFISourceDir>
     <LibFFITargetSourceDir>$(SourceDir)\src\x86</LibFFITargetSourceDir>
@@ -92,6 +99,9 @@
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Download libffi" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-libffi.ps1" />
+  </Target>
   <ItemGroup>
     <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\ffi.h" />
     <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\fficonfig.h" />

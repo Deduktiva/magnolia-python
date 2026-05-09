@@ -15,6 +15,11 @@
 # version + expected SHA-256 live in MagPython/zlib-version and
 # MagPython/zlib-sha256.
 /MagPython/zlib/
+# libffi is downloaded + extracted at build time (see
+# download-libffi.ps1 / setup_libffi in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/libffi-version and
+# MagPython/libffi-sha256.
+/MagPython/libffi/
 /Python/Python/deepfreeze/deepfreeze.c
 /Python/Python/frozen_modules/*.h
 /Python/Tools/build/__pycache__/
