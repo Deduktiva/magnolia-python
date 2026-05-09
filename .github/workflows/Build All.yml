@@ -41,6 +41,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Cache the build-time-downloaded source trees so subsequent CI
+      # runs skip the download + extract when the version+SHA pins
+      # haven't changed. Cache miss only on a version bump (or on the
+      # first run after this cache was added). actions/cache@v4 scopes
+      # the cache key by OS implicitly, so per-platform tarball
+      # extraction state stays isolated.
+      - name: Cache build-time-downloaded sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            MagPython/openssl
+          key: deps-${{ matrix.platform }}-${{ hashFiles('MagPython/openssl-version', 'MagPython/openssl-sha256') }}
+
       # Windows build (existing logic, unchanged behaviour)
       - if: matrix.platform == 'windows-x86'
         uses: ilammy/msvc-dev-cmd@v1

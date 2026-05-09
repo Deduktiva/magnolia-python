@@ -16,12 +16,12 @@ shared library. Three platforms are produced from the same source tree:
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
-| `openssl/` | Vendored OpenSSL 3.5.6 source. |
 | `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
+| `MagPython/openssl-version`, `MagPython/openssl-sha256` | Pinned version + expected tarball SHA-256 of OpenSSL. The source is downloaded from openssl/openssl GitHub Releases at build time (`MagPython/download-openssl.ps1` on Windows, `setup_openssl` in `build-common.sh` on Unix), verified against the pinned hash *and* the upstream `.sha256` sidecar, and cached under `MagPython/openssl/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-libmpdec.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-libmpdec.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -252,62 +252,64 @@ On an Apple Silicon Mac with Xcode Command Line Tools installed:
 
 Produces `MagPython-macos-arm64.zip` at the repo root.
 
-## Updating vendored OpenSSL
+## Updating pinned OpenSSL
 
-The script `MagPython/update-openssl.sh` automates a patch-level bump on
-the 3.x line:
+OpenSSL is the first dependency to move off the in-tree vendoring
+pattern: its version is pinned in `MagPython/openssl-version` and the
+expected tarball SHA-256 in `MagPython/openssl-sha256`; the tarball
+itself is downloaded from `openssl/openssl` GitHub Releases at build
+time (`download-openssl.ps1` on Windows, `setup_openssl` in
+`build-common.sh` on Unix), verified against the pinned hash *and*
+cross-checked against the upstream `.sha256` sidecar, and cached under
+`MagPython/openssl/` (gitignored).
+
+### How a bump works
 
 ```sh
-MagPython/update-openssl.sh 3.5.6
+MagPython/update-openssl.sh 3.5.7
 ```
 
-It is a portable bash script (no bashisms beyond bash 3.2, so it works on
-macOS as well as Linux). What it does:
+The script validates the version is on the 3.x line, fetches the
+upstream `.sha256` sidecar, validates it as a 64-char hex digest, and
+rewrites `MagPython/openssl-version` and `MagPython/openssl-sha256`
+in place. It deliberately does NOT download the tarball itself — the
+build does that with the same hash check, so duplicating it here would
+just slow down the bump.
 
-1. Validates the version is on the 3.x line (`3.<minor>.<patch>`). Other
-   forms are refused.
-2. Downloads `openssl-<version>.tar.gz` and its `.sha256` from the GitHub
-   release for the matching `openssl-<v>` tag, with openssl.org as a
-   fallback. Verifies the SHA-256 with `shasum` or `sha256sum`.
-3. Replaces the contents of `openssl/` in place with the extracted tree.
-   The OpenSSL tree has no project-local patches — all build customisation
-   lives in `MagPython/openssl.vcxproj` and the platform-specific build
-   scripts. Re-importing the currently vendored version produces a
-   byte-identical tree (`git status` shows no changes).
+After running:
+
+1. Run a full Windows + Linux + macOS build. The download scripts fetch
+   the tarball, hash it, and compare against `openssl-sha256` *and* the
+   upstream sidecar; any mismatch deletes the downloaded file and fails
+   the build immediately.
+2. Commit both `MagPython/openssl-version` and
+   `MagPython/openssl-sha256` together (no other file changes are
+   expected on a patch bump within the 3.x line).
 
 ### What else changes on an OpenSSL bump?
 
 For a patch-level bump within the 3.x line, the build glue needs **no
 version-specific edits**:
 
-- The Windows soname suffix (`3` today) is auto-detected from the
-  vendored tree by `MagPython/common.props` — it parses
-  `openssl/VERSION.dat`'s `SHLIB_VERSION=` line into
-  `$(OpenSslDllSuffix)`, which feeds the
+- The Windows DLL suffix (`3` today) is derived by `MagPython/common.props`
+  from the major component of `MagPython/openssl-version`, which feeds
   `libcrypto-$(OpenSslDllSuffix).dll` / `libssl-$(OpenSslDllSuffix).dll`
-  paths in `MagPython/openssl.vcxproj` and `MagPython/MagPython.vcxproj`.
+  in `MagPython/openssl.vcxproj` and `MagPython/MagPython.vcxproj`.
 - The Unix soname (`3` today) is auto-detected by
-  `MagPython/build-common.sh:openssl_shlib_version()` and threaded into
-  the `patchelf` / `install_name_tool` calls in `build-linux.sh` /
-  `build-macos.sh` (most macOS code paths use `*.dylib` globs already).
+  `MagPython/build-common.sh:openssl_shlib_version()` from the
+  downloaded tree's `VERSION.dat` (with the major-component fallback
+  used pre-download), and threaded into the `patchelf` /
+  `install_name_tool` calls in `build-linux.sh` / `build-macos.sh`.
 - The `Configure` flag set lives in
   `MagPython/build-common.sh:build_openssl()` (Unix) and
   `MagPython/openssl.vcxproj`'s `NMakeBuildCommandLine` (Windows). It
   trims the build to the surface CPython's `_ssl` / `_hashopenssl`
   actually use — see the comments in `build_openssl` for the per-flag
   rationale.
-- `MagPython/MagPython.metaproj`, `.github/workflows/Build All.yml` —
-  contain no version-specific references.
 
-The only places that need a manual edit on a patch bump are the two
-human-readable version strings in this file:
-
-- The vendored-libraries table (`Vendored OpenSSL X.Y.Z source.`)
-- The Licensing section (`OpenSSL X.Y.Z — Apache-2.0 …`).
-
-After updating those two lines, run the full Windows + Linux + macOS
-build to confirm the new tree compiles, then commit with a message like
-`Import unpacked OpenSSL 3.5.6`.
+A cross-major bump (e.g. 3.x → 4.x) is a different kind of upgrade:
+the Configure flag set, soname conventions, and `OpenSslDllSuffix`
+derivation may all need revisiting.
 
 ## Updating vendored zlib
 
@@ -580,18 +582,24 @@ don't carry the ~40-file libmpdec source tree in this repo.
 
 ### How a bump works
 
-1. Open <https://www.bytereef.org/mpdecimal/download.html> and copy
-   the SHA-256 listed for `mpdecimal-<new-version>.tar.gz`.
-2. Edit `MagPython/libmpdec-version` to the new version (a single line,
-   e.g. `2.5.1`).
-3. Edit `MagPython/libmpdec-sha256` with the hash from step 1 (a
-   single line of lowercase hex).
-4. Run a full Windows + Linux + macOS build. The download scripts
-   fetch the tarball from
+```sh
+MagPython/update-libmpdec.sh 2.5.2
+```
+
+The script validates the version is on the 2.x line, downloads the
+tarball from `bytereef.org`, computes SHA-256 locally (bytereef.org
+doesn't publish per-tarball sidecars), and rewrites
+`MagPython/libmpdec-version` and `MagPython/libmpdec-sha256` in
+place.
+
+After running:
+
+1. Run a full Windows + Linux + macOS build. The download scripts
+   re-fetch the tarball from
    `https://www.bytereef.org/software/mpdecimal/releases/`, hash it,
    and compare against `libmpdec-sha256`; any mismatch deletes the
    downloaded file and fails the build immediately.
-5. Commit both `MagPython/libmpdec-version` and
+2. Commit both `MagPython/libmpdec-version` and
    `MagPython/libmpdec-sha256` together (no other file changes are
    expected on a patch bump).
 
@@ -610,14 +618,6 @@ between major lines, so you'll likely need to revisit the
 `--with-machine=universal` flag in `build-macos.sh`, and the
 `CONFIG_32;PPRO` defines on the `_decimal.c` ClCompile in
 `MagPython.vcxproj`.
-
-### Why no `update-libmpdec.sh`
-
-The other vendored libraries each have an `update-*.sh` helper that
-replaces the source tree in place. libmpdec doesn't have one because
-there is no source tree to replace — the only in-repo state is the
-two-line pin (`libmpdec-version` + `libmpdec-sha256`), so editing
-those two files by hand is the entire update procedure.
 
 ## Continuous integration
 
@@ -648,7 +648,7 @@ monthly cadence.
 The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
-- OpenSSL 3.5.6 — Apache-2.0 license (`openssl/LICENSE.txt`)
+- OpenSSL — Apache-2.0 license (downloaded at build time; license ships in the upstream tarball)
 - zlib — zlib license (`zlib/README`)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain

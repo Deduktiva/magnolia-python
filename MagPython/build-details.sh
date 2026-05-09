@@ -12,10 +12,9 @@
 # Sources of truth (kept in sync with the build scripts so the .md never
 # drifts from what was actually built):
 #   Python/Include/patchlevel.h    -> PY_VERSION
-#   openssl/VERSION.dat            -> OPENSSL_VERSION  (OpenSSL 3 generates
-#                                     opensslv.h from a template at
-#                                     ./Configure time, so VERSION.dat is
-#                                     the only file present pre-build)
+#   MagPython/openssl-version      -> OPENSSL_VERSION  (downloaded at
+#                                     build time, see build-common.sh /
+#                                     download-openssl.ps1)
 #   MagPython/libmpdec-version     -> LIBMPDEC_VERSION (downloaded at
 #                                     build time, see build-common.sh /
 #                                     download-libmpdec.ps1)
@@ -47,19 +46,7 @@ PY_VERSION="$(awk '
     /^#define PY_VERSION[[:space:]]/ { gsub(/"/, "", $3); print $3; exit }
 ' "$REPO/Python/Include/patchlevel.h")"
 
-OPENSSL_VERSION="$(awk -F= '
-    /^MAJOR=/           { gsub(/[ \t\r]/, "", $2); maj=$2 }
-    /^MINOR=/           { gsub(/[ \t\r]/, "", $2); min=$2 }
-    /^PATCH=/           { gsub(/[ \t\r]/, "", $2); pat=$2 }
-    /^PRE_RELEASE_TAG=/ { gsub(/[ \t\r]/, "", $2); pre=$2 }
-    /^BUILD_METADATA=/  { gsub(/[ \t\r]/, "", $2); meta=$2 }
-    END {
-        v = maj"."min"."pat
-        if (pre  != "") v = v"-"pre
-        if (meta != "") v = v"+"meta
-        print v
-    }
-' "$REPO/openssl/VERSION.dat")"
+OPENSSL_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/openssl-version")"
 
 LIBMPDEC_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-version")"
 

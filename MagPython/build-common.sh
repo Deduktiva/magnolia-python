@@ -47,6 +47,24 @@ fi
 LIBMPDEC_CACHE="$REPO/MagPython/libmpdec"
 LIBMPDEC_SRC="$LIBMPDEC_CACHE/mpdecimal-$LIBMPDEC_VERSION"
 
+# OpenSSL is downloaded at build time rather than vendored. The version
+# pin lives in MagPython/openssl-version (also read by common.props on
+# Windows); the expected SHA-256 of the upstream tarball lives next to
+# it in MagPython/openssl-sha256. Both files together are the bump
+# input shared by all three platforms.
+OPENSSL_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/openssl-version")"
+if [ -z "$OPENSSL_VERSION" ]; then
+    echo "Failed to read OpenSSL version from MagPython/openssl-version" >&2
+    exit 1
+fi
+OPENSSL_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/openssl-sha256")"
+if [ -z "$OPENSSL_SHA256" ]; then
+    echo "Failed to read OpenSSL sha256 from MagPython/openssl-sha256" >&2
+    exit 1
+fi
+OPENSSL_CACHE="$REPO/MagPython/openssl"
+OPENSSL_SRC="$OPENSSL_CACHE/openssl-$OPENSSL_VERSION"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -178,15 +196,74 @@ libffi_static_lib() {
     printf '%s' "$d"
 }
 
-# Detect the vendored OpenSSL's SHLIB_VERSION ("3" today). Threaded into the
-# patchelf / install_name_tool calls below so soname-bearing filenames adapt
-# automatically when openssl/ is replaced.
+# Detect the OpenSSL SHLIB_VERSION ("3" today). Threaded into the
+# patchelf / install_name_tool calls below so soname-bearing filenames
+# adapt automatically when the pinned version moves to a new major.
+# OpenSSL's SHLIB_VERSION equals MAJOR on the 3.x line; the post-extract
+# VERSION.dat (only present after setup_openssl has run) is parsed
+# defensively in case a future minor changes that.
 openssl_shlib_version() {
-    awk -F= '/^SHLIB_VERSION=/ { gsub(/[ \t\r]/, "", $2); print $2; exit }' \
-        "$REPO/openssl/VERSION.dat"
+    if [ -f "$OPENSSL_SRC/VERSION.dat" ]; then
+        awk -F= '/^SHLIB_VERSION=/ { gsub(/[ \t\r]/, "", $2); print $2; exit }' \
+            "$OPENSSL_SRC/VERSION.dat"
+    else
+        # Pre-download fallback: derive from the pinned version's major.
+        printf '%s' "${OPENSSL_VERSION%%.*}"
+    fi
 }
 
-# Build vendored OpenSSL as shared libs at $BUILD/openssl-out.
+# Download + verify + extract the upstream OpenSSL tarball into
+# $OPENSSL_CACHE/openssl-$OPENSSL_VERSION/. Idempotent — the cache lives
+# outside $BUILD so re-runs of the build script (which wipes $BUILD via
+# prep_build_tree) reuse the already-fetched tarball.
+#
+# OpenSSL publishes per-tarball .sha256 sidecars on its GitHub Releases.
+# The expected hash is pinned in-tree at MagPython/openssl-sha256 and
+# checked against the downloaded bytes; the upstream sidecar is also
+# fetched and cross-checked as defense-in-depth (mirrors the Windows
+# download-openssl.ps1).
+setup_openssl() {
+    if [ -d "$OPENSSL_SRC" ]; then return 0; fi
+
+    log "Fetching OpenSSL $OPENSSL_VERSION"
+    mkdir -p "$OPENSSL_CACHE"
+    local base="https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION"
+    local tarball="$OPENSSL_CACHE/openssl-$OPENSSL_VERSION.tar.gz"
+    local sidecar="$tarball.sha256"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$base/openssl-$OPENSSL_VERSION.tar.gz"
+    fi
+    curl --fail --silent --show-error --location \
+        -o "$sidecar" "$base/openssl-$OPENSSL_VERSION.tar.gz.sha256"
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$OPENSSL_SHA256" != "$actual" ]; then
+        echo "OpenSSL SHA-256 mismatch: expected $OPENSSL_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/openssl-sha256 — confirm against $base/openssl-$OPENSSL_VERSION.tar.gz.sha256 before changing)" >&2
+        rm -f "$tarball" "$sidecar"
+        exit 1
+    fi
+    local upstream
+    upstream="$(awk '{print $1; exit}' "$sidecar")"
+    if [ "$OPENSSL_SHA256" != "$upstream" ]; then
+        echo "Upstream .sha256 sidecar disagrees with MagPython/openssl-sha256: sidecar=$upstream, pinned=$OPENSSL_SHA256" >&2
+        rm -f "$tarball" "$sidecar"
+        exit 1
+    fi
+    rm -f "$sidecar"
+
+    tar -xzf "$tarball" -C "$OPENSSL_CACHE"
+}
+
+# Build OpenSSL as shared libs at $BUILD/openssl-out.
 # $1: OpenSSL Configure target (linux-x86_64, darwin64-arm64-cc, ...)
 #
 # --libdir=lib pins the install path so x86_64 doesn't auto-pick lib64/;
@@ -200,8 +277,9 @@ openssl_shlib_version() {
 #   no-async no-uplink no-idea no-mdc2
 build_openssl() {
     local target="$1"
+    setup_openssl
     log "Building OpenSSL ($target)"
-    (cd "$REPO/openssl"
+    (cd "$OPENSSL_SRC"
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
      ./Configure "$target" shared --libdir=lib \
          no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso \
@@ -362,7 +440,7 @@ stage_openssl_headers() {
     log "Staging OpenSSL headers"
     mkdir -p "$STAGE/include/openssl" "$STAGE/include/crypto"
     cp -R "$BUILD/openssl-out/include/openssl/." "$STAGE/include/openssl/"
-    find "$REPO/openssl/include/crypto" -maxdepth 1 -type f -iname '*.h' \
+    find "$OPENSSL_SRC/include/crypto" -maxdepth 1 -type f -iname '*.h' \
         -exec cp {} "$STAGE/include/crypto/" \;
 }
 

@@ -14,7 +14,9 @@
   <PropertyGroup>
     <ProjectName>openssl</ProjectName>
     <ConfigurationType>Makefile</ConfigurationType>
-    <BuildDir>$(MSBuildProjectDirectory)\..\openssl</BuildDir>
+    <!-- Source tree exists at $(BuildDir) only after Download openssl runs;
+         common.props derives $(OpenSslVersion) from MagPython/openssl-version. -->
+    <BuildDir>$(MSBuildProjectDirectory)\openssl\openssl-$(OpenSslVersion)</BuildDir>
     <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -33,6 +35,9 @@
     <NMakeOutput />
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Download openssl" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-openssl.ps1" />
+  </Target>
   <Target Name="Download nasm" BeforeTargets="Build">
     <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-nasm.ps1" />
   </Target>
