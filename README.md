@@ -16,12 +16,12 @@ shared library. Three platforms are produced from the same source tree:
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
-| `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/openssl-version`, `MagPython/openssl-sha256` | Pinned version + expected tarball SHA-256 of OpenSSL. The source is downloaded from openssl/openssl GitHub Releases at build time (`MagPython/download-openssl.ps1` on Windows, `setup_openssl` in `build-common.sh` on Unix), verified against the pinned hash *and* the upstream `.sha256` sidecar, and cached under `MagPython/openssl/`; not vendored. |
 | `MagPython/zlib-version`, `MagPython/zlib-sha256` | Pinned version + expected tarball SHA-256 of zlib. The source is downloaded from madler/zlib GitHub Releases at build time (`MagPython/download-zlib.ps1` on Windows, `setup_zlib` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/zlib/`; not vendored. |
 | `MagPython/libffi-version`, `MagPython/libffi-sha256` | Pinned version + expected tarball SHA-256 of libffi (used by `_ctypes`). The source is downloaded from libffi/libffi GitHub Releases at build time (`MagPython/download-libffi.ps1` on Windows, `setup_libffi` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libffi/`; not vendored. The project-local pregenerated MSVC headers (`ffi.h`, `fficonfig.h`) live under `MagPython/libffi-msvc-include/`. |
+| `MagPython/sqlite-version`, `MagPython/sqlite-year`, `MagPython/sqlite-sha256` | Pinned version + release-year + expected SHA-256 of the SQLite amalgamation zip. The zip is downloaded from sqlite.org at build time (`MagPython/download-sqlite.ps1` on Windows, `setup_sqlite` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/sqlite/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-libmpdec.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-libmpdec.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `update-libmpdec.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-sqlite.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -87,8 +87,8 @@ Notable differences from a stock CPython Windows build:
   `Python/PC/pyconfig.h.in`, so `MagPython.dll` statically imports
   Windows 8.1 APIs (e.g. PSS) and is expected to load on Windows 8.1
   and newer with the VC++ 2015-2022 redistributable installed.
-- Frozen modules and `Python/deepfreeze/deepfreeze.c` are regenerated as part
-  of the build (see below) and are gitignored.
+- Frozen modules under `Python/Python/frozen_modules/` are regenerated
+  as part of the build (see below) and are gitignored.
 
 ## How the build is wired
 
@@ -108,49 +108,62 @@ StopOnFirstFailure="True"`:
    bump).
 2. **`openssl.vcxproj`** — a `Makefile`-type project that runs
    `perl Configure VC-WIN32-ONECORE <no-* set>` and then
-   `jom -j%NUMBER_OF_PROCESSORS% build_libs` inside `openssl/`.
-   `download-nasm.ps1` fetches NASM 2.16.01 from nasm.us before the build
-   (NASM is required by OpenSSL's x86 assembly). `download-jom.ps1`
-   fetches jom — Qt's drop-in `nmake` replacement that supports parallel
-   jobs (`-j`); Microsoft's nmake is single-threaded, so this cuts the
-   OpenSSL build from sequential `cl.exe` spawns down to one process per
-   core. Outputs: `libcrypto-<N>.dll`, `libssl-<N>.dll` (where `<N>` is
-   the soname auto-detected from `openssl/VERSION.dat`), import libs,
+   `jom -j%NUMBER_OF_PROCESSORS% build_libs` inside the build-time-
+   downloaded source tree (`MagPython/openssl/openssl-<v>/`, populated
+   by `download-openssl.ps1` and verified against the pinned SHA-256
+   *and* the upstream `.sha256` sidecar). `download-nasm.ps1` fetches
+   NASM 2.16.01 from nasm.us before the build (NASM is required by
+   OpenSSL's x86 assembly). `download-jom.ps1` fetches jom — Qt's
+   drop-in `nmake` replacement that supports parallel jobs (`-j`);
+   Microsoft's nmake is single-threaded, so this cuts the OpenSSL
+   build from sequential `cl.exe` spawns down to one process per core.
+   Outputs: `libcrypto-<N>.dll`, `libssl-<N>.dll` (where `<N>` is
+   derived from `openssl-version`'s major component), import libs,
    `applink.c`, and the headers, all copied into `MagPython/Release/`.
    A `VerifyOpenSSL` post-build target compiles + runs
    `MagPython/openssl-verify.c` against the staged libs to catch a
    misconfigured `no-*` set or a missing soname here, with a clear error,
    instead of surfacing later as a baffling `MagPython.dll` link failure.
-3. **`LibMpdec.vcxproj`** — a `Makefile`-type project that, before
-   building, runs `download-libmpdec.ps1` to fetch
-   `mpdecimal-<version>.tar.gz` from bytereef.org (version pinned in
-   `MagPython/libmpdec-version`), verifies it against the SHA-256 hash
-   pinned in `MagPython/libmpdec-sha256`, and extracts the source into
-   `MagPython/libmpdec/`. Then `nmake /f Makefile.vc MACHINE=ppro` in
-   the `libmpdec/` subdirectory of the extracted tree produces
-   `libmpdec-<version>.lib`, which `CopyArtifacts` renames to
-   `libmpdec.lib` and stages alongside `mpdecimal.h` under
+3. **`ZLib.vcxproj`** — a `Makefile`-type project that runs upstream's
+   `win32/Makefile.msc` via `jom -j%NUMBER_OF_PROCESSORS%` (re-using
+   the same jom downloaded for OpenSSL) inside the build-time-
+   downloaded zlib tree (`MagPython/zlib/zlib-<v>/`, populated by
+   `download-zlib.ps1`). Targets just `zlib.lib`; `CopyArtifacts`
+   stages it alongside `zlib.h` + `zconf.h` under
    `MagPython/Release/` (and `Release/include/`).
-4. **`FreezeMagPython.vcxproj`** — builds `FreezeMagPython.exe` from
+4. **`SQLite.vcxproj`** — a `Makefile`-type project that drives
+   `cl.exe + lib.exe` directly on the upstream amalgamation
+   (`MagPython/sqlite/sqlite-<v>/sqlite3.c`, populated by
+   `download-sqlite.ps1`). sqlite ships no Makefile.msc — only the
+   amalgamation — so there's nothing for jom to parallelise across.
+   `CopyArtifacts` stages `sqlite3.lib` + `sqlite3.h` + `sqlite3ext.h`
+   under `MagPython/Release/` (and `Release/include/`).
+5. **`LibMpdec.vcxproj`** — a `Makefile`-type project that runs
+   `nmake /f Makefile.vc MACHINE=ppro` inside the build-time-
+   downloaded mpdecimal source (`MagPython/libmpdec/mpdecimal-<v>/`,
+   populated by `download-libmpdec.ps1`). `CopyArtifacts` renames
+   `libmpdec-<version>.lib` to `libmpdec.lib` and stages alongside
+   `mpdecimal.h` under `MagPython/Release/` (and `Release/include/`).
+6. **`FreezeMagPython.vcxproj`** — builds `FreezeMagPython.exe` from
    CPython's `Programs/_freeze_module.c`. After it builds, post-build targets
    re-freeze the Python modules listed in the project (importlib bootstrap,
    `os`, `site`, `runpy`, the `__phello__` modules, etc.) into
-   `Python/Python/frozen_modules/*.h`, freeze `getpath.py` separately, and
-   then call `Python/Tools/build/deepfreeze.py` (using a host Python found
-   via `Python/PCbuild/find_python.bat`) to regenerate
-   `Python/Python/deepfreeze/deepfreeze.c`. Both generated trees are
-   gitignored. Note: the freezer binary is built but not shipped (commit
-   `3afe7fc`).
-5. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
-   `Objects/`, `Parser/`, selected `Modules/`, `PC/` glue, `zlib`, the
-   amalgamated `sqlite3.c`, `_sqlite/*`, `_decimal/_decimal.c`, `_ssl`,
-   `_hashopenssl`, `_socket`, `select`, `unicodedata`, and `_ctypes`. Links
-   against the `libcrypto.lib`, `libssl.lib`, `libffi.lib`, and
+   `Python/Python/frozen_modules/*.h` and freeze `getpath.py` separately.
+   The generated tree is gitignored. CPython 3.13 removed deepfreeze
+   entirely (the pre-3.13 deep-baked importlib bootstrap as a generated
+   `.c` file), so frozen modules are now the only regen step. The
+   freezer binary is built but not shipped (commit `3afe7fc`).
+7. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
+   `Objects/`, `Parser/`, selected `Modules/`, `PC/` glue,
+   `_sqlite/*`, `_decimal/_decimal.c`, `_ssl`, `_hashopenssl`,
+   `_socket`, `select`, `unicodedata`, `_ctypes`, and CPython's
+   `zlibmodule.c` wrapper. Links against the `libcrypto.lib`,
+   `libssl.lib`, `libffi.lib`, `zlib.lib`, `sqlite3.lib`, and
    `libmpdec.lib` produced by the earlier steps. The `CopyArtifacts`
    target then stages headers and the pure-Python stdlib into
    `Release/include/Python/` and `Release/lib/` so the output directory
    is a complete SDK drop.
-6. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
+8. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
    that calls `Py_Initialize`, prints the compiler string, and runs an
    `import sys` line), copies the DLLs and `lib/` next to it, and **executes
    `test.exe`** as part of the build via an `<Exec>` task. A failed smoke
@@ -168,11 +181,12 @@ shape as the Windows metaproj:
 1. **Static deps** — zlib's `libz.a` and libffi's `libffi.a` (both
    built from the build-time-downloaded sources under
    `MagPython/zlib/zlib-<v>/` and `MagPython/libffi/libffi-<v>/`),
-   plus `build-out/sqlite/libsqlite3.a` from the still-vendored
-   `sqlite/` tree. All three end up linked into the main library,
-   mirroring the Windows configuration where sqlite compiles directly
-   into `MagPython.dll` and zlib + libffi are built as separate
-   static libs by `ZLib.vcxproj` / `LibFFI.vcxproj`.
+   plus `build-out/sqlite/libsqlite3.a` (compiled from the
+   build-time-downloaded amalgamation under
+   `MagPython/sqlite/sqlite-<v>/sqlite3.c`). All three end up linked
+   into the main library, mirroring the Windows configuration where
+   they're each built as separate static libs by `ZLib.vcxproj` /
+   `LibFFI.vcxproj` / `SQLite.vcxproj`.
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
    `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
@@ -191,8 +205,8 @@ shape as the Windows metaproj:
    --with-openssl=...build-out/openssl-out --with-system-libmpdec`,
    plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, and `LIBMPDEC_*` env
    vars pointing at the static libs from the earlier stages.
-5. **Regen frozen + deepfreeze, then make** — `make regen-frozen
-   regen-deepfreeze` followed by an awk pass that rewrites
+5. **Regen frozen, then make** — `make regen-frozen` followed by an
+   awk pass that rewrites
    `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
    comments out the lines for modules listed under `*disabled*` in
    `MagPython/Setup.local`. (The `*disabled*` directive on its own only
@@ -212,7 +226,7 @@ shape as the Windows metaproj:
    `MagPython/test.c` is built and run against the staged tree (failure
    fails the build), and the final zip is produced.
 
-The host Python required by `regen-deepfreeze` is
+The host Python required by `regen-frozen` is
 `/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
 on Linux, and the `macos-14` runner's preinstalled `python3` on macOS.
 
@@ -226,7 +240,7 @@ Requirements:
   Windows 8.1 SDK baseline — see commit `1bbd920`).
 - Perl in `PATH` (for OpenSSL `Configure`).
 - A host Python in `PATH` or one discoverable by
-  `Python/PCbuild/find_python.bat` (used by `deepfreeze.py`).
+  `Python/PCbuild/find_python.bat` (used by the frozen-modules regen).
 - Network access on the first build (NASM is downloaded by
   `MagPython/download-nasm.ps1`).
 
@@ -364,57 +378,62 @@ the build glue (the upstream `win32/Makefile.msc` target name and the
 `./configure --static` flag set may shift), so `update-zlib.sh`
 refuses anything outside `1.*`.
 
-## Updating vendored SQLite
+## Updating pinned SQLite
 
-`MagPython/update-sqlite.sh` is the analogous helper for the SQLite
-amalgamation:
+SQLite's version is pinned in `MagPython/sqlite-version`, the
+calendar release-year in `MagPython/sqlite-year`, and the expected
+amalgamation-zip SHA-256 in `MagPython/sqlite-sha256`. The zip is
+downloaded from sqlite.org at build time (`download-sqlite.ps1` on
+Windows, `setup_sqlite` in `build-common.sh` on Unix), verified
+against the pinned hash, and cached under `MagPython/sqlite/`
+(gitignored). sqlite.org doesn't publish per-zip `.sha256` sidecars,
+so the in-tree pin is the sole hash check.
 
-```sh
-MagPython/update-sqlite.sh 3.45.1 2024
-```
-
-The second argument is the **calendar year** the release was
-published — sqlite.org's download URLs embed the year and there is no
-reliable way to derive it from the version alone. Look it up on
+The year pin exists because sqlite.org's download URL embeds a
+calendar-year segment (e.g.
+`https://sqlite.org/2025/sqlite-amalgamation-3530100.zip`) that isn't
+derivable from the version. Look it up on
 <https://sqlite.org/chronology.html> or in the release announcement.
 
-What the script does, in the same shape as the OpenSSL/zlib helpers:
+The numeric `3530100` in the URL is the version encoded as
+`<major>*1000000 + <minor>*10000 + <patch>*100` (e.g. 3.53.1 →
+`3530100`); the download scripts compute it inline from the version
+pin.
 
-1. Refuses anything off the SQLite **3.x** line.
-2. Downloads `sqlite-amalgamation-<NNNNNNN>.zip` from
-   `https://sqlite.org/<year>/`, where `<NNNNNNN>` is the version
-   encoded as `<major>*1000000 + <minor>*10000 + <patch>*100`
-   (e.g. 3.45.1 → `3450100`). SQLite does not publish `.sha256`
-   sidecars; the script trusts HTTPS to sqlite.org and prints the
-   downloaded zip's SHA-256 for the record. The unpacked
-   `sqlite3.h`'s embedded `SQLITE_VERSION` is also cross-checked
-   against the requested version as a sanity guard.
-3. Replaces the contents of `sqlite/` in place. The vendored tree is
-   the upstream amalgamation as-is — four files: `sqlite3.c`,
-   `sqlite3.h`, `sqlite3ext.h`, and `shell.c` (the SQLite CLI, which
-   the build deliberately does not compile).
-4. Reports drift between `MagPython/MagPython.vcxproj`'s
-   `$(sqlite3Dir)\<name>.c|h` references and the new tree, with the
-   previous tree's intentional exclusions (just `shell.c`) subtracted
-   so each run only surfaces drift introduced by *this* upgrade.
-   GONE entries (referenced files missing from the new tree) are
-   always reported.
+### How a bump works
+
+```sh
+MagPython/update-sqlite.sh 3.53.2 2025
+```
+
+The script validates the version is on the 3.x line and the year is
+four digits, downloads the zip, computes SHA-256 locally, and
+rewrites all three pin files (`sqlite-version`, `sqlite-year`,
+`sqlite-sha256`).
+
+After running:
+
+1. Run a full Windows + Linux + macOS build. The download scripts
+   re-fetch the zip, hash it, and compare against `sqlite-sha256`;
+   any mismatch deletes the downloaded file and fails the build
+   immediately.
+2. Commit all three pin files together:
+
+   ```sh
+   git add MagPython/sqlite-version MagPython/sqlite-year MagPython/sqlite-sha256
+   git commit -m 'Bump sqlite pin to 3.53.2 (2025)'
+   ```
 
 ### What else changes on a SQLite bump?
 
-SQLite is statically linked into `MagPython.dll` (not shipped as its
-own DLL), so a patch bump only touches:
+For a patch-level bump within the 3.x line, no other files need
+editing — `SQLite.vcxproj` and `setup_sqlite` substitute the version
+from `sqlite-version`, the URL year comes from `sqlite-year`, and
+the verification step reads the new hash from `sqlite-sha256`.
 
-- `MagPython/MagPython.vcxproj` — the `<ClCompile>`/`<ClInclude>`
-  lists, *if and only if* the drift detector reports new files.
-- The version string in the vendored-libraries table at the top of
-  this README. (The licensing line says "SQLite — public domain" and
-  carries no version.)
-
-`MagPython/sqlite3.vcxproj` exists in the tree but is not referenced
-from `MagPython.metaproj` — the actual build pulls `sqlite3.c`
-directly into `MagPython.vcxproj` via `$(sqlite3Dir)`. Either way,
-neither file has a version-specific reference.
+A cross-major bump (e.g. 3.x → 4.x) would warrant a manual review of
+the build glue, so `update-sqlite.sh` refuses anything outside the
+3.x line.
 
 ## Updating pinned libffi
 

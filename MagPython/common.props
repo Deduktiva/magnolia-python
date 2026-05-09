@@ -56,4 +56,17 @@
     <_LibFFIVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libffi-version'))</_LibFFIVersionRaw>
     <LibFFIVersion>$(_LibFFIVersionRaw.Trim())</LibFFIVersion>
   </PropertyGroup>
+
+  <!--
+    SQLite is downloaded at build time (see download-sqlite.ps1 /
+    SQLite.vcxproj on Windows, build-common.sh on Unix) rather than
+    vendored; the version pin lives in MagPython/sqlite-version. The
+    sqlite-year and sqlite-sha256 pins are read by the download
+    scripts directly; only the version is needed here for
+    SQLite.vcxproj's BuildDir path.
+  -->
+  <PropertyGroup>
+    <_SQLiteVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)sqlite-version'))</_SQLiteVersionRaw>
+    <SQLiteVersion>$(_SQLiteVersionRaw.Trim())</SQLiteVersion>
+  </PropertyGroup>
 </Project>

@@ -95,6 +95,28 @@ fi
 LIBFFI_CACHE="$REPO/MagPython/libffi"
 LIBFFI_SRC="$LIBFFI_CACHE/libffi-$LIBFFI_VERSION"
 
+# SQLite is downloaded at build time rather than vendored. Same shape
+# as the other devendored deps, plus an extra sqlite-year pin
+# (sqlite.org's URL embeds a calendar-year segment that isn't
+# derivable from the version — see https://sqlite.org/chronology.html).
+SQLITE_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/sqlite-version")"
+if [ -z "$SQLITE_VERSION" ]; then
+    echo "Failed to read sqlite version from MagPython/sqlite-version" >&2
+    exit 1
+fi
+SQLITE_YEAR="$(tr -d '[:space:]' < "$REPO/MagPython/sqlite-year")"
+if [ -z "$SQLITE_YEAR" ]; then
+    echo "Failed to read sqlite year from MagPython/sqlite-year" >&2
+    exit 1
+fi
+SQLITE_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/sqlite-sha256")"
+if [ -z "$SQLITE_SHA256" ]; then
+    echo "Failed to read sqlite sha256 from MagPython/sqlite-sha256" >&2
+    exit 1
+fi
+SQLITE_CACHE="$REPO/MagPython/sqlite"
+SQLITE_SRC="$SQLITE_CACHE/sqlite-$SQLITE_VERSION"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -129,11 +151,12 @@ build_static_deps() {
      ./configure "${args[@]}"
      make -j"$JOBS")
 
+    setup_sqlite
     log "Compiling sqlite3 amalgamation"
     mkdir -p "$BUILD/sqlite"
     cc -c -O2 -fPIC \
        -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
-       "$REPO/sqlite/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
+       "$SQLITE_SRC/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
     ar rcs "$BUILD/sqlite/libsqlite3.a" "$BUILD/sqlite/sqlite3.o"
 }
 
@@ -173,6 +196,65 @@ setup_zlib() {
     fi
 
     tar -xzf "$tarball" -C "$ZLIB_CACHE"
+}
+
+# Download + verify + extract the upstream SQLite amalgamation zip
+# into $SQLITE_CACHE/sqlite-$SQLITE_VERSION/. Idempotent — the cache
+# lives outside $BUILD so re-runs of the build script (which wipes
+# $BUILD via prep_build_tree) reuse the already-fetched zip.
+#
+# sqlite.org's URL embeds a calendar-year segment (read from
+# MagPython/sqlite-year) and a numeric encoding of the version
+# (<major>*1000000 + <minor>*10000 + <patch>*100, e.g. 3.53.1 ->
+# 3530100). The extracted upstream dir is sqlite-amalgamation-<numeric>;
+# rename it to sqlite-<version> so the path consumers can refer to it
+# via SQLITE_SRC without recomputing the numeric encoding.
+#
+# sqlite.org doesn't publish per-zip .sha256 sidecars, so the expected
+# hash is pinned in-tree at MagPython/sqlite-sha256.
+setup_sqlite() {
+    if [ -d "$SQLITE_SRC" ]; then return 0; fi
+
+    log "Fetching SQLite $SQLITE_VERSION ($SQLITE_YEAR)"
+    mkdir -p "$SQLITE_CACHE"
+    # Compute the numeric encoding sqlite.org's URL embeds.
+    local sq_maj sq_min sq_pat sq_num zipname url tarball
+    IFS=. read -r sq_maj sq_min sq_pat <<EOF
+$SQLITE_VERSION
+EOF
+    sq_num="$(printf '%07d' $(( sq_maj * 1000000 + sq_min * 10000 + sq_pat * 100 )))"
+    zipname="sqlite-amalgamation-$sq_num.zip"
+    url="https://sqlite.org/$SQLITE_YEAR/$zipname"
+    tarball="$SQLITE_CACHE/$zipname"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$url"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$SQLITE_SHA256" != "$actual" ]; then
+        echo "SQLite SHA-256 mismatch: expected $SQLITE_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/sqlite-sha256 — regenerate via" >&2
+        echo "   MagPython/update-sqlite.sh before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    # unzip ships in manylinux_2_28 and on macOS; bsdtar's zip support
+    # would also work but unzip is the more universal choice.
+    if ! command -v unzip >/dev/null 2>&1; then
+        echo "Need 'unzip' on PATH to extract the SQLite amalgamation" >&2
+        exit 1
+    fi
+    (cd "$SQLITE_CACHE" && unzip -q "$zipname")
+    # Rename upstream sqlite-amalgamation-<numeric>/ to sqlite-<version>/.
+    mv "$SQLITE_CACHE/sqlite-amalgamation-$sq_num" "$SQLITE_SRC"
 }
 
 # Download + verify + extract the upstream libffi tarball into
@@ -468,7 +550,7 @@ configure_libmagpython() {
         LIBFFI_LIBS="$libffi_lib" \
         ZLIB_CFLAGS="-I$ZLIB_SRC" \
         ZLIB_LIBS="$ZLIB_SRC/libz.a" \
-        LIBSQLITE3_CFLAGS="-I$REPO/sqlite" \
+        LIBSQLITE3_CFLAGS="-I$SQLITE_SRC" \
         LIBSQLITE3_LIBS="$BUILD/sqlite/libsqlite3.a" \
         LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \
         LIBMPDEC_LIBS="$BUILD/libmpdec-out/lib/libmpdec.a -lm" \
