@@ -16,12 +16,12 @@ shared library. Three platforms are produced from the same source tree:
 | Path | Contents |
 | --- | --- |
 | `Python/` | Vendored CPython 3.13.13 source tree (upstream `python/cpython`). |
-| `zlib/` | Vendored zlib 1.3.2 source. |
 | `libffi/` | Vendored libffi 3.5.2 source (used by `_ctypes`). |
 | `sqlite/` | Vendored SQLite 3.53.1 amalgamation (`sqlite3.c` + headers). |
 | `MagPython/openssl-version`, `MagPython/openssl-sha256` | Pinned version + expected tarball SHA-256 of OpenSSL. The source is downloaded from openssl/openssl GitHub Releases at build time (`MagPython/download-openssl.ps1` on Windows, `setup_openssl` in `build-common.sh` on Unix), verified against the pinned hash *and* the upstream `.sha256` sidecar, and cached under `MagPython/openssl/`; not vendored. |
+| `MagPython/zlib-version`, `MagPython/zlib-sha256` | Pinned version + expected tarball SHA-256 of zlib. The source is downloaded from madler/zlib GitHub Releases at build time (`MagPython/download-zlib.ps1` on Windows, `setup_zlib` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/zlib/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-libmpdec.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-libmpdec.ps1`). |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libmpdec.sh`, `update-libffi.sh`, `update-sqlite.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libmpdec.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -160,11 +160,13 @@ StopOnFirstFailure="True"`:
 Unix builds. Both source `MagPython/build-common.sh` and follow the same
 shape as the Windows metaproj:
 
-1. **Static deps** — `zlib/libz.a` (built with `CFLAGS=-fPIC`),
+1. **Static deps** — zlib's `libz.a` (built with `CFLAGS=-fPIC` from
+   the build-time-downloaded source under `MagPython/zlib/zlib-<v>/`),
    `libffi/<host-triple>/.libs/libffi.a`, `build-out/sqlite/libsqlite3.a`.
    All three end up linked into the main library, mirroring the Windows
-   configuration where their sources are compiled directly into
-   `MagPython.dll`.
+   configuration where libffi and sqlite compile directly into
+   `MagPython.dll` and zlib is built as a separate static lib by
+   `ZLib.vcxproj`.
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
    `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
@@ -311,51 +313,50 @@ A cross-major bump (e.g. 3.x → 4.x) is a different kind of upgrade:
 the Configure flag set, soname conventions, and `OpenSslDllSuffix`
 derivation may all need revisiting.
 
-## Updating vendored zlib
+## Updating pinned zlib
 
-`MagPython/update-zlib.sh` is the analogous helper for the zlib tree:
+zlib's version is pinned in `MagPython/zlib-version` and the expected
+tarball SHA-256 in `MagPython/zlib-sha256`; the tarball itself is
+downloaded from `madler/zlib` GitHub Releases at build time
+(`download-zlib.ps1` on Windows, `setup_zlib` in `build-common.sh` on
+Unix), verified against the pinned hash, and cached under
+`MagPython/zlib/` (gitignored). madler/zlib doesn't publish per-tarball
+`.sha256` sidecars on its GitHub releases, so the in-tree pin is the
+sole hash check (same shape as libmpdec, and matches the OpenSSL flow
+minus the upstream-sidecar cross-check).
+
+### How a bump works
 
 ```sh
-MagPython/update-zlib.sh 1.3.1
+MagPython/update-zlib.sh 1.3.3
 ```
 
-Same shape as the OpenSSL script (bash 3.2, macOS-friendly), with two
-notable differences in how it behaves:
+The script validates the version is on the 1.x line, downloads the
+tarball, computes SHA-256 locally, and rewrites
+`MagPython/zlib-version` and `MagPython/zlib-sha256` in place.
 
-1. Pinned to the zlib **1.x** line. A 2.x bump would warrant a manual
-   review of the build glue, so the script refuses anything outside
-   `1.*`.
-2. zlib does not publish `.sha256` sidecars on its GitHub releases, so
-   there is no upstream-anchored hash to verify against. The script
-   trusts HTTPS to GitHub plus the immutability of release artifacts,
-   and prints the SHA-256 of the downloaded tarball for the record
-   (paste it into the commit message). If you want stronger assurance,
-   GitHub does publish `.tar.gz.asc` GPG signatures from Mark Adler —
-   verify out of band before running the script.
+After running:
 
-The drift detector compares the `$(zlibDir)\<name>.c` and
-`$(zlibDir)\<name>.h` references in `MagPython/MagPython.vcxproj`
-against the top-level files in the new tree, with the previous tree's
-intentional exclusions (the `gz*` family — Python's `zlibmodule`
-doesn't use them) subtracted as a baseline. As with OpenSSL, only drift
-introduced by the current upgrade surfaces; **GONE** entries
-(`<ClCompile>` references that no longer exist would break the build,
-`<ClInclude>` ones rot the IDE view) are always reported regardless.
+1. Run a full Windows + Linux + macOS build. The download scripts
+   re-fetch the tarball, hash it, and compare against `zlib-sha256`;
+   any mismatch deletes the downloaded file and fails the build
+   immediately.
+2. Commit both `MagPython/zlib-version` and `MagPython/zlib-sha256`
+   together (no other file changes are expected on a patch bump within
+   the 1.x line).
 
 ### What else changes on a zlib bump?
 
-Unlike OpenSSL, zlib is statically linked into `MagPython.dll` rather
-than shipped as its own DLL — there are no soname-bearing artifacts.
-So a patch bump only touches:
+For a patch-level bump within the same minor line, nothing else
+should need editing — `ZLib.vcxproj` (Windows), `setup_zlib` /
+`build_static_deps` in `build-common.sh` (Unix), and `common.props`
+all substitute the version from `zlib-version`, and the verification
+step reads the new hash from `zlib-sha256`.
 
-- `MagPython/MagPython.vcxproj` — the `<ClCompile>` and `<ClInclude>`
-  lists, *if and only if* the drift detector reports new files.
-- The version string in the vendored-libraries table at the top of
-  this README. (zlib's licensing line carries no version because the
-  license terms are stable across the 1.x line, unlike OpenSSL.)
-
-The `<zlibDir>` property and CI workflow have no version-specific
-references and stay as-is.
+A cross-major bump (e.g. 1.x → 2.x) would warrant a manual review of
+the build glue (the upstream `win32/Makefile.msc` target name and the
+`./configure --static` flag set may shift), so `update-zlib.sh`
+refuses anything outside `1.*`.
 
 ## Updating vendored SQLite
 
@@ -649,6 +650,6 @@ The vendored sources keep their upstream licenses:
 
 - CPython — PSF License (`Python/LICENSE`)
 - OpenSSL — Apache-2.0 license (downloaded at build time; license ships in the upstream tarball)
-- zlib — zlib license (`zlib/README`)
+- zlib — zlib license (downloaded at build time; license ships in the upstream tarball)
 - libffi — MIT (`libffi/LICENSE`)
 - SQLite — public domain

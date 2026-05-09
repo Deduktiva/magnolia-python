@@ -28,12 +28,6 @@
 /MagPython-windows-x86.md
 /MagPython-linux-x86_64.md
 /MagPython-macos-arm64.md
-/zlib/Makefile
-/zlib/libz.a
-/zlib/zconf.h
-/zlib/*.o
-/zlib/configure.log
-/zlib/zlib.pc
 /libffi/Makefile
 /libffi/.libs/
 /libffi/*-pc-linux-gnu/
