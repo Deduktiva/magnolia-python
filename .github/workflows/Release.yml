@@ -32,37 +32,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Pull each version from the source of truth so the notes match the
-          # zips we're about to attach without any manual bookkeeping.
-          PY_VERSION="$(awk '/^#define PY_VERSION[[:space:]]/ {gsub(/"/, "", $3); print $3; exit}' Python/Include/patchlevel.h)"
-          OPENSSL_VERSION="$(sed -n -E 's|.*"OpenSSL ([^ ]+).*|\1|p' openssl/include/openssl/opensslv.h | head -1)"
-          MSVC_TOOLSET="$(sed -n -E 's|.*<PlatformToolset[^>]*>([^<]+)</PlatformToolset>.*|\1|p' MagPython/common.props | head -1)"
-          MACOS_DEPLOY_TARGET="$(sed -n -E 's|^export MACOSX_DEPLOYMENT_TARGET=([0-9.]+).*|\1|p' MagPython/build-macos.sh | head -1)"
-          MANYLINUX_TAG="$(sed -n -E 's|.*quay\.io/pypa/(manylinux[^ ]+).*|\1|p' '.github/workflows/Build All.yml' | head -1)"
-          MACOS_RUNNER="$(sed -n -E "s|^[[:space:]]*runs-on:[[:space:]]*(macos-[0-9]+).*|\1|p" '.github/workflows/Build All.yml' | head -1)"
-
-          for var in PY_VERSION OPENSSL_VERSION MSVC_TOOLSET MACOS_DEPLOY_TARGET MANYLINUX_TAG MACOS_RUNNER; do
-            [ -n "${!var}" ] || { echo "failed to detect $var" >&2; exit 1; }
-          done
+          # Each per-platform build job emits its own MagPython-<platform>.md
+          # alongside the zip (see "Generate build details" in Build All.yml).
+          # Concatenating those is enough — the release workflow doesn't need
+          # to know anything about Python / OpenSSL / toolchain versions.
+          mapfile -t FRAGMENTS < <(find artifacts -name 'MagPython-*.md' -type f | sort)
+          [ "${#FRAGMENTS[@]}" -gt 0 ] || { echo "no MagPython-*.md fragments found under artifacts/" >&2; exit 1; }
 
           {
             echo "## Build details"
             echo
-            echo "### Windows x86"
-            echo "- Python ${PY_VERSION}"
-            echo "- OpenSSL ${OPENSSL_VERSION}"
-            echo "- MSVC Toolset ${MSVC_TOOLSET}"
-            echo
-            echo "### Linux x86_64"
-            echo "- Python ${PY_VERSION}"
-            echo "- OpenSSL ${OPENSSL_VERSION}"
-            echo "- ${MANYLINUX_TAG}"
-            echo
-            echo "### macOS arm64"
-            echo "- Python ${PY_VERSION}"
-            echo "- OpenSSL ${OPENSSL_VERSION}"
-            echo "- ${MACOS_RUNNER} runner, MACOSX_DEPLOYMENT_TARGET=${MACOS_DEPLOY_TARGET}"
-            echo
+            for f in "${FRAGMENTS[@]}"; do
+              cat "$f"
+              echo
+            done
           } > body.md
 
           cat body.md
