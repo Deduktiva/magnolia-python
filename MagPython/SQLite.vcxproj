@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D7C39C8E-2B41-4F7C-9D61-7A3E5C8B2D14}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ProjectName>SQLite</ProjectName>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <BuildDir>$(MSBuildProjectDirectory)\sqlite\sqlite-$(SQLiteVersion)</BuildDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <!--
+      sqlite.org ships only the amalgamation (sqlite3.c + headers), no
+      Makefile, so we drive the cl + lib invocations directly. The
+      flags match the previous in-MagPython.vcxproj build path: NDEBUG
+      runtime, /MD multi-threaded DLL CRT (matching MagPython.dll's
+      runtime), /O2, -Fdsqlite for the PDB. No SQLite_ENABLE_* feature
+      flags here — the previous Windows build didn't set them either,
+      so behavior is unchanged. (Unix sets FTS5/RTREE/JSON1 in
+      build-common.sh — pre-existing inconsistency, out of scope here.)
+
+      The tree exists at $(BuildDir) only after Download sqlite runs;
+      the commands below execute at build time, not at project-load
+      time.
+    -->
+    <NMakeBuildCommandLine>
+      cd /D "$(BuildDir)"
+      cl /nologo /c /MD /O2 /DNDEBUG /Fdsqlite sqlite3.c
+      lib /nologo /OUT:sqlite3.lib sqlite3.obj
+    </NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>
+      cd /D "$(BuildDir)"
+      if exist sqlite3.obj del sqlite3.obj
+      if exist sqlite3.lib del sqlite3.lib
+      cl /nologo /c /MD /O2 /DNDEBUG /Fdsqlite sqlite3.c
+      lib /nologo /OUT:sqlite3.lib sqlite3.obj
+    </NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>
+      if exist "$(BuildDir)\sqlite3.obj" del "$(BuildDir)\sqlite3.obj"
+      if exist "$(BuildDir)\sqlite3.lib" del "$(BuildDir)\sqlite3.lib"
+    </NMakeCleanCommandLine>
+    <NMakeOutput />
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Download sqlite" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-sqlite.ps1" />
+  </Target>
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <!-- Inside the Target so the file list is re-evaluated after
+           the NMake build produced sqlite3.lib. Same pattern as
+           openssl.vcxproj / ZLib.vcxproj / LibMpdec.vcxproj. -->
+      <StaticLib Include="$(BuildDir)\sqlite3.lib" />
+      <PublicHeader Include="$(BuildDir)\sqlite3.h" />
+      <PublicHeader Include="$(BuildDir)\sqlite3ext.h" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)" />
+    <MakeDir Directories="$(OutDir)include" />
+    <Copy SourceFiles="@(StaticLib)" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="@(PublicHeader)" DestinationFolder="$(OutDir)include\" />
+  </Target>
+  <Target Name="Clean">
+    <Exec Command="if exist &quot;$(BuildDir)\sqlite3.obj&quot; del &quot;$(BuildDir)\sqlite3.obj&quot;" />
+    <Exec Command="if exist &quot;$(BuildDir)\sqlite3.lib&quot; del &quot;$(BuildDir)\sqlite3.lib&quot;" />
+    <Delete Files="$(OutDir)sqlite3.lib;$(OutDir)include\sqlite3.h;$(OutDir)include\sqlite3ext.h" />
+  </Target>
+</Project>

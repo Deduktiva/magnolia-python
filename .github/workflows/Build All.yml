@@ -68,6 +68,11 @@ jobs:
         with:
           path: MagPython/libffi
           key: deps-libffi-${{ matrix.platform }}-${{ hashFiles('MagPython/libffi-version', 'MagPython/libffi-sha256') }}
+      - name: Cache SQLite download
+        uses: actions/cache@v4
+        with:
+          path: MagPython/sqlite
+          key: deps-sqlite-${{ matrix.platform }}-${{ hashFiles('MagPython/sqlite-version', 'MagPython/sqlite-year', 'MagPython/sqlite-sha256') }}
 
       # Windows build (existing logic, unchanged behaviour)
       - if: matrix.platform == 'windows-x86'

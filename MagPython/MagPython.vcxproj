@@ -54,7 +54,6 @@
     <PyArchExt Condition="'$(ArchName)' == 'arm64'">-arm64</PyArchExt>
     <PySourcePath>$(PythonSourceDir)</PySourcePath>
     <PyVPath>$(PythonSourceDir)\\..\\..</PyVPath>
-    <sqlite3Dir>$(TopDir)\sqlite\</sqlite3Dir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -65,7 +64,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;FFI_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(OutDir)\include;$(sqlite3Dir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OutDir)\include</AdditionalIncludeDirectories>
       <!-- from python.props -->
       <PreprocessorDefinitions>_USRDLL;Py_BUILD_CORE;Py_BUILD_CORE_BUILTIN;Py_ENABLE_SHARED;MS_DLL_ID="";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -661,14 +660,12 @@
     </ClCompile>
     <ClInclude Include="$(PythonSourceDir)\Modules\_decimal\docstrings.h" />
   </ItemGroup>
-  <!-- from sqlite3.vcxproj -->
-  <ItemGroup>
-    <ClInclude Include="$(sqlite3Dir)\sqlite3.h" />
-    <ClInclude Include="$(sqlite3Dir)\sqlite3ext.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="$(sqlite3Dir)\sqlite3.c" />
-  </ItemGroup>
+  <!-- sqlite3 itself is built as a separate static lib by SQLite.vcxproj
+       (which compiles the build-time-downloaded amalgamation under
+       MagPython/sqlite/sqlite-<v>/). The staged sqlite3.h / sqlite3ext.h
+       are findable via $(OutDir)\include (already on the include path
+       from the AdditionalIncludeDirectories entry up top), and
+       sqlite3.lib is linked via the <Library Include> entry below. -->
   <!-- from _sqlite3.vcxproj -->
   <ItemGroup>
     <ClInclude Include="$(PythonSourceDir)\Modules\_sqlite\connection.h" />
@@ -699,6 +696,7 @@
     <Library Include="$(OutDir)\libffi.lib" />
     <Library Include="$(OutDir)\libmpdec.lib" />
     <Library Include="$(OutDir)\zlib.lib" />
+    <Library Include="$(OutDir)\sqlite3.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

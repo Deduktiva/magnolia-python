@@ -20,6 +20,11 @@
 # version + expected SHA-256 live in MagPython/libffi-version and
 # MagPython/libffi-sha256.
 /MagPython/libffi/
+# SQLite is downloaded + extracted at build time (see
+# download-sqlite.ps1 / setup_sqlite in build-common.sh). Pinned
+# version + year + expected SHA-256 live in MagPython/sqlite-version,
+# MagPython/sqlite-year and MagPython/sqlite-sha256.
+/MagPython/sqlite/
 /Python/Python/deepfreeze/deepfreeze.c
 /Python/Python/frozen_modules/*.h
 /Python/Tools/build/__pycache__/
