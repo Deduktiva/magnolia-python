@@ -22,6 +22,11 @@
     <NMakeBuildCommandLine>
       cd /D "$(BuildDir)"
       set PATH=$(MSBuildProjectDirectory)\nasm;$(MSBuildProjectDirectory)\jom;%PATH%
+      rem /FS serialises cl's writes to ossl_static.pdb so the parallel
+      rem jobs jom spawns don't collide on it (without /FS the build dies
+      rem with "cannot open program database ... if multiple CL.EXE write
+      rem to the same .PDB file, please use /FS").
+      set CL=/FS
       perl Configure no-makedepend VC-WIN32-ONECORE no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests no-async no-fips no-docs no-legacy no-cmp no-apps
       jom -j%NUMBER_OF_PROCESSORS% build_libs
     </NMakeBuildCommandLine>
