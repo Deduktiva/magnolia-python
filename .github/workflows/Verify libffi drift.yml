@@ -1,0 +1,51 @@
+name: Verify libffi drift
+
+# Runs on PRs that touch libffi-related files. Catches the case where a
+# Renovate-driven (or manual) libffi version bump would break the
+# Windows build because upstream renamed/removed a file that
+# LibFFI.vcxproj's per-file <ClCompile> / <CustomBuild> / <ClInclude>
+# list still references.
+#
+# The build itself surfaces the same drift later as a cl.exe C1083
+# 'cannot open source file' error during the LibFFI.vcxproj step; this
+# workflow just makes it visible at PR-review time on a Linux runner
+# (~30s wall-clock) instead of waiting for a 5+ minute Windows job.
+
+on:
+  pull_request:
+    paths:
+      - 'MagPython/libffi-version'
+      - 'MagPython/libffi-sha256'
+      - 'MagPython/LibFFI.vcxproj'
+  # Allow manual trigger for paranoid checks (e.g. validating that
+  # main currently passes after an unrelated merge).
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache libffi download
+        uses: actions/cache@v4
+        with:
+          path: MagPython/libffi
+          key: deps-libffi-drift-${{ hashFiles('MagPython/libffi-version', 'MagPython/libffi-sha256') }}
+
+      - name: Populate libffi cache
+        # Source build-common.sh in a subshell so its `set -x` doesn't
+        # leak into subsequent steps. The `set +x` after sourcing
+        # silences the trace for the actual setup_libffi run; the
+        # 2>/dev/null on the disable-trace command itself is the
+        # standard idiom to suppress the trace of `set +x` itself.
+        run: |
+          bash -c '
+            . MagPython/build-common.sh
+            { set +x; } 2>/dev/null
+            setup_libffi
+          '
+
+      - name: Check LibFFI.vcxproj refs against the libffi tree
+        run: MagPython/check-libffi-drift.sh
