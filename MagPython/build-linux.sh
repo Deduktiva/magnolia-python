@@ -26,8 +26,8 @@ source "$SCRIPT_DIR/build-common.sh"
 HOST_PYTHON="/opt/python/cp313-cp313/bin/python3"
 [ -x "$HOST_PYTHON" ] || HOST_PYTHON="$(command -v python3)"
 
-# manylinux_2_28 ships patchelf (auditwheel needs it) but not zip; install
-# zip on demand. Keep the install line idempotent so re-runs are cheap.
+# manylinux_2_28 doesn't ship zip; install it on demand. Keep the install line
+# idempotent so re-runs are cheap.
 if ! command -v zip >/dev/null; then
     if command -v dnf >/dev/null; then
         dnf install -y zip
@@ -101,12 +101,5 @@ done
 stage_headers_and_stdlib "$BUILD/main"
 stage_openssl_headers
 run_smoke_test '$ORIGIN'
-
-# Sanity: ensure no surprise glibc-only-recent symbols. manylinux2014 ships
-# auditwheel; skip this check gracefully if it isn't available locally.
-if command -v auditwheel >/dev/null; then
-    log "auditwheel show (informational)"
-    auditwheel show "$STAGE/libMagPython.so" || true
-fi
 
 zip_artifact linux-x86_64
