@@ -40,11 +40,18 @@
     <NMakeBuildCommandLine>
       cd /D "$(BuildDir)"
       set PATH=$(MSBuildProjectDirectory)\jom;%PATH%
+      rem /FS serialises cl's writes to zlib.pdb so the parallel jobs
+      rem jom spawns don't collide on it. Same /FS fix openssl.vcxproj
+      rem applies for the same reason; without it the build dies with
+      rem "cannot open program database ... if multiple CL.EXE write
+      rem to the same .PDB file, please use /FS".
+      set CL=/FS
       jom -j%NUMBER_OF_PROCESSORS% -f win32\Makefile.msc zlib.lib
     </NMakeBuildCommandLine>
     <NMakeReBuildCommandLine>
       cd /D "$(BuildDir)"
       set PATH=$(MSBuildProjectDirectory)\jom;%PATH%
+      set CL=/FS
       nmake /nologo /f win32\Makefile.msc clean
       jom -j%NUMBER_OF_PROCESSORS% -f win32\Makefile.msc zlib.lib
     </NMakeReBuildCommandLine>
