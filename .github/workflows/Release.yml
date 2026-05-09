@@ -28,41 +28,10 @@ jobs:
         with:
           path: artifacts
 
-      - name: Compose release notes
-        run: |
-          set -euo pipefail
-
-          # Each per-platform build job emits its own MagPython-<platform>.md
-          # alongside the zip (see "Generate build details" in Build All.yml).
-          # Concatenating those is enough — the release workflow doesn't need
-          # to know anything about Python / OpenSSL / toolchain versions.
-          mapfile -t FRAGMENTS < <(find artifacts -name 'MagPython-*.md' -type f | sort)
-          [ "${#FRAGMENTS[@]}" -gt 0 ] || { echo "no MagPython-*.md fragments found under artifacts/" >&2; exit 1; }
-
-          {
-            echo "## Build details"
-            echo
-            for f in "${FRAGMENTS[@]}"; do
-              cat "$f"
-              echo
-            done
-          } > body.md
-
-          cat body.md
-
+      # Logic lives in MagPython/release.sh so the notes-composition step
+      # can be exercised locally with DRY_RUN=1, without standing up a
+      # full release.
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-          NAME: ${{ inputs.name }}
-        run: |
-          set -euo pipefail
-          mapfile -t ASSETS < <(find artifacts -name '*.zip' -type f | sort)
-          [ "${#ASSETS[@]}" -gt 0 ] || { echo "no artifacts found under artifacts/" >&2; exit 1; }
-          # --generate-notes appends GitHub's auto-generated changelog after
-          # the body we wrote (the API pre-pends `body` to the generated notes).
-          gh release create "$NAME" \
-            --title "$NAME" \
-            --target "$GITHUB_SHA" \
-            --notes-file body.md \
-            --generate-notes \
-            "${ASSETS[@]}"
+        run: bash MagPython/release.sh "${{ inputs.name }}"
