@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{C5A2D6E1-9F4B-4C8E-A1B7-3D5F8E2A9C7B}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ProjectName>ZLib</ProjectName>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <BuildDir>$(MSBuildProjectDirectory)\zlib\zlib-$(ZlibVersion)</BuildDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <!--
+      Upstream's win32/Makefile.msc is the supported MSVC build path.
+      The default 'all' target builds shared + static + import libs
+      together; we only need the static lib (zlib.lib) since
+      MagPython.dll links it directly, so target it explicitly to skip
+      the .dll/.def/.res tail of the makefile.
+
+      jom (downloaded via download-jom.ps1, same one openssl.vcxproj
+      uses) parallelises the per-file cl.exe invocations. zlib has
+      ~10 translation units; without jom this is serial nmake, which
+      regresses build time vs. the previous setup where MagPython.vcxproj
+      compiled the same files under MSBuild's /m parallelism.
+
+      The tree exists at $(BuildDir) only after Download zlib runs;
+      these commands must therefore live in NMakeBuildCommandLine
+      (executed at build time), not in static <ClCompile> items
+      (evaluated at project-load time).
+    -->
+    <NMakeBuildCommandLine>
+      cd /D "$(BuildDir)"
+      set PATH=$(MSBuildProjectDirectory)\jom;%PATH%
+      jom -j%NUMBER_OF_PROCESSORS% -f win32\Makefile.msc zlib.lib
+    </NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>
+      cd /D "$(BuildDir)"
+      set PATH=$(MSBuildProjectDirectory)\jom;%PATH%
+      nmake /nologo /f win32\Makefile.msc clean
+      jom -j%NUMBER_OF_PROCESSORS% -f win32\Makefile.msc zlib.lib
+    </NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>
+      if exist "$(BuildDir)\win32\Makefile.msc" cd /D "$(BuildDir)" &amp;&amp; nmake /nologo /f win32\Makefile.msc clean
+    </NMakeCleanCommandLine>
+    <NMakeOutput />
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Download zlib" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-zlib.ps1" />
+  </Target>
+  <Target Name="Download jom" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-jom.ps1" />
+  </Target>
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <!-- Inside the Target so the file list is re-evaluated after the
+           NMake build produced zlib.lib + headers. Same pattern as
+           openssl.vcxproj's CopyArtifacts. zconf.h is generated from
+           zconf.h.in by zlib's configure; on Windows the prebuilt
+           zconf.h checked into the source tree is used as-is. -->
+      <StaticLib Include="$(BuildDir)\zlib.lib" />
+      <PublicHeader Include="$(BuildDir)\zlib.h" />
+      <PublicHeader Include="$(BuildDir)\zconf.h" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)" />
+    <MakeDir Directories="$(OutDir)include" />
+    <Copy SourceFiles="@(StaticLib)" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="@(PublicHeader)" DestinationFolder="$(OutDir)include\" />
+  </Target>
+  <Target Name="Clean">
+    <Exec Command="if exist &quot;$(BuildDir)\win32\Makefile.msc&quot; (cd /D &quot;$(BuildDir)&quot; &amp;&amp; nmake /nologo /f win32\Makefile.msc clean)" />
+    <Delete Files="$(OutDir)zlib.lib;$(OutDir)include\zlib.h;$(OutDir)include\zconf.h" />
+  </Target>
+</Project>

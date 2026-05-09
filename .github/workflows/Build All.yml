@@ -58,6 +58,11 @@ jobs:
         with:
           path: MagPython/libmpdec
           key: deps-libmpdec-${{ matrix.platform }}-${{ hashFiles('MagPython/libmpdec-version', 'MagPython/libmpdec-sha256') }}
+      - name: Cache zlib download
+        uses: actions/cache@v4
+        with:
+          path: MagPython/zlib
+          key: deps-zlib-${{ matrix.platform }}-${{ hashFiles('MagPython/zlib-version', 'MagPython/zlib-sha256') }}
 
       # Windows build (existing logic, unchanged behaviour)
       - if: matrix.platform == 'windows-x86'

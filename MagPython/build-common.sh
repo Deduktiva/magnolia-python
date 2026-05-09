@@ -65,6 +65,21 @@ fi
 OPENSSL_CACHE="$REPO/MagPython/openssl"
 OPENSSL_SRC="$OPENSSL_CACHE/openssl-$OPENSSL_VERSION"
 
+# zlib is downloaded at build time rather than vendored. Same shape
+# as the OpenSSL / libmpdec blocks above.
+ZLIB_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/zlib-version")"
+if [ -z "$ZLIB_VERSION" ]; then
+    echo "Failed to read zlib version from MagPython/zlib-version" >&2
+    exit 1
+fi
+ZLIB_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/zlib-sha256")"
+if [ -z "$ZLIB_SHA256" ]; then
+    echo "Failed to read zlib sha256 from MagPython/zlib-sha256" >&2
+    exit 1
+fi
+ZLIB_CACHE="$REPO/MagPython/zlib"
+ZLIB_SRC="$ZLIB_CACHE/zlib-$ZLIB_VERSION"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -72,19 +87,20 @@ prep_build_tree() {
     mkdir -p "$BUILD" "$STAGE"
 }
 
-# Build vendored deps that are linked statically into libMagPython:
-#   zlib    -> $REPO/zlib/libz.a
+# Build deps that are linked statically into libMagPython:
+#   zlib    -> $ZLIB_SRC/libz.a (built from build-time download)
 #   libffi  -> $REPO/libffi/.libs/libffi.a (+ generated headers)
 #   sqlite  -> $BUILD/sqlite/libsqlite3.a
 # $1 (optional): libffi --host triple (for cross-build edge cases).
 build_static_deps() {
     local libffi_host="${1:-}"
 
+    setup_zlib
     log "Building zlib static lib"
     # zlib's configure doesn't add -fPIC under --static, but we link the .a
     # into a shared libpython, so pass it explicitly. (libffi handles --with-pic
     # itself; sqlite gets -fPIC from our cc invocation below.)
-    (cd "$REPO/zlib"
+    (cd "$ZLIB_SRC"
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
      CFLAGS="-O3 -fPIC" ./configure --static
      make -j"$JOBS" libz.a)
@@ -103,6 +119,44 @@ build_static_deps() {
        -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
        "$REPO/sqlite/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
     ar rcs "$BUILD/sqlite/libsqlite3.a" "$BUILD/sqlite/sqlite3.o"
+}
+
+# Download + verify + extract the upstream zlib tarball into
+# $ZLIB_CACHE/zlib-$ZLIB_VERSION/. Idempotent — the cache lives outside
+# $BUILD so re-runs of the build script (which wipes $BUILD via
+# prep_build_tree) reuse the already-fetched tarball.
+#
+# madler/zlib doesn't publish per-tarball .sha256 sidecars on its
+# GitHub releases, so the expected hash is pinned in-tree at
+# MagPython/zlib-sha256 and checked against the downloaded bytes.
+setup_zlib() {
+    if [ -d "$ZLIB_SRC" ]; then return 0; fi
+
+    log "Fetching zlib $ZLIB_VERSION"
+    mkdir -p "$ZLIB_CACHE"
+    local base="https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION"
+    local tarball="$ZLIB_CACHE/zlib-$ZLIB_VERSION.tar.gz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$base/zlib-$ZLIB_VERSION.tar.gz"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$ZLIB_SHA256" != "$actual" ]; then
+        echo "zlib SHA-256 mismatch: expected $ZLIB_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/zlib-sha256 — regenerate via" >&2
+        echo "   MagPython/update-zlib.sh before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xzf "$tarball" -C "$ZLIB_CACHE"
 }
 
 # Download + verify + extract the upstream mpdecimal tarball into
@@ -360,8 +414,8 @@ configure_libmagpython() {
         --without-pymalloc-debug \
         LIBFFI_CFLAGS="-I$libffi_inc -I$REPO/libffi/include" \
         LIBFFI_LIBS="$libffi_lib" \
-        ZLIB_CFLAGS="-I$REPO/zlib" \
-        ZLIB_LIBS="$REPO/zlib/libz.a" \
+        ZLIB_CFLAGS="-I$ZLIB_SRC" \
+        ZLIB_LIBS="$ZLIB_SRC/libz.a" \
         LIBSQLITE3_CFLAGS="-I$REPO/sqlite" \
         LIBSQLITE3_LIBS="$BUILD/sqlite/libsqlite3.a" \
         LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \

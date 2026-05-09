@@ -34,4 +34,15 @@
     <_LibMpdecVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libmpdec-version'))</_LibMpdecVersionRaw>
     <LibMpdecVersion>$(_LibMpdecVersionRaw.Trim())</LibMpdecVersion>
   </PropertyGroup>
+
+  <!--
+    zlib is downloaded at build time (see download-zlib.ps1 /
+    ZLib.vcxproj on Windows, build-common.sh on Unix) rather than
+    vendored; the version pin lives in MagPython/zlib-version so
+    every consumer reads the same value.
+  -->
+  <PropertyGroup>
+    <_ZlibVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)zlib-version'))</_ZlibVersionRaw>
+    <ZlibVersion>$(_ZlibVersionRaw.Trim())</ZlibVersion>
+  </PropertyGroup>
 </Project>

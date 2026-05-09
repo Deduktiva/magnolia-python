@@ -10,6 +10,11 @@
 # version + expected SHA-256 live in MagPython/openssl-version and
 # MagPython/openssl-sha256.
 /MagPython/openssl/
+# zlib is downloaded + extracted at build time (see
+# download-zlib.ps1 / setup_zlib in build-common.sh). Pinned
+# version + expected SHA-256 live in MagPython/zlib-version and
+# MagPython/zlib-sha256.
+/MagPython/zlib/
 /Python/Python/deepfreeze/deepfreeze.c
 /Python/Python/frozen_modules/*.h
 /Python/Tools/build/__pycache__/
