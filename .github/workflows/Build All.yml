@@ -26,8 +26,12 @@ jobs:
             # Explicit label, not windows-latest: the build needs the
             # v142 toolset component (see README), which is only
             # guaranteed to be present on the explicitly-labelled
-            # images. Don't bump past windows-2025 without confirming
-            # the v142 component is still installed on the new image.
+            # images. As of 2026-05-12 GitHub redirects this label to
+            # the windows-2025-vs2026 image (VS 2026 replacing VS 2022);
+            # v142 is preserved on that image via the
+            # Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64
+            # component. Don't bump past windows-2025 without confirming
+            # v142 is still present on the new image.
             runs-on: windows-2025
           - platform: linux-x86_64
             runs-on: ubuntu-22.04
