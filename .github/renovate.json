@@ -1,0 +1,58 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^MagPython/openssl-version$"],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "openssl",
+      "packageNameTemplate": "openssl/openssl",
+      "extractVersionTemplate": "^openssl-(?<version>3\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^MagPython/zlib-version$"],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "zlib",
+      "packageNameTemplate": "madler/zlib",
+      "extractVersionTemplate": "^v(?<version>1\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^MagPython/libffi-version$"],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "libffi",
+      "packageNameTemplate": "libffi/libffi",
+      "extractVersionTemplate": "^v(?<version>3\\.\\d+\\.\\d+)$"
+    }
+  ],
+  "postUpgradeTasks": {
+    "commands": [
+      "MagPython/update-{{depName}}.sh {{newVersion}}"
+    ],
+    "fileFilters": [
+      "MagPython/openssl-version",
+      "MagPython/openssl-sha256",
+      "MagPython/zlib-version",
+      "MagPython/zlib-sha256",
+      "MagPython/libffi-version",
+      "MagPython/libffi-sha256",
+      "MagPython/libffi-msvc-include/ffi.h"
+    ],
+    "executionMode": "update"
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["openssl", "zlib", "libffi"],
+      "commitMessageTopic": "{{depName}} pin",
+      "commitMessageAction": "Bump",
+      "groupName": null
+    }
+  ]
+}

@@ -685,6 +685,69 @@ Concurrency-grouped per `github.ref` with cancel-in-progress.
 `.github/dependabot.yaml` keeps the GitHub Actions versions current on a
 monthly cadence.
 
+`.github/workflows/Verify libffi drift.yml` runs on PRs that touch
+`MagPython/{libffi-version,libffi-sha256,LibFFI.vcxproj}`. It downloads
+the pinned libffi tarball on a Linux runner and confirms every `.c` /
+`.S` / `.h` file `LibFFI.vcxproj` references actually exists in the
+new tree — without this, drift only surfaces later as a cl.exe C1083
+error during a 5+ minute Windows build job. The drift logic lives in
+`MagPython/check-libffi-drift.sh` and is the libffi-specific
+counterpart to the per-file file-list management the Makefile-typed
+`ZLib.vcxproj` / `SQLite.vcxproj` / `LibMpdec.vcxproj` projects don't
+need (their file lists come from upstream's own makefile or from a
+single amalgamation file).
+
+## Auto-update via Renovate
+
+`.github/renovate.json` configures Renovate to open monthly version-
+bump PRs for the three pinned dependencies whose upstream is a
+GitHub repo:
+
+| Dep | Datasource | Filter |
+| --- | --- | --- |
+| openssl | `openssl/openssl` GitHub tags | `openssl-3.x.y` |
+| zlib | `madler/zlib` GitHub tags | `v1.x.y` |
+| libffi | `libffi/libffi` GitHub releases | `v3.x.y` |
+
+When Renovate opens a bump PR, it rewrites the `<dep>-version` pin and
+runs `MagPython/update-<dep>.sh <newVersion>` as a `postUpgradeTask`.
+That script downloads the new tarball, computes the SHA-256, and
+rewrites `<dep>-sha256` (and, for libffi, also regenerates
+`MagPython/libffi-msvc-include/ffi.h` from upstream's template). All
+three modified files end up in Renovate's PR commit.
+
+The other three pinned deps stay manually-bumped because their
+upstream isn't tracked by Renovate-supported datasources:
+
+- **sqlite** — sqlite.org's URL embeds a calendar-year segment that
+  isn't derivable from the version (see "Updating pinned SQLite"
+  above). Bump via `MagPython/update-sqlite.sh <version> <year>`.
+- **libmpdec** — bytereef.org has no Renovate-trackable release
+  feed. Bump via `MagPython/update-libmpdec.sh <version>`.
+- **NASM, jom** — build tools, rarely updated; bump via
+  `MagPython/update-nasm.sh <version>` / `MagPython/update-jom.sh
+  <version>` when you want to.
+
+### Self-host requirement for `postUpgradeTasks`
+
+Renovate's hosted (Mend) bot disables `postUpgradeTasks` by default
+on its public app — running arbitrary commands per PR is a privilege
+the cloud bot doesn't grant without explicit allowlist configuration.
+If this repo is using the public Mend Renovate, the version-pin update
+will land but the SHA-256 (and, for libffi, `ffi.h`) won't auto-refresh
+— CI will fail loudly with a clear "SHA-256 mismatch" error. Two
+recovery paths:
+
+1. **Self-host Renovate** in this repo's CI (an `.github/workflows/
+   renovate.yml` that runs the official renovate-action) and grant
+   it the right permissions; `postUpgradeTasks` then works.
+2. **Fix up Renovate's PR by hand** — fetch the branch, run
+   `MagPython/update-<dep>.sh <newVersion>`, push. The two extra
+   files land as a follow-up commit.
+
+Either way, the in-tree pin is the source of truth and CI's hash
+check protects against a stale SHA being merged.
+
 ## Licensing
 
 The vendored sources keep their upstream licenses:
