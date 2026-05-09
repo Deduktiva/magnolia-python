@@ -29,14 +29,11 @@ jobs:
             # images. Don't bump past windows-2025 without confirming
             # the v142 component is still installed on the new image.
             runs-on: windows-2025
-            artifact-path: MagPython-windows-x86.zip
           - platform: linux-x86_64
             runs-on: ubuntu-22.04
             container: quay.io/pypa/manylinux_2_28_x86_64
-            artifact-path: MagPython-linux-x86_64.zip
           - platform: macos-arm64
             runs-on: macos-14
-            artifact-path: MagPython-macos-arm64.zip
     steps:
       - uses: actions/checkout@v6
 
@@ -74,5 +71,5 @@ jobs:
           name: MagPython-${{ matrix.platform }}
           retention-days: 7
           path: |
-            ${{ matrix.artifact-path }}
+            MagPython-${{ matrix.platform }}.zip
             MagPython-${{ matrix.platform }}.md
