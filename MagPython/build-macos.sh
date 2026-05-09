@@ -30,6 +30,12 @@ prep_build_tree
 install_setup_local
 build_static_deps aarch64-apple-darwin
 build_openssl darwin64-arm64-cc
+# CPython's configure.ac forces libmpdec_machine=universal on Darwin
+# ("compile with whatever -arch the C compiler is using"); pass the same
+# override to upstream's configure so the x64 inline asm path doesn't get
+# selected on arm64. Without this, autoconf detection trips on arm64
+# Macs and falls back to ANSI in inconsistent ways.
+build_libmpdec --with-machine=universal
 
 log "Configuring libMagPython"
 mkdir -p "$BUILD/main"

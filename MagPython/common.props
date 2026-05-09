@@ -18,4 +18,15 @@
     <_OpenSslShlibVersion>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(_OpenSslVersionDat)')), 'SHLIB_VERSION=([0-9.]+)').Groups[1].Value)</_OpenSslShlibVersion>
     <OpenSslDllSuffix>$(_OpenSslShlibVersion.Replace('.', '_'))</OpenSslDllSuffix>
   </PropertyGroup>
+
+  <!--
+    libmpdec is downloaded at build time (see download-libmpdec.ps1 /
+    LibMpdec.vcxproj on Windows, build-common.sh on Unix) rather than
+    vendored; the version pin lives in MagPython/libmpdec-version so
+    every consumer reads the same value.
+  -->
+  <PropertyGroup>
+    <_LibMpdecVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libmpdec-version'))</_LibMpdecVersionRaw>
+    <LibMpdecVersion>$(_LibMpdecVersionRaw.Trim())</LibMpdecVersion>
+  </PropertyGroup>
 </Project>

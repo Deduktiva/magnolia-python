@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8E1D9B45-8D17-4D1F-8B92-5F0F9B7C3D2A}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ProjectName>LibMpdec</ProjectName>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <SourceRoot>$(MSBuildProjectDirectory)\libmpdec\mpdecimal-$(LibMpdecVersion)</SourceRoot>
+    <BuildDir>$(SourceRoot)\libmpdec</BuildDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <!--
+      Upstream's libmpdec/Makefile.vc is the supported Windows build path
+      (per mpdecimal-X.Y.Z/INSTALL): cd to libmpdec/, then
+      `nmake /f Makefile.vc MACHINE=<machine>`. MACHINE=ppro selects the
+      Pentium Pro x87 inline-asm path, which is what CPython's bundled
+      _decimal.vcxproj uses on Win32 too.
+
+      Every rule in Makefile.vc has the literal token `Makefile` as a
+      dependency, so running `nmake /f Makefile.vc` directly fails with
+      U1073 ("don't know how to make 'Makefile'"). Upstream's
+      vcbuild/vcbuild32.bat works around this by copying Makefile.vc to
+      Makefile first, then invoking plain `nmake` (which auto-picks up
+      the file named `Makefile`). We do the same.
+
+      The tree exists at $(SourceRoot) only after Download libmpdec runs;
+      these commands must therefore live in NMakeBuildCommandLine
+      (executed at build time), not in static <ClCompile> items
+      (evaluated at project-load time).
+
+      LIBSTATIC=libmpdec.lib overrides upstream's default versioned name
+      (libmpdec-X.Y.Z.lib) so the artifact MagPython.vcxproj links is
+      stable across version bumps; CopyArtifacts then just stages the
+      unversioned file straight through with no rename step.
+    -->
+    <NMakeBuildCommandLine>
+      cd /D "$(BuildDir)"
+      copy /y Makefile.vc Makefile
+      nmake /nologo clean
+      nmake /nologo MACHINE=ppro LIBSTATIC=libmpdec.lib libmpdec.lib
+    </NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>
+      cd /D "$(BuildDir)"
+      copy /y Makefile.vc Makefile
+      nmake /nologo clean
+      nmake /nologo MACHINE=ppro LIBSTATIC=libmpdec.lib libmpdec.lib
+    </NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>
+      if exist "$(BuildDir)\Makefile" cd /D "$(BuildDir)" &amp;&amp; nmake /nologo clean
+    </NMakeCleanCommandLine>
+    <NMakeOutput />
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Download libmpdec" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-libmpdec.ps1" />
+  </Target>
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <!-- Inside the Target so the file list is re-evaluated after the
+           NMake build produced libmpdec.lib / mpdecimal.h. Same pattern
+           as openssl.vcxproj's CopyArtifacts. -->
+      <StaticLib Include="$(BuildDir)\libmpdec.lib" />
+      <PublicHeader Include="$(BuildDir)\mpdecimal.h" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)" />
+    <MakeDir Directories="$(OutDir)include" />
+    <Copy SourceFiles="@(StaticLib)" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="@(PublicHeader)" DestinationFolder="$(OutDir)include\" />
+  </Target>
+  <Target Name="Clean">
+    <Exec Command="if exist &quot;$(BuildDir)\Makefile&quot; (cd /D &quot;$(BuildDir)&quot; &amp;&amp; nmake /nologo clean)" />
+    <Delete Files="$(OutDir)libmpdec.lib;$(OutDir)include\mpdecimal.h" />
+  </Target>
+</Project>
