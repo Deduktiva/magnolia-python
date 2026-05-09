@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      name:
-        description: 'Release name (also used as the git tag)'
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -28,10 +23,19 @@ jobs:
         with:
           path: artifacts
 
+      # Name is v<python>-<run#>, e.g. v3.13.13-5. github.run_number
+      # auto-increments per workflow, so each Release run gets a unique
+      # tag without manual input.
+      - name: Derive release name
+        id: name
+        run: |
+          PY_VERSION=$(awk '/^#define PY_VERSION[[:space:]]/ { gsub(/"/, "", $3); print $3; exit }' Python/Include/patchlevel.h)
+          echo "name=v${PY_VERSION}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       # Logic lives in MagPython/release.sh so the notes-composition step
       # can be exercised locally with DRY_RUN=1, without standing up a
       # full release.
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash MagPython/release.sh "${{ inputs.name }}"
+        run: bash MagPython/release.sh "${{ steps.name.outputs.name }}"
