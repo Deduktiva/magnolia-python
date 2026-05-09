@@ -11,7 +11,9 @@
 #
 # Sources of truth (kept in sync with the build scripts so the .md never
 # drifts from what was actually built):
-#   Python/Include/patchlevel.h    -> PY_VERSION
+#   MagPython/python-version       -> PY_VERSION       (downloaded at
+#                                     build time, see build-common.sh /
+#                                     download-python.ps1)
 #   MagPython/openssl-version      -> OPENSSL_VERSION  (downloaded at
 #                                     build time, see build-common.sh /
 #                                     download-openssl.ps1)
@@ -42,9 +44,7 @@ require() {
     [ -n "${!1:-}" ] || { echo "failed to detect $1" >&2; exit 1; }
 }
 
-PY_VERSION="$(awk '
-    /^#define PY_VERSION[[:space:]]/ { gsub(/"/, "", $3); print $3; exit }
-' "$REPO/Python/Include/patchlevel.h")"
+PY_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/python-version")"
 
 OPENSSL_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/openssl-version")"
 

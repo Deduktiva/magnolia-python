@@ -1,0 +1,49 @@
+name: Verify python drift
+
+# Runs on PRs that touch Python-pin or vcxproj files. Catches the
+# cross-minor-bump case where a Renovate-driven (or manual) Python
+# version bump would break the Windows build because upstream
+# renamed/added/removed sources that MagPython.vcxproj or
+# FreezeMagPython.vcxproj's per-file <ClCompile>/<ClInclude> list
+# still references.
+#
+# The build itself surfaces the same drift later as a cl.exe C1083
+# 'cannot open source file' error 5+ minutes into a metaproj run on
+# the Windows runner; this workflow makes it visible at PR-review time
+# on a Linux runner (~15s wall-clock) instead.
+
+on:
+  pull_request:
+    paths:
+      - 'MagPython/python-version'
+      - 'MagPython/python-sha256'
+      - 'MagPython/MagPython.vcxproj'
+      - 'MagPython/FreezeMagPython.vcxproj'
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CPython download
+        uses: actions/cache@v4
+        with:
+          path: MagPython/python
+          key: deps-python-drift-${{ hashFiles('MagPython/python-version', 'MagPython/python-sha256') }}
+
+      - name: Populate CPython cache
+        # Source build-common.sh in a subshell so its `set -x` doesn't
+        # leak into subsequent steps. The `set +x` after sourcing
+        # silences the trace for the actual setup_python run.
+        run: |
+          bash -c '
+            . MagPython/build-common.sh
+            { set +x; } 2>/dev/null
+            setup_python
+          '
+
+      - name: Check vcxproj refs against the CPython tree
+        run: MagPython/check-python-drift.sh
