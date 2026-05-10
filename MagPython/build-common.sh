@@ -733,12 +733,13 @@ run_smoke_test() {
 }
 
 # Stage the upstream license / NOTICE files from each pinned dep into
-# $STAGE/licenses/<dep>/. Consumers of the artifact zip can drop the
-# resulting tree into their own build's third-party-licenses directory
-# verbatim. Per-dep:
+# $STAGE/licenses/ as a flat tree of <dep>-license.txt files. Consumers
+# of the artifact zip can drop the resulting directory into their own
+# build's third-party-licenses area verbatim. Per-dep:
 #   cpython  -> LICENSE                          (PSF)
 #   openssl  -> LICENSE.txt                      (Apache-2.0 since 3.x)
-#   libffi   -> LICENSE [+ LICENSE-BUILDTOOLS]   (MIT + autotools notice)
+#   libffi   -> LICENSE                          (MIT; LICENSE-BUILDTOOLS
+#               covers autotools wrappers we don't redistribute)
 #   libmpdec -> LICENSE.txt                      (BSD)
 #   zlib     -> LICENSE                          (zlib)
 #   sqlite   -> leading /* ... */ block of sqlite3.h. The amalgamation
@@ -751,34 +752,26 @@ stage_licenses() {
     mkdir -p "$STAGE/licenses"
 
     _copy_license() {
-        local dep="$1" src_dir="$2"; shift 2
-        mkdir -p "$STAGE/licenses/$dep"
-        local found=0 f
-        for f in "$@"; do
-            if [ -f "$src_dir/$f" ]; then
-                cp "$src_dir/$f" "$STAGE/licenses/$dep/"
-                found=1
-            fi
-        done
-        if [ "$found" -eq 0 ]; then
-            echo "stage_licenses: no license file found for $dep in $src_dir (looked for: $*)" >&2
+        local dep="$1" src_dir="$2" filename="$3"
+        if [ ! -f "$src_dir/$filename" ]; then
+            echo "stage_licenses: $filename not found in $src_dir (for $dep)" >&2
             exit 1
         fi
+        cp "$src_dir/$filename" "$STAGE/licenses/${dep}-license.txt"
     }
 
     _copy_license cpython   "$PYTHON_SRC"   LICENSE
     _copy_license openssl   "$OPENSSL_SRC"  LICENSE.txt
-    _copy_license libffi    "$LIBFFI_SRC"   LICENSE LICENSE-BUILDTOOLS
+    _copy_license libffi    "$LIBFFI_SRC"   LICENSE
     _copy_license libmpdec  "$LIBMPDEC_SRC" LICENSE.txt
     _copy_license zlib      "$ZLIB_SRC"     LICENSE
 
-    mkdir -p "$STAGE/licenses/sqlite"
     awk '
         /^\/\*/         { in_block = 1 }
         in_block        { print }
         in_block && /\*\// { exit }
-    ' "$SQLITE_SRC/sqlite3.h" > "$STAGE/licenses/sqlite/LICENSE.txt"
-    if [ ! -s "$STAGE/licenses/sqlite/LICENSE.txt" ]; then
+    ' "$SQLITE_SRC/sqlite3.h" > "$STAGE/licenses/sqlite-license.txt"
+    if [ ! -s "$STAGE/licenses/sqlite-license.txt" ]; then
         echo "stage_licenses: failed to extract leading comment block from $SQLITE_SRC/sqlite3.h" >&2
         exit 1
     fi
