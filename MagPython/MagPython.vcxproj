@@ -360,6 +360,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\_abc.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_asynciomodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_bisectmodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_blake2\blake2module.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_blake2\blake2b_impl.c" />
@@ -378,6 +379,7 @@
     <ClCompile Include="$(PythonSourceDir)\Modules\_localemodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_lsprof.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_pickle.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_queuemodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_randommodule.c" />
     <ClCompile Include="$(PythonSourceDir)\Modules\_sre\sre.c" />
     <ClInclude Include="$(PythonSourceDir)\Modules\_sre\sre.h" />
