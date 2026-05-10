@@ -153,6 +153,7 @@ done
 stage_headers_and_stdlib "$BUILD/main"
 stage_openssl_headers
 stage_licenses
+verify_no_static_dep_leakage "$STAGE/libMagPython.dylib"
 run_smoke_test '@loader_path'
 
 # Sanity: only @rpath/* and system libs should remain in the LC_LOAD_DYLIB

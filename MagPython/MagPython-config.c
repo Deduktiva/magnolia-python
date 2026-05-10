@@ -105,6 +105,10 @@ extern PyObject* PyInit__hashlib(void);
 extern PyObject* PyInit__socket(void);
 extern PyObject* PyInit_select(void);
 extern PyObject* PyInit_unicodedata(void);
+extern PyObject* PyInit__sqlite3(void);
+extern PyObject* PyInit__decimal(void);
+extern PyObject* PyInit__asyncio(void);
+extern PyObject* PyInit__queue(void);
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
@@ -191,6 +195,10 @@ struct _inittab _PyImport_Inittab[] = {
     {"_socket", PyInit__socket},
     {"select", PyInit_select},
     {"unicodedata", PyInit_unicodedata},
+    {"_sqlite3", PyInit__sqlite3},
+    {"_decimal", PyInit__decimal},
+    {"_asyncio", PyInit__asyncio},
+    {"_queue", PyInit__queue},
 
 /* tools/freeze/makeconfig.py marker for additional "_inittab" entries */
 /* -- ADDMODULE MARKER 2 -- */
