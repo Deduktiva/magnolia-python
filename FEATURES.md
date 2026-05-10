@@ -37,12 +37,13 @@ Versions are pinned in `MagPython/<dep>-version` and SHA-256 in
 All three platforms ship the same module surface (modulo `_winapi`,
 Windows-only).
 
-Core / runtime: `_abc`, `_codecs`, `_collections`, `_contextvars`,
-`_functools`, `_io`, `_locale`, `_opcode`, `_operator`, `_signal`,
-`_sre`, `_stat`, `_string`, `_suggestions`, `_symtable`, `_sysconfig`,
-`_thread`, `_tracemalloc`, `_typing`, `_warnings`, `_weakref`, `atexit`,
-`builtins`, `errno`, `faulthandler`, `gc`, `itertools`, `marshal`,
-`posix` (Unix) / `nt` (Windows), `sys`, `time`, `xxsubtype`.
+Core / runtime: `_abc`, `_asyncio`, `_codecs`, `_collections`,
+`_contextvars`, `_functools`, `_io`, `_locale`, `_opcode`, `_operator`,
+`_queue`, `_signal`, `_sre`, `_stat`, `_string`, `_suggestions`,
+`_symtable`, `_sysconfig`, `_thread`, `_tracemalloc`, `_typing`,
+`_warnings`, `_weakref`, `atexit`, `builtins`, `errno`, `faulthandler`,
+`gc`, `itertools`, `marshal`, `posix` (Unix) / `nt` (Windows), `sys`,
+`time`, `xxsubtype`.
 
 Data / numerics: `_bisect`, `_csv`, `_datetime`, `_decimal` (libmpdec),
 `_heapq`, `_json`, `_lsprof`, `_pickle`, `_random`, `_statistics`,
@@ -71,16 +72,15 @@ Windows-only: `_winapi`.
 Not built into the library, so any pure-Python stdlib that `import`s
 them will fail (canonical list: `MagPython/Setup.local`):
 
-`_asyncio`, `_bz2`, `_crypt`, `_dbm`, `_elementtree`, `_gdbm`,
-`_lzma`, `_multiprocessing`, `_posixshmem`, `_queue`, `_scproxy`,
-`_testbuffer`, `_testcapi`, `_testclinic`, `_testimportmultiple`,
+`_bz2`, `_crypt`, `_dbm`, `_elementtree`, `_gdbm`, `_lzma`,
+`_multiprocessing`, `_posixshmem`, `_scproxy`, `_testbuffer`,
+`_testcapi`, `_testclinic`, `_testimportmultiple`,
 `_testinternalcapi`, `_testmultiphase`, `_testsinglephase`,
-`_tkinter`, `_uuid`, `_xxtestfuzz`, `_zoneinfo`, `nis`,
-`ossaudiodev`, `pyexpat`, `readline`, `spwd`, `xxlimited`,
-`xxlimited_35`.
+`_tkinter`, `_uuid`, `_xxtestfuzz`, `_zoneinfo`, `nis`, `ossaudiodev`,
+`pyexpat`, `readline`, `spwd`, `xxlimited`, `xxlimited_35`.
 
-User-visible consequences include: no `asyncio`, `bz2`, `lzma`,
-`multiprocessing`, `queue`, `tkinter`, `uuid` (the C accelerator;
+User-visible consequences include: no `bz2`, `lzma`,
+`multiprocessing`, `tkinter`, `uuid` (the C accelerator;
 the pure-Python parts of `uuid` still import), `zoneinfo`, `dbm`,
 `xml.etree` (no `pyexpat`). `curses` is POSIX-only — Windows ships
 no `_curses` (CPython upstream relies on the `windows-curses` PyPI

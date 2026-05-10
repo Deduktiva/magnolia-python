@@ -8,7 +8,6 @@
 # platforms ship the same Python surface to the host application.
 
 *disabled*
-_asyncio
 _bz2
 _crypt
 _dbm
@@ -17,7 +16,6 @@ _gdbm
 _lzma
 _multiprocessing
 _posixshmem
-_queue
 _scproxy
 _testbuffer
 _testcapi
