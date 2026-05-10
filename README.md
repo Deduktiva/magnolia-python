@@ -747,5 +747,8 @@ The vendored sources keep their upstream licenses:
 Each artifact zip ships these license files as a flat tree under
 `MagPython/licenses/<dep>-license.txt` (populated by `stage_licenses` in
 `build-common.sh` on Linux/macOS and the `StageLicenses` target in
-`MagPython.vcxproj` on Windows). Consumers can copy the directory into their
-own build's third-party-licenses area verbatim.
+`MagPython.vcxproj` on Windows, with `stage-license.ps1` doing the per-file
+work). Each file's first line states the dep name and pinned version
+(e.g. `cpython 3.13.13`); the upstream license text follows after a blank
+line. Consumers can copy the directory into their own build's
+third-party-licenses area verbatim.
