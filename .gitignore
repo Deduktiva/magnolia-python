@@ -25,6 +25,11 @@
 # version + year + expected SHA-256 live in MagPython/sqlite-version,
 # MagPython/sqlite-year and MagPython/sqlite-sha256.
 /MagPython/sqlite/
+# ncurses is downloaded + extracted at build time on POSIX (see
+# setup_ncurses in build-common.sh; no Windows equivalent — the
+# Windows artifact ships no curses module). Pinned version + expected
+# SHA-256 live in MagPython/ncurses-version and MagPython/ncurses-sha256.
+/MagPython/ncurses/
 # CPython is downloaded + extracted at build time (see
 # download-python.ps1 / setup_python in build-common.sh). Pinned
 # version + expected SHA-256 live in MagPython/python-version and

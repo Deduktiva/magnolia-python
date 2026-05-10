@@ -21,7 +21,8 @@ shared library. Three platforms are produced from the same source tree:
 | `MagPython/libffi-version`, `MagPython/libffi-sha256` | Pinned version + expected tarball SHA-256 of libffi (used by `_ctypes`). The source is downloaded from libffi/libffi GitHub Releases at build time (`MagPython/download-libffi.ps1` on Windows, `setup_libffi` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libffi/`; not vendored. The project-local pregenerated MSVC headers (`ffi.h`, `fficonfig.h`) live under `MagPython/libffi-msvc-include/`. |
 | `MagPython/sqlite-version`, `MagPython/sqlite-year`, `MagPython/sqlite-sha256` | Pinned version + release-year + expected SHA-256 of the SQLite amalgamation zip. The zip is downloaded from sqlite.org at build time (`MagPython/download-sqlite.ps1` on Windows, `setup_sqlite` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/sqlite/`; not vendored. |
 | `MagPython/libmpdec-version`, `MagPython/libmpdec-sha256` | Pinned version + expected tarball SHA-256 of mpdecimal (used by `_decimal`). The source is downloaded from bytereef.org at build time (`MagPython/download-libmpdec.ps1` on Windows, `setup_libmpdec` in `build-common.sh` on Unix), verified against the pinned hash, and cached under `MagPython/libmpdec/`; not vendored. |
-| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `update-libmpdec.sh`, `update-nasm.sh`, `update-jom.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-sqlite.ps1`, `download-libmpdec.ps1`, `download-jom.ps1`, `download-python.ps1`). |
+| `MagPython/ncurses-version`, `MagPython/ncurses-sha256` | Pinned version + expected tarball SHA-256 of ncurses (used by `_curses` / `_curses_panel`). POSIX-only — the Windows artifact ships no curses module, so there is no `download-ncurses.ps1` counterpart. The source is downloaded from ftp.gnu.org at build time (`setup_ncurses` in `build-common.sh`), verified against the pinned hash, and cached under `MagPython/ncurses/`; not vendored. |
+| `MagPython/` | All of the project's own build glue: MSBuild projects + `*.props` for Windows, `build-linux.sh` / `build-macos.sh` / `build-common.sh` for Unix, the shared smoke test (`test.c`), `Setup.local` (modules omitted from libMagPython on Unix to mirror MagPython.vcxproj), and helper scripts (`update-python.sh`, `update-openssl.sh`, `update-zlib.sh`, `update-libffi.sh`, `update-sqlite.sh`, `update-libmpdec.sh`, `update-ncurses.sh`, `update-nasm.sh`, `update-jom.sh`, `download-nasm.ps1`, `download-openssl.ps1`, `download-zlib.ps1`, `download-libffi.ps1`, `download-sqlite.ps1`, `download-libmpdec.ps1`, `download-jom.ps1`, `download-python.ps1`). |
 | `.github/workflows/Build All.yml` | CI that builds and uploads the artifact. |
 
 The vendored library directories are the upstream sources, used as-is; all of
@@ -32,7 +33,10 @@ the project-specific build configuration lives under `MagPython/`.
 Each platform produces one zip with the same shape — a `MagPython/`
 directory containing the main shared lib, the OpenSSL libs, the headers,
 and the pure-Python stdlib. zlib, libffi, sqlite, and libmpdec are linked
-statically into the main library on every platform.
+statically into the main library on every platform; ncurses is linked
+statically into the POSIX builds only (the Windows artifact ships no
+curses module — CPython upstream relies on the `windows-curses` PyPI
+shim there).
 
 Windows (`MagPython-windows-x86.zip`):
 
@@ -200,12 +204,24 @@ shape as the Windows metaproj:
    --disable-shared` (with `--with-machine=universal` on macOS to
    match what CPython's own configure picks for arm64) and installs
    into `build-out/libmpdec-out/`.
-4. **Configure libpython** — out-of-tree configure in `build-out/main`
+4. **ncurses** — `build_ncurses` fetches `ncurses-<version>.tar.gz`
+   from ftp.gnu.org (version pinned in `MagPython/ncurses-version`,
+   hash in `MagPython/ncurses-sha256`), then runs upstream's
+   `./configure --without-shared --with-pic --enable-widec
+   --without-debug --without-tests --without-progs --without-cxx
+   --without-cxx-binding --without-ada --without-manpages
+   --enable-pc-files=no --without-termlib` and installs into
+   `build-out/ncurses-out/`. Produces `libncursesw.a` + `libpanelw.a`
+   (terminfo functions stay inside `libncursesw.a` because we don't
+   pass `--with-termlib`, so there is no separate `libtinfo.a` to
+   plumb through). POSIX-only — there is no Windows equivalent.
+5. **Configure libpython** — out-of-tree configure in `build-out/main`
    with `--enable-shared --without-static-libpython
    --with-openssl=...build-out/openssl-out --with-system-libmpdec`,
-   plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, and `LIBMPDEC_*` env
-   vars pointing at the static libs from the earlier stages.
-5. **Regen frozen, then make** — `make regen-frozen` followed by an
+   plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, `LIBMPDEC_*`, and
+   `CURSES_*` / `PANEL_*` env vars pointing at the static libs from
+   the earlier stages.
+6. **Regen frozen, then make** — `make regen-frozen` followed by an
    awk pass that rewrites
    `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
    comments out the lines for modules listed under `*disabled*` in
@@ -213,8 +229,9 @@ shape as the Windows metaproj:
    affects runtime registration in `Modules/config.c` — to keep modules
    out of the build entirely we need to drop their stdlib lines.) This
    produces a libpython that contains the same module subset as
-   `MagPython/MagPython.vcxproj` does on Windows.
-6. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
+   `MagPython/MagPython.vcxproj` does on Windows, plus the POSIX-only
+   `_curses` / `_curses_panel` modules backed by the static ncurses.
+7. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
    copied to `libMagPython.{so,dylib}` and its SONAME / install name is
    rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
    Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
@@ -646,6 +663,56 @@ between major lines, so you'll likely need to revisit the
 `CONFIG_32;PPRO` defines on the `_decimal.c` ClCompile in
 `MagPython.vcxproj`.
 
+## Updating pinned ncurses
+
+ncurses' version is pinned in `MagPython/ncurses-version` and the
+expected tarball SHA-256 in `MagPython/ncurses-sha256`; the tarball
+itself is downloaded from `ftp.gnu.org/gnu/ncurses/` at build time
+(`setup_ncurses` in `build-common.sh`), verified against the pinned
+hash, and cached under `MagPython/ncurses/` (gitignored). POSIX-only
+— there is no Windows download or build step; the Windows artifact
+ships no curses module.
+
+The canonical upstream is invisible-island.net (Thomas Dickey's
+site); ftp.gnu.org carries the same tarball with stable HTTPS, so
+the build downloads from there to match the per-dep TLS shape used
+by every other devendored dep. invisible-island.net doesn't publish
+per-tarball `.sha256` sidecars in a Renovate-trackable form, so the
+in-tree pin is the sole hash check (same shape as zlib, libffi, and
+libmpdec).
+
+### How a bump works
+
+```sh
+MagPython/update-ncurses.sh 6.5
+```
+
+The script validates the version is on the 6.x line, downloads the
+tarball, computes SHA-256 locally, and rewrites
+`MagPython/ncurses-version` and `MagPython/ncurses-sha256` in place.
+
+After running:
+
+1. Run a full Linux + macOS build. The Windows build is unaffected
+   (no ncurses involvement). The Unix build re-fetches the tarball,
+   hashes it, and compares against `ncurses-sha256`; any mismatch
+   deletes the downloaded file and fails the build immediately.
+2. Commit both `MagPython/ncurses-version` and
+   `MagPython/ncurses-sha256` together (no other file changes are
+   expected on a patch bump within the 6.x line).
+
+### What else changes on an ncurses bump?
+
+For a patch-level bump within the 6.x line, the build glue needs
+no version-specific edits — `setup_ncurses` / `build_ncurses` in
+`build-common.sh` substitute the version from `ncurses-version`,
+and the verification step reads the new hash from `ncurses-sha256`.
+
+A cross-major bump (e.g. 6.x → 7.x) would warrant a manual review
+of the build glue (the configure flag set and the libncursesw /
+libpanelw filename conventions may shift), so `update-ncurses.sh`
+refuses anything outside `6.*`.
+
 ## Continuous integration
 
 `.github/workflows/Build All.yml` is a single matrix-based workflow that
@@ -743,6 +810,7 @@ The vendored sources keep their upstream licenses:
 - libffi — MIT (downloaded at build time; license ships in the upstream tarball)
 - libmpdec — BSD-2-Clause (downloaded at build time; license ships in the upstream tarball)
 - SQLite — public domain (the amalgamation zip carries no separate LICENSE; the blessing lives in the leading comment of `sqlite3.h`, mirroring https://www.sqlite.org/copyright.html)
+- ncurses — MIT-style "X11" license (downloaded at build time, POSIX builds only; the upstream tarball ships the blessing as `COPYING`, with the release blurb in `ANNOUNCE` — `stage_licenses` concatenates both into `licenses/ncurses-license.txt`)
 
 Each artifact zip ships these license files as a flat tree under
 `MagPython/licenses/<dep>-license.txt` (populated by `stage_licenses` in
