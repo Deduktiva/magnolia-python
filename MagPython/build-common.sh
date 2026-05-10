@@ -732,6 +732,58 @@ run_smoke_test() {
     rm -f "$STAGE/MagPython_test"
 }
 
+# Stage the upstream license / NOTICE files from each pinned dep into
+# $STAGE/licenses/<dep>/. Consumers of the artifact zip can drop the
+# resulting tree into their own build's third-party-licenses directory
+# verbatim. Per-dep:
+#   cpython  -> LICENSE                          (PSF)
+#   openssl  -> LICENSE.txt                      (Apache-2.0 since 3.x)
+#   libffi   -> LICENSE [+ LICENSE-BUILDTOOLS]   (MIT + autotools notice)
+#   libmpdec -> LICENSE.txt                      (BSD)
+#   zlib     -> LICENSE                          (zlib)
+#   sqlite   -> leading /* ... */ block of sqlite3.h. The amalgamation
+#               zip ships only sqlite3.{c,h}/sqlite3ext.h/shell.c — the
+#               public-domain blessing lives in that comment block (the
+#               same text https://www.sqlite.org/copyright.html publishes).
+stage_licenses() {
+    log "Staging license files into licenses/"
+    rm -rf "$STAGE/licenses"
+    mkdir -p "$STAGE/licenses"
+
+    _copy_license() {
+        local dep="$1" src_dir="$2"; shift 2
+        mkdir -p "$STAGE/licenses/$dep"
+        local found=0 f
+        for f in "$@"; do
+            if [ -f "$src_dir/$f" ]; then
+                cp "$src_dir/$f" "$STAGE/licenses/$dep/"
+                found=1
+            fi
+        done
+        if [ "$found" -eq 0 ]; then
+            echo "stage_licenses: no license file found for $dep in $src_dir (looked for: $*)" >&2
+            exit 1
+        fi
+    }
+
+    _copy_license cpython   "$PYTHON_SRC"   LICENSE
+    _copy_license openssl   "$OPENSSL_SRC"  LICENSE.txt
+    _copy_license libffi    "$LIBFFI_SRC"   LICENSE LICENSE-BUILDTOOLS
+    _copy_license libmpdec  "$LIBMPDEC_SRC" LICENSE.txt
+    _copy_license zlib      "$ZLIB_SRC"     LICENSE
+
+    mkdir -p "$STAGE/licenses/sqlite"
+    awk '
+        /^\/\*/         { in_block = 1 }
+        in_block        { print }
+        in_block && /\*\// { exit }
+    ' "$SQLITE_SRC/sqlite3.h" > "$STAGE/licenses/sqlite/LICENSE.txt"
+    if [ ! -s "$STAGE/licenses/sqlite/LICENSE.txt" ]; then
+        echo "stage_licenses: failed to extract leading comment block from $SQLITE_SRC/sqlite3.h" >&2
+        exit 1
+    fi
+}
+
 zip_artifact() {
     local platform="$1"
     local out="$REPO/MagPython-${platform}.zip"

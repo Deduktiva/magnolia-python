@@ -741,4 +741,10 @@ The vendored sources keep their upstream licenses:
 - OpenSSL — Apache-2.0 license (downloaded at build time; license ships in the upstream tarball)
 - zlib — zlib license (downloaded at build time; license ships in the upstream tarball)
 - libffi — MIT (downloaded at build time; license ships in the upstream tarball)
-- SQLite — public domain
+- libmpdec — BSD-2-Clause (downloaded at build time; license ships in the upstream tarball)
+- SQLite — public domain (the amalgamation zip carries no separate LICENSE; the blessing lives in the leading comment of `sqlite3.h`, mirroring https://www.sqlite.org/copyright.html)
+
+Each artifact zip ships these license files under `MagPython/licenses/<dep>/`
+(populated by `stage_licenses` in `build-common.sh` on Linux/macOS and the
+`StageLicenses` target in `MagPython.vcxproj` on Windows). Consumers can copy
+the tree into their own build's third-party-licenses directory verbatim.

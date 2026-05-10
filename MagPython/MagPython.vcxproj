@@ -734,6 +734,40 @@
     <Copy SourceFiles="@(PythonFiles)" DestinationFolder="$(OutDir)\lib\%(RecursiveDir)" />
   </Target>
 
+  <!-- Stage the upstream license / NOTICE files from each pinned dep into
+       $(OutDir)\licenses\<dep>\. Mirrors stage_licenses in build-common.sh
+       so the windows-x86 zip carries the same licenses\ tree shape as the
+       linux-x86_64 / macos-arm64 zips. SQLite is special-cased because
+       the amalgamation we devendor ships no separate LICENSE file —
+       extract-sqlite-license.ps1 pulls the public-domain blessing out of
+       sqlite3.h's leading comment block, version-aligned with the pin. -->
+  <Target Name="StageLicenses" AfterTargets="CopyArtifacts">
+    <ItemGroup>
+      <_License Include="$(PythonSourceDir)\LICENSE">
+        <Dep>cpython</Dep>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\openssl\openssl-$(OpenSslVersion)\LICENSE.txt">
+        <Dep>openssl</Dep>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\libffi\libffi-$(LibFFIVersion)\LICENSE">
+        <Dep>libffi</Dep>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\libffi\libffi-$(LibFFIVersion)\LICENSE-BUILDTOOLS"
+                Condition="Exists('$(MSBuildProjectDirectory)\libffi\libffi-$(LibFFIVersion)\LICENSE-BUILDTOOLS')">
+        <Dep>libffi</Dep>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\libmpdec\mpdecimal-$(LibMpdecVersion)\LICENSE.txt">
+        <Dep>libmpdec</Dep>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\zlib\zlib-$(ZlibVersion)\LICENSE">
+        <Dep>zlib</Dep>
+      </_License>
+    </ItemGroup>
+    <Copy SourceFiles="@(_License)" DestinationFolder="$(OutDir)\licenses\%(_License.Dep)" />
+    <MakeDir Directories="$(OutDir)\licenses\sqlite" />
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file &quot;$(MSBuildProjectDirectory)\extract-sqlite-license.ps1&quot; &quot;$(MSBuildProjectDirectory)\sqlite\sqlite-$(SQLiteVersion)\sqlite3.h&quot; &quot;$(OutDir)licenses\sqlite\LICENSE.txt&quot;" />
+  </Target>
+
   <!-- Capture dumpbin output for the shipped DLLs so toolchain/SDK changes
        (e.g. runner image, MSVC toolset) can be diffed against a baseline.
        See PR #29 for the validation checklist that motivated this. -->

@@ -109,6 +109,7 @@ done
 
 stage_headers_and_stdlib "$BUILD/main"
 stage_openssl_headers
+stage_licenses
 run_smoke_test '$ORIGIN'
 
 zip_artifact linux-x86_64
