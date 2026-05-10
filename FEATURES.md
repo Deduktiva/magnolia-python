@@ -2,7 +2,9 @@
 
 Embeddable build of CPython 3.13.13 packaged as a single shared library plus
 the OpenSSL DLLs and the pure-Python stdlib. zlib, libffi, sqlite, and
-libmpdec are linked statically into the main library.
+libmpdec are linked statically into the main library on every platform;
+ncurses is linked statically into the POSIX builds (the Windows artifact
+ships no curses module).
 
 ## Platforms
 
@@ -25,6 +27,7 @@ Each zip contains the main lib, OpenSSL libs, headers under
 | libffi   | static                     | backs `_ctypes` |
 | SQLite   | static                     | backs `_sqlite3` |
 | libmpdec | static                     | backs `_decimal` |
+| ncurses  | static                     | backs `_curses` / `_curses_panel`, POSIX only |
 
 Versions are pinned in `MagPython/<dep>-version` and SHA-256 in
 `MagPython/<dep>-sha256`; see `README.md` for bump procedures.
@@ -54,6 +57,8 @@ Networking / IO: `_socket`, `select`.
 FFI / DB / compression: `_ctypes` (libffi), `_sqlite3` (sqlite),
 `zlib`.
 
+Terminal (POSIX only): `_curses` (ncurses), `_curses_panel` (ncurses).
+
 CJK codecs: `_codecs_cn`, `_codecs_hk`, `_codecs_iso2022`,
 `_codecs_jp`, `_codecs_kr`, `_codecs_tw`, `_multibytecodec`.
 
@@ -66,18 +71,21 @@ Windows-only: `_winapi`.
 Not built into the library, so any pure-Python stdlib that `import`s
 them will fail (canonical list: `MagPython/Setup.local`):
 
-`_asyncio`, `_bz2`, `_crypt`, `_curses`, `_curses_panel`, `_dbm`,
-`_elementtree`, `_gdbm`, `_lzma`, `_multiprocessing`, `_posixshmem`,
-`_queue`, `_scproxy`, `_testbuffer`, `_testcapi`, `_testclinic`,
-`_testimportmultiple`, `_testinternalcapi`, `_testmultiphase`,
-`_testsinglephase`, `_tkinter`, `_uuid`, `_xxtestfuzz`, `_zoneinfo`,
-`nis`, `ossaudiodev`, `pyexpat`, `readline`, `spwd`, `xxlimited`,
+`_asyncio`, `_bz2`, `_crypt`, `_dbm`, `_elementtree`, `_gdbm`,
+`_lzma`, `_multiprocessing`, `_posixshmem`, `_queue`, `_scproxy`,
+`_testbuffer`, `_testcapi`, `_testclinic`, `_testimportmultiple`,
+`_testinternalcapi`, `_testmultiphase`, `_testsinglephase`,
+`_tkinter`, `_uuid`, `_xxtestfuzz`, `_zoneinfo`, `nis`,
+`ossaudiodev`, `pyexpat`, `readline`, `spwd`, `xxlimited`,
 `xxlimited_35`.
 
 User-visible consequences include: no `asyncio`, `bz2`, `lzma`,
 `multiprocessing`, `queue`, `tkinter`, `uuid` (the C accelerator;
 the pure-Python parts of `uuid` still import), `zoneinfo`, `dbm`,
-`curses`, `xml.etree` (no `pyexpat`).
+`xml.etree` (no `pyexpat`). `curses` is POSIX-only — Windows ships
+no `_curses` (CPython upstream relies on the `windows-curses` PyPI
+shim there), so a host application targeting all three platforms
+should treat `curses` as Linux/macOS only.
 
 ## Notes for embedders
 

@@ -11,8 +11,6 @@
 _asyncio
 _bz2
 _crypt
-_curses
-_curses_panel
 _dbm
 _elementtree
 _gdbm

@@ -38,6 +38,7 @@ build_openssl darwin64-arm64-cc
 # selected on arm64. Without this, autoconf detection trips on arm64
 # Macs and falls back to ANSI in inconsistent ways.
 build_libmpdec --with-machine=universal
+build_ncurses
 
 log "Configuring libMagPython"
 mkdir -p "$BUILD/main"

@@ -53,6 +53,7 @@ install_setup_local
 build_static_deps ""
 build_openssl linux-x86_64
 build_libmpdec
+build_ncurses
 
 log "Configuring libMagPython"
 mkdir -p "$BUILD/main"

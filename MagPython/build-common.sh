@@ -125,6 +125,25 @@ fi
 SQLITE_CACHE="$REPO/MagPython/sqlite"
 SQLITE_SRC="$SQLITE_CACHE/sqlite-$SQLITE_VERSION"
 
+# ncurses is downloaded at build time rather than vendored. POSIX-only
+# (no Windows equivalent — the Windows artifact ships no curses module).
+# Backs CPython's _curses / _curses_panel; built statically so the
+# artifact zip stays self-contained on platforms whose system ncurses
+# either isn't installable from a manylinux_2_28 base (Linux) or ships
+# only a narrow-char libncurses (macOS).
+NCURSES_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/ncurses-version")"
+if [ -z "$NCURSES_VERSION" ]; then
+    echo "Failed to read ncurses version from MagPython/ncurses-version" >&2
+    exit 1
+fi
+NCURSES_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/ncurses-sha256")"
+if [ -z "$NCURSES_SHA256" ]; then
+    echo "Failed to read ncurses sha256 from MagPython/ncurses-sha256" >&2
+    exit 1
+fi
+NCURSES_CACHE="$REPO/MagPython/ncurses"
+NCURSES_SRC="$NCURSES_CACHE/ncurses-$NCURSES_VERSION"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -415,6 +434,95 @@ build_libmpdec() {
      make install)
 }
 
+# Download + verify + extract the upstream ncurses tarball into
+# $NCURSES_CACHE/ncurses-$NCURSES_VERSION/. Idempotent — the cache
+# lives outside $BUILD so re-runs of the build script (which wipes
+# $BUILD via prep_build_tree) reuse the already-fetched tarball.
+#
+# invisible-island.net (the canonical upstream) doesn't publish a
+# Renovate-trackable release feed, and ftp.gnu.org (the GNU mirror)
+# carries the same tarball with stable HTTPS — fetch from the GNU
+# mirror so the download path matches every other devendored dep
+# (no per-dep TLS quirks). The expected hash is pinned in-tree at
+# MagPython/ncurses-sha256 and checked against the downloaded bytes.
+setup_ncurses() {
+    if [ -d "$NCURSES_SRC" ]; then return 0; fi
+
+    log "Fetching ncurses $NCURSES_VERSION"
+    mkdir -p "$NCURSES_CACHE"
+    local url="https://ftp.gnu.org/gnu/ncurses/ncurses-$NCURSES_VERSION.tar.gz"
+    local tarball="$NCURSES_CACHE/ncurses-$NCURSES_VERSION.tar.gz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$url"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$NCURSES_SHA256" != "$actual" ]; then
+        echo "ncurses SHA-256 mismatch: expected $NCURSES_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/ncurses-sha256 — regenerate via" >&2
+        echo "   MagPython/update-ncurses.sh before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xzf "$tarball" -C "$NCURSES_CACHE"
+}
+
+# Build ncurses as a static lib at $BUILD/ncurses-out via upstream's
+# autoconf. Mirrors libmpdec handling — the .a is consumed by CPython's
+# _curses / _curses_panel via CURSES_CFLAGS/CURSES_LIBS (and the
+# PANEL_* equivalents) in configure_libmagpython.
+#
+# Configure flag set:
+#   --without-shared --with-pic     static-only, PIC for the libpython link
+#   --enable-widec                  Unicode (wide-char) support; selects
+#                                   the libncursesw / libpanelw names
+#   --without-debug                 drop debug-build artifacts
+#   --without-tests --without-progs no test/binary executables
+#   --without-cxx --without-cxx-binding  drop the C++ binding
+#   --without-manpages              drop manpages from the install tree
+#   --without-ada                   drop the Ada95 binding (some hosts
+#                                   have gnat installed and would otherwise
+#                                   build it)
+#   --enable-pc-files=no            don't install pkg-config .pc files
+#                                   into the staged tree (we point CPython
+#                                   at the .a files directly via
+#                                   CURSES_LIBS, not via pkg-config)
+#   --without-termlib               keep terminfo functions inside
+#                                   libncursesw rather than splitting them
+#                                   into a separate libtinfo — one fewer
+#                                   .a to plumb through CURSES_LIBS, and
+#                                   matches the macOS shape (where libtinfo
+#                                   isn't separated)
+build_ncurses() {
+    setup_ncurses
+    log "Building ncurses $NCURSES_VERSION"
+    (cd "$NCURSES_SRC"
+     [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
+     ./configure \
+         --prefix="$BUILD/ncurses-out" \
+         --without-shared --with-pic \
+         --enable-widec \
+         --without-debug \
+         --without-tests \
+         --without-progs \
+         --without-cxx --without-cxx-binding \
+         --without-ada \
+         --without-manpages \
+         --enable-pc-files=no \
+         --without-termlib \
+         CFLAGS="-O2 -fPIC"
+     make -j"$JOBS"
+     make install)
+}
+
 # Locate the libffi build's generated include dir (host triple subdir).
 # After `./configure && make`, libffi puts fficonfig.h + ffi.h into
 # $LIBFFI_SRC/<triple>/include. We need this on the include path so that
@@ -609,6 +717,10 @@ configure_libmagpython() {
         LIBSQLITE3_LIBS="$BUILD/sqlite/libsqlite3.a" \
         LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \
         LIBMPDEC_LIBS="$BUILD/libmpdec-out/lib/libmpdec.a -lm" \
+        CURSES_CFLAGS="-DHAVE_NCURSESW=1 -I$BUILD/ncurses-out/include -I$BUILD/ncurses-out/include/ncursesw" \
+        CURSES_LIBS="$BUILD/ncurses-out/lib/libncursesw.a" \
+        PANEL_CFLAGS="-DHAVE_NCURSESW=1 -I$BUILD/ncurses-out/include -I$BUILD/ncurses-out/include/ncursesw" \
+        PANEL_LIBS="$BUILD/ncurses-out/lib/libpanelw.a $BUILD/ncurses-out/lib/libncursesw.a" \
         CFLAGS_NODIST="-fPIC" \
         LDFLAGS_NODIST="$extra_ldflags" \
         "$@"
@@ -747,6 +859,9 @@ run_smoke_test() {
 #               zip ships only sqlite3.{c,h}/sqlite3ext.h/shell.c — the
 #               public-domain blessing lives in that comment block (the
 #               same text https://www.sqlite.org/copyright.html publishes).
+#   ncurses  -> ANNOUNCE (release blurb naming the upstream maintainer)
+#               concatenated with COPYING (the MIT-style "X11" license).
+#               POSIX-only — the Windows artifact ships no curses.
 stage_licenses() {
     log "Staging license files into licenses/"
     rm -rf "$STAGE/licenses"
@@ -786,6 +901,23 @@ stage_licenses() {
         echo "stage_licenses: failed to extract leading comment block from $SQLITE_SRC/sqlite3.h" >&2
         exit 1
     fi
+
+    # ncurses: the upstream tarball doesn't ship a single LICENSE file —
+    # ANNOUNCE names the upstream maintainer and the release; COPYING
+    # holds the MIT-style "X11" blessing. Concatenate both so the staged
+    # file carries both pieces upstream points consumers at.
+    for f in ANNOUNCE COPYING; do
+        if [ ! -f "$NCURSES_SRC/$f" ]; then
+            echo "stage_licenses: $f not found in $NCURSES_SRC (for ncurses)" >&2
+            exit 1
+        fi
+    done
+    {
+        printf 'ncurses %s\n\n' "$NCURSES_VERSION"
+        cat "$NCURSES_SRC/ANNOUNCE"
+        printf '\n--- COPYING ---\n\n'
+        cat "$NCURSES_SRC/COPYING"
+    } > "$STAGE/licenses/ncurses-license.txt"
 }
 
 zip_artifact() {
