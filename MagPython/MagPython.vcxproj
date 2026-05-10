@@ -734,6 +734,52 @@
     <Copy SourceFiles="@(PythonFiles)" DestinationFolder="$(OutDir)\lib\%(RecursiveDir)" />
   </Target>
 
+  <!-- Stage the upstream license / NOTICE files from each pinned dep into
+       $(OutDir)\licenses\ as a flat tree of <dep>-license.txt files, each
+       prefixed with a "<dep> <version>" header line. Mirrors
+       stage_licenses in build-common.sh so the windows-x86 zip carries
+       the same licenses\ shape as the linux-x86_64 / macos-arm64 zips.
+       SQLite is special-cased (Mode=ExtractCComment) because the
+       amalgamation we devendor ships no separate LICENSE file —
+       stage-license.ps1 pulls the public-domain blessing out of sqlite3.h's
+       leading comment block, version-aligned with the pin. -->
+  <Target Name="StageLicenses" AfterTargets="CopyArtifacts">
+    <ItemGroup>
+      <_License Include="$(PythonSourceDir)\LICENSE">
+        <Dep>cpython</Dep>
+        <Version>$(PythonVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\openssl\openssl-$(OpenSslVersion)\LICENSE.txt">
+        <Dep>openssl</Dep>
+        <Version>$(OpenSslVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\libffi\libffi-$(LibFFIVersion)\LICENSE">
+        <Dep>libffi</Dep>
+        <Version>$(LibFFIVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\libmpdec\mpdecimal-$(LibMpdecVersion)\LICENSE.txt">
+        <Dep>libmpdec</Dep>
+        <Version>$(LibMpdecVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\zlib\zlib-$(ZlibVersion)\LICENSE">
+        <Dep>zlib</Dep>
+        <Version>$(ZlibVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
+      <_License Include="$(MSBuildProjectDirectory)\sqlite\sqlite-$(SQLiteVersion)\sqlite3.h">
+        <Dep>sqlite</Dep>
+        <Version>$(SQLiteVersion)</Version>
+        <Mode>ExtractCComment</Mode>
+      </_License>
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)\licenses" />
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file &quot;$(MSBuildProjectDirectory)\stage-license.ps1&quot; -Source &quot;%(_License.Identity)&quot; -Dep &quot;%(_License.Dep)&quot; -Version &quot;%(_License.Version)&quot; -OutPath &quot;$(OutDir)licenses\%(_License.Dep)-license.txt&quot; -Mode &quot;%(_License.Mode)&quot;" />
+  </Target>
+
   <!-- Capture dumpbin output for the shipped DLLs so toolchain/SDK changes
        (e.g. runner image, MSVC toolset) can be diffed against a baseline.
        See PR #29 for the validation checklist that motivated this. -->

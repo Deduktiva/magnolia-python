@@ -732,6 +732,62 @@ run_smoke_test() {
     rm -f "$STAGE/MagPython_test"
 }
 
+# Stage the upstream license / NOTICE files from each pinned dep into
+# $STAGE/licenses/ as a flat tree of <dep>-license.txt files. Each file
+# starts with a "<dep> <version>" header line so the project and pinned
+# version are unambiguous to a downstream consumer; the upstream license
+# text follows after a blank line. Per-dep:
+#   cpython  -> LICENSE                          (PSF)
+#   openssl  -> LICENSE.txt                      (Apache-2.0 since 3.x)
+#   libffi   -> LICENSE                          (MIT; LICENSE-BUILDTOOLS
+#               covers autotools wrappers we don't redistribute)
+#   libmpdec -> LICENSE.txt                      (BSD)
+#   zlib     -> LICENSE                          (zlib)
+#   sqlite   -> leading /* ... */ block of sqlite3.h. The amalgamation
+#               zip ships only sqlite3.{c,h}/sqlite3ext.h/shell.c — the
+#               public-domain blessing lives in that comment block (the
+#               same text https://www.sqlite.org/copyright.html publishes).
+stage_licenses() {
+    log "Staging license files into licenses/"
+    rm -rf "$STAGE/licenses"
+    mkdir -p "$STAGE/licenses"
+
+    _stage_license() {
+        local dep="$1" version="$2" src_dir="$3" filename="$4"
+        if [ ! -f "$src_dir/$filename" ]; then
+            echo "stage_licenses: $filename not found in $src_dir (for $dep)" >&2
+            exit 1
+        fi
+        {
+            printf '%s %s\n\n' "$dep" "$version"
+            cat "$src_dir/$filename"
+        } > "$STAGE/licenses/${dep}-license.txt"
+    }
+
+    _stage_license cpython   "$PYTHON_VERSION"   "$PYTHON_SRC"   LICENSE
+    _stage_license openssl   "$OPENSSL_VERSION"  "$OPENSSL_SRC"  LICENSE.txt
+    _stage_license libffi    "$LIBFFI_VERSION"   "$LIBFFI_SRC"   LICENSE
+    _stage_license libmpdec  "$LIBMPDEC_VERSION" "$LIBMPDEC_SRC" LICENSE.txt
+    _stage_license zlib      "$ZLIB_VERSION"     "$ZLIB_SRC"     LICENSE
+
+    {
+        printf 'sqlite %s\n\n' "$SQLITE_VERSION"
+        awk '
+            /^\/\*/         { in_block = 1 }
+            in_block        { print }
+            in_block && /\*\// { exit }
+        ' "$SQLITE_SRC/sqlite3.h"
+    } > "$STAGE/licenses/sqlite-license.txt"
+    # Guard against an unexpectedly-empty awk extraction (e.g. upstream
+    # restructures sqlite3.h's leading comment): the header line we just
+    # wrote means the file is never zero-byte, so check for the blessing
+    # text instead.
+    if ! grep -q 'disclaims copyright' "$STAGE/licenses/sqlite-license.txt"; then
+        echo "stage_licenses: failed to extract leading comment block from $SQLITE_SRC/sqlite3.h" >&2
+        exit 1
+    fi
+}
+
 zip_artifact() {
     local platform="$1"
     local out="$REPO/MagPython-${platform}.zip"
