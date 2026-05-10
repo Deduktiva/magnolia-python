@@ -520,7 +520,19 @@ build_ncurses() {
          --without-termlib \
          CFLAGS="-O2 -fPIC"
      make -j"$JOBS"
-     make install)
+     # Install only the .a files and headers — `make install` would
+     # also run `install.data`, which compiles ncurses' terminfo
+     # database with `tic`. We pass `--without-progs`, so `tic` isn't
+     # built here; install.data then falls back to a system `tic` on
+     # PATH. manylinux_2_28's base image carries a compatible
+     # /usr/bin/tic from its ncurses-devel package, but the macos-14
+     # runner doesn't ship a widec-aware tic — install.data fails
+     # there. We don't ship the terminfo database in the artifact
+     # anyway (curses uses the host system's terminfo at runtime),
+     # so installing only libs + includes keeps the two platforms on
+     # the same path and gives CPython's configure exactly what
+     # CURSES_CFLAGS/CURSES_LIBS need to point at.
+     make install.libs install.includes)
 }
 
 # Locate the libffi build's generated include dir (host triple subdir).
