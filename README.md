@@ -70,7 +70,8 @@ Notable differences from a stock CPython Windows build:
   Windows 8.1 APIs (e.g. PSS) and is expected to load on Windows 8.1
   and newer with the VC++ 2015-2022 redistributable installed.
 - Frozen modules under `Python/Python/frozen_modules/` are regenerated
-  as part of the build (see below) and are gitignored.
+  as part of the build (see below) and are gitignored. The freezer
+  binary itself is built but not shipped.
 
 ## How the build is wired
 
@@ -133,8 +134,7 @@ StopOnFirstFailure="True"`:
    `Python/Python/frozen_modules/*.h` and freeze `getpath.py` separately.
    The generated tree is gitignored. CPython 3.13 removed deepfreeze
    entirely (the pre-3.13 deep-baked importlib bootstrap as a generated
-   `.c` file), so frozen modules are now the only regen step. The
-   freezer binary is built but not shipped (commit `3afe7fc`).
+   `.c` file), so frozen modules are now the only regen step.
 7. **`MagPython.vcxproj`** — the main DLL. Compiles the Python core,
    `Objects/`, `Parser/`, selected `Modules/`, `PC/` glue,
    `_sqlite/*`, `_decimal/_decimal.c`, `_ssl`, `_hashopenssl`,
@@ -246,7 +246,7 @@ on Linux, and the `macos-14` runner's preinstalled `python3` on macOS.
 Requirements:
 
 - Windows with Visual Studio 2019 build tools (MSVC v142, x86 cross tools,
-  Windows 8.1 SDK baseline — see commit `1bbd920`).
+  Windows 8.1 SDK baseline).
 - Perl in `PATH` (for OpenSSL `Configure`).
 - A host Python in `PATH` or one discoverable by
   `Python/PCbuild/find_python.bat` (used by the frozen-modules regen).
@@ -283,154 +283,81 @@ On an Apple Silicon Mac with Xcode Command Line Tools installed:
 
 Produces `MagPython-macos-arm64.zip` at the repo root.
 
-## Updating pinned OpenSSL
+## Updating pinned dependencies
 
-OpenSSL is the first dependency to move off the in-tree vendoring
-pattern: its version is pinned in `MagPython/openssl-version` and the
-expected tarball SHA-256 in `MagPython/openssl-sha256`; the tarball
-itself is downloaded from `openssl/openssl` GitHub Releases at build
-time (`download-openssl.ps1` on Windows, `setup_openssl` in
-`build-common.sh` on Unix), verified against the pinned hash *and*
-cross-checked against the upstream `.sha256` sidecar, and cached under
-`MagPython/openssl/` (gitignored).
+Every devendored dep follows the same shape: a `<dep>-version` and
+`<dep>-sha256` pin file under `MagPython/`, the build downloads the
+tarball at build time (Windows: `MagPython/download-<dep>.ps1`; Unix:
+`setup_<dep>` in `build-common.sh`), verifies it against the pinned
+hash, and caches under `MagPython/<dep>/` (gitignored). Each dep has
+an `update-<dep>.sh` wrapper that bumps the pins; the shared logic
+lives in `MagPython/update-pin-common.sh`, and the wrappers refuse
+cross-major bumps so the build glue can be reviewed manually when an
+ABI line changes.
 
-### How a bump works
+OpenSSL is the only dep whose upstream publishes a `.sha256` sidecar
+the build can cross-check against the in-tree pin (and whose
+`update-openssl.sh` only needs to fetch that sidecar rather than the
+full tarball). For everyone else the in-tree pin is the sole hash
+check — upstreams either don't ship sidecars, or don't ship them in
+a Renovate-trackable form — so `update-<dep>.sh` downloads the
+tarball and computes SHA-256 locally.
 
-```sh
-MagPython/update-openssl.sh 3.5.7
-```
+| Dep      | Source                                 | Sidecar | Line | Bump command                   |
+| ---      | ---                                    | ---     | ---  | ---                            |
+| OpenSSL  | `openssl/openssl` GitHub Releases      | yes     | 3.x  | `update-openssl.sh 3.5.7`      |
+| zlib     | `madler/zlib` GitHub Releases          | no      | 1.x  | `update-zlib.sh 1.3.3`         |
+| SQLite   | sqlite.org                             | no      | 3.x  | `update-sqlite.sh 3.53.2 2025` |
+| libffi   | `libffi/libffi` GitHub Releases        | no      | 3.x  | `update-libffi.sh 3.5.3`       |
+| libmpdec | bytereef.org                           | no      | 2.x  | `update-libmpdec.sh 2.5.2`     |
+| ncurses  | ftp.gnu.org                            | no      | 6.x  | `update-ncurses.sh 6.5`        |
+| CPython  | `python/cpython` tag archive on GitHub | no      | 3.x  | `update-python.sh 3.13.14`     |
 
-The script validates the version is on the 3.x line, fetches the
-upstream `.sha256` sidecar, validates it as a 64-char hex digest, and
-rewrites `MagPython/openssl-version` and `MagPython/openssl-sha256`
-in place. It deliberately does NOT download the tarball itself — the
-build does that with the same hash check, so duplicating it here would
-just slow down the bump.
+libmpdec is the C library behind the `_decimal` module. ncurses is
+POSIX-only — the Windows artifact ships no curses module, so there is
+no Windows download or build step; the canonical upstream is
+invisible-island.net but the build pulls from ftp.gnu.org's mirror
+because it serves the same tarball over stable HTTPS.
 
-### What else changes on an OpenSSL bump?
+For a patch-level bump within the same major line nothing else needs
+editing: every consumer (the `.vcxproj` files, `build-common.sh`,
+`common.props`, the verification step) substitutes the version from
+the relevant pin file, and the Windows DLL suffix / Unix soname for
+OpenSSL is derived from the version's major component. A few deps
+have extra moving parts noted below.
 
-For a patch-level bump within the 3.x line, the build glue needs **no
-version-specific edits**:
+### SQLite — the `sqlite-year` pin
 
-- The Windows DLL suffix (`3` today) is derived by `MagPython/common.props`
-  from the major component of `MagPython/openssl-version`, which feeds
-  `libcrypto-$(OpenSslDllSuffix).dll` / `libssl-$(OpenSslDllSuffix).dll`
-  in `MagPython/openssl.vcxproj` and `MagPython/MagPython.vcxproj`.
-- The Unix soname (`3` today) is auto-detected by
-  `MagPython/build-common.sh:openssl_shlib_version()` from the
-  downloaded tree's `VERSION.dat` (with the major-component fallback
-  used pre-download), and threaded into the `patchelf` /
-  `install_name_tool` calls in `build-linux.sh` / `build-macos.sh`.
-- The `Configure` flag set lives in
-  `MagPython/build-common.sh:build_openssl()` (Unix) and
-  `MagPython/openssl.vcxproj`'s `NMakeBuildCommandLine` (Windows). It
-  trims the build to the surface CPython's `_ssl` / `_hashopenssl`
-  actually use — see the comments in `build_openssl` for the per-flag
-  rationale.
-
-A cross-major bump (e.g. 3.x → 4.x) is a different kind of upgrade:
-the Configure flag set, soname conventions, and `OpenSslDllSuffix`
-derivation may all need revisiting.
-
-## Updating pinned zlib
-
-zlib's version is pinned in `MagPython/zlib-version` and the expected
-tarball SHA-256 in `MagPython/zlib-sha256`; the tarball itself is
-downloaded from `madler/zlib` GitHub Releases at build time
-(`download-zlib.ps1` on Windows, `setup_zlib` in `build-common.sh` on
-Unix), verified against the pinned hash, and cached under
-`MagPython/zlib/` (gitignored). madler/zlib doesn't publish per-tarball
-`.sha256` sidecars on its GitHub releases, so the in-tree pin is the
-sole hash check (same shape as libmpdec, and matches the OpenSSL flow
-minus the upstream-sidecar cross-check).
-
-### How a bump works
-
-```sh
-MagPython/update-zlib.sh 1.3.3
-```
-
-The script validates the version is on the 1.x line, downloads the
-tarball, computes SHA-256 locally, and rewrites
-`MagPython/zlib-version` and `MagPython/zlib-sha256` in place.
-
-## Updating pinned SQLite
-
-SQLite's version is pinned in `MagPython/sqlite-version`, the
-calendar release-year in `MagPython/sqlite-year`, and the expected
-amalgamation-zip SHA-256 in `MagPython/sqlite-sha256`. The zip is
-downloaded from sqlite.org at build time (`download-sqlite.ps1` on
-Windows, `setup_sqlite` in `build-common.sh` on Unix), verified
-against the pinned hash, and cached under `MagPython/sqlite/`
-(gitignored). sqlite.org doesn't publish per-zip `.sha256` sidecars,
-so the in-tree pin is the sole hash check.
-
-The year pin exists because sqlite.org's download URL embeds a
-calendar-year segment (e.g.
-`https://sqlite.org/2025/sqlite-amalgamation-3530100.zip`) that isn't
-derivable from the version. Look it up on
+sqlite.org's download URL embeds a calendar-year segment that isn't
+derivable from the version (e.g.
+`https://sqlite.org/2025/sqlite-amalgamation-3530100.zip`), so the
+year is pinned in `MagPython/sqlite-year` and passed as a second
+positional arg to `update-sqlite.sh`. Look it up on
 <https://sqlite.org/chronology.html> or in the release announcement.
-
 The numeric `3530100` in the URL is the version encoded as
-`<major>*1000000 + <minor>*10000 + <patch>*100` (e.g. 3.53.1 →
-`3530100`); the download scripts compute it inline from the version
-pin.
+`<major>*1000000 + <minor>*10000 + <patch>*100`; the download scripts
+compute it inline from the version pin.
 
-### How a bump works
-
-```sh
-MagPython/update-sqlite.sh 3.53.2 2025
-```
-
-The script validates the version is on the 3.x line and the year is
-four digits, downloads the zip, computes SHA-256 locally, and
-rewrites all three pin files (`sqlite-version`, `sqlite-year`,
-`sqlite-sha256`).
-
-### What else changes on a SQLite bump?
-
-For a patch-level bump within the 3.x line, no other files need
-editing — `SQLite.vcxproj` and `setup_sqlite` substitute the version
-from `sqlite-version`, the URL year comes from `sqlite-year`, and
-the verification step reads the new hash from `sqlite-sha256`.
-
-A cross-major bump (e.g. 3.x → 4.x) would warrant a manual review of
-the build glue, so `update-sqlite.sh` refuses anything outside the
-3.x line.
-
-## Updating pinned libffi
-
-libffi's version is pinned in `MagPython/libffi-version` and the
-expected tarball SHA-256 in `MagPython/libffi-sha256`; the tarball
-itself is downloaded from `libffi/libffi` GitHub Releases at build
-time (`download-libffi.ps1` on Windows, `setup_libffi` in
-`build-common.sh` on Unix), verified against the pinned hash, and
-cached under `MagPython/libffi/` (gitignored). libffi/libffi doesn't
-publish per-tarball `.sha256` sidecars on its GitHub releases, so the
-in-tree pin is the sole hash check (same shape as zlib and libmpdec).
-
-### The MagPython/libffi-msvc-include/ headers
+### libffi — the project-local MSVC headers
 
 Upstream libffi ships pre-generated MSVC headers only for `aarch64`
 (under `msvc_build/aarch64/`); it has never published an x86 Windows
-variant. Two files we need, `ffi.h` and `fficonfig.h`, therefore live
-under `MagPython/libffi-msvc-include/`, outside the build-time-
-downloaded source tree (which gets wiped on each tarball extract).
-`update-libffi.sh` handles them differently:
+variant. The `ffi.h` and `fficonfig.h` we need therefore live under
+`MagPython/libffi-msvc-include/`, outside the build-time-downloaded
+tree (which gets wiped on each tarball extract):
 
-- **`ffi.h`** is regenerated on every run from upstream's
-  `include/ffi.h.in` template via six `sed` substitutions (`@VERSION@`,
-  `@FFI_VERSION_STRING@`, `@FFI_VERSION_NUMBER@`, `@TARGET@` →
-  `X86_WIN32`, `@HAVE_LONG_DOUBLE@` → `0`, `@FFI_EXEC_TRAMPOLINE_TABLE@`
-  → `0`). The script aborts if upstream introduces a new `@VAR@` token
-  it doesn't know how to substitute, or if any token slips through
-  unsubstituted into the regenerated file.
+- **`ffi.h`** is regenerated on every `update-libffi.sh` run from
+  upstream's `include/ffi.h.in` via six `sed` substitutions
+  (`@VERSION@`, `@FFI_VERSION_STRING@`, `@FFI_VERSION_NUMBER@`,
+  `@TARGET@` → `X86_WIN32`, `@HAVE_LONG_DOUBLE@` → `0`,
+  `@FFI_EXEC_TRAMPOLINE_TABLE@` → `0`). The script aborts if upstream
+  introduces a new `@VAR@` token it doesn't know how to substitute,
+  or if any token slips through unsubstituted.
 
-- **`fficonfig.h`** is autoheader output that depends on autoconf
-  feature-detection results, so the script can't substitute tokens by
-  hand the way `ffi.h` works. The committed copy is preserved across
-  upgrades. If upstream's `fficonfig.h.in` template changes between
-  the previous and new libffi versions, the project-local
+- **`fficonfig.h`** is autoheader output that depends on
+  feature-detection results, so the script can't substitute it by
+  hand. The committed copy is preserved across upgrades; if upstream's
+  `fficonfig.h.in` template changes between versions the project-local
   `fficonfig.h` may need to be regenerated by hand on a Linux/macOS
   host (the script prints the recipe at the end of its run):
 
@@ -440,143 +367,30 @@ downloaded source tree (which gets wiped on each tarball extract).
   cp fficonfig.h <repo>/MagPython/libffi-msvc-include/fficonfig.h
   ```
 
-### How a bump works
+### CPython — cross-minor bumps
 
-```sh
-MagPython/update-libffi.sh 3.5.3
-```
+The `Verify python drift` workflow (`.github/workflows/Verify python
+drift.yml`) downloads the new tarball on Linux and confirms every
+`$(PythonSourceDir)\<path>\<name>.c|h` ref in `MagPython.vcxproj` /
+`FreezeMagPython.vcxproj` exists in the new tree. Cross-minor bumps
+(e.g. 3.13 → 3.14) routinely surface MISSING refs here, and
+reconciling them is part of the upgrade work — expect:
 
-The script validates the version is on the 3.x line, downloads the
-tarball, computes SHA-256 locally, rewrites
-`MagPython/libffi-version` and `MagPython/libffi-sha256`, then
-regenerates `MagPython/libffi-msvc-include/ffi.h` from the new
-upstream's template.
-
-## Updating pinned Python
-
-CPython's version is pinned in `MagPython/python-version` and the
-expected SHA-256 of the upstream tag archive in
-`MagPython/python-sha256`; the tarball itself is downloaded from
-`https://github.com/python/cpython/archive/refs/tags/v<version>.tar.gz`
-at build time (`download-python.ps1` on Windows, `setup_python` in
-`build-common.sh` on Unix), verified against the pinned hash, and
-cached under `MagPython/python/` (gitignored).
-
-### How a bump works
-
-```sh
-MagPython/update-python.sh 3.13.14
-```
-
-The script validates the version is on the 3.x line, downloads the
-tag archive, computes SHA-256 locally, and rewrites
-`MagPython/python-version` and `MagPython/python-sha256`.
-
-After running:
-
-1. Run a full Windows + Linux + macOS build. The download scripts
-   re-fetch the tarball, hash it, and compare against `python-sha256`;
-   any mismatch deletes the downloaded file and fails the build
-   immediately.
-2. The "Verify python drift" CI workflow (`.github/workflows/Verify
-   python drift.yml`) downloads the new tarball on Linux and confirms
-   every `$(PythonSourceDir)\<path>\<name>.c|h` ref in
-   `MagPython/MagPython.vcxproj` and `FreezeMagPython.vcxproj` exists
-   in the new tree. *Cross-minor bumps* (e.g. 3.13 → 3.14) routinely
-   surface MISSING refs here — reconciling them is part of the
-   upgrade work and may need `<ClCompile>` additions / removals.
-3. Commit both pin files (and any vcxproj edits) together:
-
-   ```sh
-   git add MagPython/python-version MagPython/python-sha256
-   git commit -m 'Bump python pin to 3.13.14'
-   ```
-
-### What else changes on a Python bump?
-
-For a patch-level bump within the same minor line, no other files
-need editing — `MagPython.vcxproj`, `FreezeMagPython.vcxproj`, and
-`build-common.sh` all substitute the version from `python-version`,
-and the verification step reads the new hash from `python-sha256`.
-
-For a *cross-minor* bump (e.g. 3.13 → 3.14):
-
-- `MagPython.vcxproj` — the per-file `<ClCompile>`/`<ClInclude>`
-  lists may need fixups for upstream renames or additions; the
-  drift workflow flags GONE refs.
+- `MagPython.vcxproj` — per-file `<ClCompile>`/`<ClInclude>` lists
+  may need fixups for upstream renames or additions.
 - `MagPython/Setup.local` — verify the disabled-modules list still
   matches the upstream `Modules/Setup.stdlib` shape.
 - The Linux/macOS build scripts derive `python3.<minor>` paths from
   `PY_X_Y` (computed from the pin), so the libpython soname and
   staged `lib/python<X.Y>/` directory follow automatically.
 
-## Updating pinned libmpdec
+### Cross-major bumps
 
-`libmpdec` (the C library behind `_decimal`) is the one dependency that
-isn't checked in. Its version is pinned in `MagPython/libmpdec-version`
-and the expected tarball SHA-256 in `MagPython/libmpdec-sha256`; the
-tarball itself is downloaded from bytereef.org at build time, verified
-against that pinned hash, and cached under `MagPython/libmpdec/`
-(gitignored). bytereef.org doesn't publish per-tarball `.sha256`
-sidecars — the hashes live only in the table at
-<https://www.bytereef.org/mpdecimal/download.html> — which is why the
-hash is pinned in-tree alongside the version.
-
-### How a bump works
-
-```sh
-MagPython/update-libmpdec.sh 2.5.2
-```
-
-The script validates the version is on the 2.x line, downloads the
-tarball from `bytereef.org`, computes SHA-256 locally (bytereef.org
-doesn't publish per-tarball sidecars), and rewrites
-`MagPython/libmpdec-version` and `MagPython/libmpdec-sha256` in
-place.
-
-### What else changes on a libmpdec bump?
-
-For a patch-level bump within the same minor line, nothing else
-should need editing — `LibMpdec.vcxproj`, `setup_libmpdec` /
-`build_libmpdec` in `build-common.sh`, and `common.props` all
-substitute the version from `libmpdec-version`, and the verification
-step reads the new hash from `libmpdec-sha256`.
-
-A cross-minor bump (e.g. 2.5.x → 4.x) is a different kind of
-upgrade: mpdecimal's ABI and `MACHINE=` flavours have changed
-between major lines, so you'll likely need to revisit the
-`MACHINE=ppro` flag in `LibMpdec.vcxproj`, the
-`--with-machine=universal` flag in `build-macos.sh`, and the
-`CONFIG_32;PPRO` defines on the `_decimal.c` ClCompile in
-`MagPython.vcxproj`.
-
-## Updating pinned ncurses
-
-ncurses' version is pinned in `MagPython/ncurses-version` and the
-expected tarball SHA-256 in `MagPython/ncurses-sha256`; the tarball
-itself is downloaded from `ftp.gnu.org/gnu/ncurses/` at build time
-(`setup_ncurses` in `build-common.sh`), verified against the pinned
-hash, and cached under `MagPython/ncurses/` (gitignored). POSIX-only
-— there is no Windows download or build step; the Windows artifact
-ships no curses module.
-
-The canonical upstream is invisible-island.net (Thomas Dickey's
-site); ftp.gnu.org carries the same tarball with stable HTTPS, so
-the build downloads from there to match the per-dep TLS shape used
-by every other devendored dep. invisible-island.net doesn't publish
-per-tarball `.sha256` sidecars in a Renovate-trackable form, so the
-in-tree pin is the sole hash check (same shape as zlib, libffi, and
-libmpdec).
-
-### How a bump works
-
-```sh
-MagPython/update-ncurses.sh 6.5
-```
-
-The script validates the version is on the 6.x line, downloads the
-tarball, computes SHA-256 locally, and rewrites
-`MagPython/ncurses-version` and `MagPython/ncurses-sha256` in place.
+`update-<dep>.sh` rejects anything outside the configured major line
+because cross-major bumps typically need build-glue revisions —
+Configure flag sets, soname conventions, OpenSSL's `OpenSslDllSuffix`
+derivation, mpdecimal's `MACHINE=ppro` / `--with-machine=universal`
+/ `CONFIG_32;PPRO` flavour selection, and so on.
 
 ## Continuous integration
 
