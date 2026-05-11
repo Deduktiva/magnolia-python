@@ -5,10 +5,8 @@
 # Usage: MagPython/update-jom.sh <version>
 #   e.g. MagPython/update-jom.sh 1.1.4
 #
-# qt.io's download page doesn't publish per-zip .sha256 sidecars on
-# the same path as the zip, so this script downloads the zip,
-# computes SHA-256 locally, and writes both pin files. jom is only
-# used on the Windows builder (it's a Windows-only nmake replacement).
+# jom is only used on the Windows builder (it's a Windows-only nmake
+# replacement).
 #
 # qt.io's URL uses underscore-separated version (jom_1_1_4.zip);
 # the substitution happens in update-pin-common.sh's update_pin

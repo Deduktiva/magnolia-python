@@ -12,10 +12,6 @@
 # computed from the version's numeric encoding
 # (<major>*1000000 + <minor>*10000 + <patch>*100).
 #
-# sqlite.org doesn't publish per-zip .sha256 sidecars, so this script
-# downloads the zip, computes SHA-256 locally, and writes all three
-# pin files.
-#
 # Compatible with bash 3.2 (the default on macOS).
 
 set -eu

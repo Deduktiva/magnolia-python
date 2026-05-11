@@ -5,10 +5,9 @@
 # Usage: MagPython/update-ncurses.sh <version>
 #   e.g. MagPython/update-ncurses.sh 6.5
 #
-# invisible-island.net (the upstream) doesn't publish per-tarball
-# .sha256 sidecars in a Renovate-trackable form, so this script
-# downloads the tarball from ftp.gnu.org's GNU mirror, computes
-# SHA-256 locally, and writes both pin files.
+# Pulls from ftp.gnu.org's GNU mirror (the canonical upstream is
+# invisible-island.net, but ftp.gnu.org's layout is easier to fetch
+# programmatically).
 #
 # Compatible with bash 3.2 (the default on macOS).
 

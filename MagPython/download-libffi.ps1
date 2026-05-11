@@ -1,6 +1,4 @@
-# Download and unpack libffi. libffi/libffi doesn't publish per-tarball
-# .sha256 sidecars on its GitHub releases, so the in-tree pin is the
-# sole hash check.
+# Download and unpack libffi.
 #
 # This script does NOT regenerate the project-local
 # MagPython/libffi-msvc-include/ffi.h — that's update-libffi.sh's

@@ -5,10 +5,6 @@
 # Usage: MagPython/update-openssl.sh <version>
 #   e.g. MagPython/update-openssl.sh 3.5.7
 #
-# The build downloads + verifies the tarball at build time, so this
-# script intentionally only fetches the small upstream .sha256 sidecar
-# rather than the full tarball.
-#
 # Compatible with bash 3.2 (the default on macOS).
 
 set -eu
@@ -20,5 +16,4 @@ update_pin \
     --version-pattern '3.[0-9]*.[0-9]*' \
     --version-pattern-help '3.x line' \
     --tarball-url 'https://github.com/openssl/openssl/releases/download/openssl-<v>/openssl-<v>.tar.gz' \
-    --sidecar-url 'https://github.com/openssl/openssl/releases/download/openssl-<v>/openssl-<v>.tar.gz.sha256' \
     "$@"

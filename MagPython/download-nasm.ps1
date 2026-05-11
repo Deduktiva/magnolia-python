@@ -1,5 +1,4 @@
-# Download and unpack netwide assembler. nasm.us doesn't publish
-# per-zip .sha256 sidecars, so the in-tree pin is the sole hash check.
+# Download and unpack netwide assembler.
 #
 # Stage the extracted tree as MagPython/nasm/ (unversioned) rather
 # than nasm-<version>/ so the openssl.vcxproj NMakeBuildCommandLine's

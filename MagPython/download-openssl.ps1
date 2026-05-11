@@ -1,7 +1,4 @@
-# Download and unpack OpenSSL. Verified against the pinned SHA-256
-# *and* the upstream .sha256 sidecar (defense-in-depth: the in-tree
-# pin defends against a tampered upstream tarball+sidecar pair, the
-# sidecar cross-check defends against a tampered in-tree pin).
+# Download and unpack OpenSSL. Verified against the pinned SHA-256.
 #
 # Keep this file ASCII-only (see download-helpers.ps1's note for why).
 $ErrorActionPreference = "Stop"
@@ -17,5 +14,4 @@ Get-PinnedSource `
     -Url "$BaseUrl/openssl-$Version.tar.gz" `
     -ArchiveName "openssl-$Version.tar.gz" `
     -TargetDir "openssl\openssl-$Version" `
-    -WorkDir 'openssl' `
-    -SidecarUrl "$BaseUrl/openssl-$Version.tar.gz.sha256"
+    -WorkDir 'openssl'
