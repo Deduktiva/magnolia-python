@@ -285,7 +285,7 @@ Produces `MagPython-macos-arm64.zip` at the repo root.
 
 ## Updating pinned dependencies
 
-Every devendored dep follows the same shape: a `<dep>-version` and
+Every dep follows the same shape: a `<dep>-version` and
 `<dep>-sha256` pin file under `MagPython/`, the build downloads the
 tarball at build time (Windows: `MagPython/download-<dep>.ps1`; Unix:
 `setup_<dep>` in `build-common.sh`), verifies it against the pinned
