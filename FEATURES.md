@@ -1,10 +1,12 @@
 # MagPython features
 
 Embeddable build of CPython 3.13.13 packaged as a single shared library plus
-the OpenSSL DLLs and the pure-Python stdlib. zlib, libffi, sqlite, and
-libmpdec are linked statically into the main library on every platform;
-ncurses is linked statically into the POSIX builds (the Windows artifact
-ships no curses module).
+the OpenSSL DLLs and the pure-Python stdlib. zlib and libmpdec are linked
+statically into the main library on every platform; libffi is statically
+linked on Windows/Linux and used from the SDK on macOS; sqlite ships as a
+sibling shared lib on Linux/macOS and statically on Windows; ncurses is
+linked statically into the POSIX builds (the Windows artifact ships no
+curses module).
 
 ## Platforms
 
@@ -20,14 +22,14 @@ Each zip contains the main lib, OpenSSL libs, headers under
 
 ## Pinned third-party libraries
 
-| Library  | Linkage                    | Notes |
-| ---      | ---                        | --- |
-| OpenSSL  | shared (libcrypto, libssl) | trimmed Configure flag set |
-| zlib     | static                     | |
-| libffi   | static                     | backs `_ctypes` |
-| SQLite   | static                     | backs `_sqlite3` |
-| libmpdec | static                     | backs `_decimal` |
-| ncurses  | static                     | backs `_curses` / `_curses_panel`, POSIX only |
+| Library  | Linkage                                                | Notes |
+| ---      | ---                                                    | --- |
+| OpenSSL  | shared (libcrypto, libssl)                             | trimmed Configure flag set |
+| zlib     | static                                                 | |
+| libffi   | static (Windows, Linux); SDK system libffi (macOS)     | backs `_ctypes` |
+| SQLite   | shared sibling (Linux, macOS); static (Windows)        | backs `_sqlite3` |
+| libmpdec | static                                                 | backs `_decimal` |
+| ncurses  | static                                                 | backs `_curses` / `_curses_panel`, POSIX only |
 
 Versions are pinned in `MagPython/<dep>-version` and SHA-256 in
 `MagPython/<dep>-sha256`; see `README.md` for bump procedures.

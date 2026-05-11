@@ -32,11 +32,13 @@ the project-specific build configuration lives under `MagPython/`.
 
 Each platform produces one zip with the same shape — a `MagPython/`
 directory containing the main shared lib, the OpenSSL libs, the headers,
-and the pure-Python stdlib. zlib, libffi, sqlite, and libmpdec are linked
-statically into the main library on every platform; ncurses is linked
-statically into the POSIX builds only (the Windows artifact ships no
-curses module — CPython upstream relies on the `windows-curses` PyPI
-shim there).
+and the pure-Python stdlib. zlib and libmpdec are linked statically into
+the main library on every platform; libffi is linked statically on
+Windows/Linux, while macOS uses the SDK's system libffi; sqlite ships as
+a sibling shared library on Linux/macOS and statically on Windows;
+ncurses is linked statically into the POSIX builds only (the Windows
+artifact ships no curses module — CPython upstream relies on the
+`windows-curses` PyPI shim there).
 
 Windows (`MagPython-windows-x86.zip`):
 
@@ -56,6 +58,8 @@ MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
   libcrypto.so.3
   libssl.so.3
+  libsqlite3.so.0        # SONAME libsqlite3.so.0
+  libsqlite3.so          # symlink -> libsqlite3.so.0
   include/Python/...
   lib/python3.13/        # stdlib at the path Python's Unix discovery
                          # looks for (lib/python<X.Y>/os.py)
@@ -69,6 +73,8 @@ MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
   libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
   libssl.3.dylib         # install_name @rpath/libssl.3.dylib
+  libsqlite3.0.dylib     # install_name @rpath/libsqlite3.0.dylib
+  libsqlite3.dylib       # symlink -> libsqlite3.0.dylib
   include/Python/...
   lib/python3.13/
   lib/python3.13/lib-dynload/
@@ -182,15 +188,21 @@ StopOnFirstFailure="True"`:
 Unix builds. Both source `MagPython/build-common.sh` and follow the same
 shape as the Windows metaproj:
 
-1. **Static deps** — zlib's `libz.a` and libffi's `libffi.a` (both
-   built from the build-time-downloaded sources under
-   `MagPython/zlib/zlib-<v>/` and `MagPython/libffi/libffi-<v>/`),
-   plus `build-out/sqlite/libsqlite3.a` (compiled from the
-   build-time-downloaded amalgamation under
-   `MagPython/sqlite/sqlite-<v>/sqlite3.c`). All three end up linked
-   into the main library, mirroring the Windows configuration where
-   they're each built as separate static libs by `ZLib.vcxproj` /
-   `LibFFI.vcxproj` / `SQLite.vcxproj`.
+1. **Static deps** — zlib's `libz.a` (built from the build-time-
+   downloaded source under `MagPython/zlib/zlib-<v>/`) is linked into
+   the main library on both Linux and macOS. On Linux only, libffi's
+   `libffi.a` (from `MagPython/libffi/libffi-<v>/`) is also linked
+   statically; macOS instead uses the SDK's `/usr/lib/libffi.dylib`
+   via CPython's Darwin-specific autoconf block, so no MagPython-built
+   libffi exists in the macOS artifact. SQLite is built from the
+   build-time-downloaded amalgamation
+   (`MagPython/sqlite/sqlite-<v>/sqlite3.c`) into a shared library
+   (`build-out/sqlite/libsqlite3.so.0` on Linux,
+   `build-out/sqlite/libsqlite3.0.dylib` on macOS) that is shipped
+   next to `libMagPython` rather than statically linked, so CPython's
+   `configure` can find it via the standard `-L`/`-lsqlite3` autoconf
+   probe path. Windows continues to build all three as separate static
+   libs via `ZLib.vcxproj` / `LibFFI.vcxproj` / `SQLite.vcxproj`.
 2. **OpenSSL** — `./Configure linux-x86_64` or `darwin64-arm64-cc`, then
    `make && make install_sw` into `build-out/openssl-out`. Produces
    `libcrypto.{so.3,3.dylib}` + `libssl.{so.3,3.dylib}`.
@@ -218,9 +230,14 @@ shape as the Windows metaproj:
 5. **Configure libpython** — out-of-tree configure in `build-out/main`
    with `--enable-shared --without-static-libpython
    --with-openssl=...build-out/openssl-out --with-system-libmpdec`,
-   plus `LIBFFI_*`, `ZLIB_*`, `LIBSQLITE3_*`, `LIBMPDEC_*`, and
-   `CURSES_*` / `PANEL_*` env vars pointing at the static libs from
-   the earlier stages.
+   plus `ZLIB_*`, `LIBSQLITE3_*`, `LIBMPDEC_*`, and `CURSES_*` /
+   `PANEL_*` env vars pointing at the libs from the earlier stages.
+   `LDFLAGS=-Lbuild-out/sqlite` puts the shared sqlite directory on
+   the linker's search path so `AC_CHECK_LIB([sqlite3], …)` probes
+   resolve `-lsqlite3` cleanly. On Linux the call additionally passes
+   `LIBFFI_CFLAGS` / `LIBFFI_LIBS` for the bundled static libffi; on
+   macOS those are omitted so CPython's Darwin block in `configure`
+   auto-detects the SDK's `ffi.h` and `-lffi`.
 6. **Regen frozen, then make** — `make regen-frozen` followed by an
    awk pass that rewrites
    `Modules/Setup.stdlib`: it flips `*shared*` to `*static*`, then
@@ -236,12 +253,15 @@ shape as the Windows metaproj:
    rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
    Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
    is relocatable; macOS rewrites OpenSSL `LC_LOAD_DYLIB` paths and
-   absolute `LC_RPATH` entries to `@rpath/...`. Headers and the
-   pure-Python stdlib are staged next to the libs (with a
-   `Python/python.h -> Python.h` symlink so `MagPython/test.c`'s
-   lowercase include resolves on case-sensitive filesystems),
-   `MagPython/test.c` is built and run against the staged tree (failure
-   fails the build), and the final zip is produced.
+   absolute `LC_RPATH` entries to `@rpath/...`. The shared
+   `libsqlite3.{so.0,0.dylib}` (already built with `SONAME=libsqlite3.so.0`
+   / `install_name=@rpath/libsqlite3.0.dylib`) is copied alongside, with
+   the unversioned symlink consumers expect from a normal sqlite
+   install. Headers and the pure-Python stdlib are staged next to the
+   libs (with a `Python/python.h -> Python.h` symlink so
+   `MagPython/test.c`'s lowercase include resolves on case-sensitive
+   filesystems), `MagPython/test.c` is built and run against the staged
+   tree (failure fails the build), and the final zip is produced.
 
 The host Python required by `regen-frozen` is
 `/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
@@ -386,7 +406,7 @@ After running:
 
 For a patch-level bump within the same minor line, nothing else
 should need editing — `ZLib.vcxproj` (Windows), `setup_zlib` /
-`build_static_deps` in `build-common.sh` (Unix), and `common.props`
+`build_zlib_static` in `build-common.sh` (Unix), and `common.props`
 all substitute the version from `zlib-version`, and the verification
 step reads the new hash from `zlib-sha256`.
 
