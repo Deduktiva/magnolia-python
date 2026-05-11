@@ -32,6 +32,24 @@
       "depNameTemplate": "libffi",
       "packageNameTemplate": "libffi/libffi",
       "extractVersionTemplate": "^v(?<version>3\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^MagPython/python-version$"],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "python",
+      "packageNameTemplate": "python/cpython",
+      "extractVersionTemplate": "^v(?<version>3\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^MagPython/nasm-version$"],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "nasm",
+      "packageNameTemplate": "netwide-assembler/nasm",
+      "extractVersionTemplate": "^nasm-(?<version>2\\.\\d+\\.\\d+)$"
     }
   ],
   "postUpgradeTasks": {
@@ -45,14 +63,18 @@
       "MagPython/zlib-sha256",
       "MagPython/libffi-version",
       "MagPython/libffi-sha256",
-      "MagPython/libffi-msvc-include/ffi.h"
+      "MagPython/libffi-msvc-include/ffi.h",
+      "MagPython/python-version",
+      "MagPython/python-sha256",
+      "MagPython/nasm-version",
+      "MagPython/nasm-sha256"
     ],
     "executionMode": "update"
   },
   "packageRules": [
     {
       "matchManagers": ["custom.regex"],
-      "matchDepNames": ["openssl", "zlib", "libffi"],
+      "matchDepNames": ["openssl", "zlib", "libffi", "python", "nasm"],
       "commitMessageTopic": "{{depName}} pin",
       "commitMessageAction": "Bump",
       "groupName": null
