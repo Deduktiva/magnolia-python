@@ -7,6 +7,8 @@
 #     libMagPython.dylib
 #     libcrypto.<openssl-shlib-version>.dylib  # 3 on the 3.x line
 #     libssl.<openssl-shlib-version>.dylib
+#     libsqlite3.0.dylib
+#     libsqlite3.dylib -> libsqlite3.0.dylib
 #     include/Python/...
 #     lib/...
 
@@ -30,7 +32,11 @@ command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 prep_build_tree
 setup_python
 install_setup_local
-build_static_deps aarch64-apple-darwin
+build_zlib_static
+# libffi is the SDK's /usr/lib/libffi.dylib on macOS — CPython's Darwin
+# block in configure auto-detects the SDK headers and -lffi. No
+# libMagPython-bundled libffi here (unlike the Linux build).
+build_sqlite_shared
 build_openssl darwin64-arm64-cc
 # CPython's configure.ac forces libmpdec_machine=universal on Darwin
 # ("compile with whatever -arch the C compiler is using"); pass the same
@@ -86,6 +92,12 @@ log "Renaming libpython$PY_X_Y -> libMagPython"
  cp "libpython$PY_X_Y.dylib" "$STAGE/libMagPython.dylib"
  install_name_tool -id @rpath/libMagPython.dylib "$STAGE/libMagPython.dylib")
 
+log "Copying libsqlite3 dylib"
+# build_sqlite_shared already linked it with install_name=@rpath/libsqlite3.0.dylib
+# and dropped a libsqlite3.dylib -> libsqlite3.0.dylib symlink. Both ship.
+cp -P "$BUILD/sqlite/libsqlite3.0.dylib" "$STAGE/"
+ln -sf libsqlite3.0.dylib "$STAGE/libsqlite3.dylib"
+
 log "Copying OpenSSL dylibs"
 ssl_libdir="$BUILD/openssl-out/lib"
 cp -P "$ssl_libdir"/libcrypto.*.dylib "$STAGE/"
@@ -118,11 +130,13 @@ for f in "$STAGE/libMagPython.dylib" "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.
             base="$(basename "$path")"
             install_name_tool -change "$path" "@rpath/$base" "$f"
         done
-    # Drop any absolute LC_RPATH entries that point at the build's
-    # openssl-out (added by --with-openssl-rpath=auto and by OpenSSL's
-    # own link rules) so the artifact is relocatable.
+    # Drop any absolute LC_RPATH entries that point under $BUILD so the
+    # artifact is relocatable. Catches both --with-openssl-rpath=auto's
+    # $BUILD/openssl-out/lib entry (added by configure + OpenSSL's own
+    # link rules) and the $BUILD/sqlite entry we add to LDFLAGS_NODIST
+    # so build-time helpers (_freeze_module) can load libsqlite3.
     otool -l "$f" \
-        | awk -v root="$BUILD/openssl-out" '
+        | awk -v root="$BUILD" '
             /^ +cmd LC_RPATH/   { in_rpath=1; next }
             in_rpath && /path / { if (index($2, root) == 1) print $2; in_rpath=0 }
         ' | while read -r rpath; do
@@ -146,7 +160,7 @@ log "Stripping debug symbols from shared libs"
 # tens of MB to libMagPython.dylib. `strip -x` keeps the symbol table's
 # dynamic entries while dropping local/debug symbols — same intent as
 # Linux's plain `strip`.
-for f in "$STAGE"/libMagPython.dylib "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib; do
+for f in "$STAGE"/libMagPython.dylib "$STAGE"/libcrypto.*.dylib "$STAGE"/libssl.*.dylib "$STAGE"/libsqlite3.*.dylib; do
     strip -x "$f"
 done
 

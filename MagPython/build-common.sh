@@ -151,24 +151,24 @@ prep_build_tree() {
     mkdir -p "$BUILD" "$STAGE"
 }
 
-# Build deps that are linked statically into libMagPython:
-#   zlib    -> $ZLIB_SRC/libz.a (built from build-time download)
-#   libffi  -> $LIBFFI_SRC/<triple>/.libs/libffi.a (+ generated headers)
-#   sqlite  -> $BUILD/sqlite/libsqlite3.a
-# $1 (optional): libffi --host triple (for cross-build edge cases).
-build_static_deps() {
-    local libffi_host="${1:-}"
-
+# Build zlib as a static lib at $ZLIB_SRC/libz.a. Linked into libpython.
+build_zlib_static() {
     setup_zlib
     log "Building zlib static lib"
     # zlib's configure doesn't add -fPIC under --static, but we link the .a
-    # into a shared libpython, so pass it explicitly. (libffi handles --with-pic
-    # itself; sqlite gets -fPIC from our cc invocation below.)
+    # into a shared libpython, so pass it explicitly.
     (cd "$ZLIB_SRC"
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
      CFLAGS="-O3 -fPIC" ./configure --static
      make -j"$JOBS" libz.a)
+}
 
+# Build libffi as a static lib at $LIBFFI_SRC/<triple>/.libs/libffi.a (plus
+# generated headers next to it). Linked into libpython. Linux-only — on macOS
+# the build uses the system libffi shipped with the SDK.
+# $1 (optional): libffi --host triple (for cross-build edge cases).
+build_libffi_static() {
+    local libffi_host="${1:-}"
     setup_libffi
     log "Building libffi static lib"
     (cd "$LIBFFI_SRC"
@@ -177,14 +177,47 @@ build_static_deps() {
      [ -n "$libffi_host" ] && args+=(--host="$libffi_host")
      ./configure "${args[@]}"
      make -j"$JOBS")
+}
 
+# Build sqlite3 as a shared lib at $BUILD/sqlite/libsqlite3.<so.0|0.dylib>
+# (with the unversioned $BUILD/sqlite/libsqlite3.<so|dylib> symlink the
+# linker resolves `-lsqlite3` against). Shipped as a sibling of libMagPython
+# in the artifact.
+#
+# Building shared (rather than the previous static .a) lets CPython's
+# configure find sqlite3 the normal autoconf way: AC_CHECK_LIB([sqlite3],
+# ...) link probes resolve `-lsqlite3` against $BUILD/sqlite via -L without
+# an order-of-arguments dance. The previous static path needed the
+# ac_cv_lib_sqlite3_* cache to be pre-populated to skip those probes
+# entirely; shared lib + standard -L makes that workaround unnecessary.
+#
+# Soname / install_name use the major-zero suffix matching the convention
+# Linux distros and Homebrew apply to their libsqlite3 packages, so
+# libMagPython's recorded NEEDED / LC_LOAD_DYLIB entry has the same shape
+# a host application sees from a system sqlite.
+build_sqlite_shared() {
     setup_sqlite
-    log "Compiling sqlite3 amalgamation"
+    log "Building sqlite3 shared lib"
     mkdir -p "$BUILD/sqlite"
-    cc -c -O2 -fPIC \
-       -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
-       "$SQLITE_SRC/sqlite3.c" -o "$BUILD/sqlite/sqlite3.o"
-    ar rcs "$BUILD/sqlite/libsqlite3.a" "$BUILD/sqlite/sqlite3.o"
+    case "$(uname -s)" in
+        Darwin)
+            cc -dynamiclib -O2 -fPIC \
+               -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
+               -install_name "@rpath/libsqlite3.0.dylib" \
+               "$SQLITE_SRC/sqlite3.c" \
+               -o "$BUILD/sqlite/libsqlite3.0.dylib"
+            ln -sf libsqlite3.0.dylib "$BUILD/sqlite/libsqlite3.dylib"
+            ;;
+        *)
+            cc -shared -O2 -fPIC \
+               -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_RTREE -DSQLITE_ENABLE_JSON1 \
+               -Wl,-soname,libsqlite3.so.0 \
+               "$SQLITE_SRC/sqlite3.c" \
+               -o "$BUILD/sqlite/libsqlite3.so.0" \
+               -lm -lpthread
+            ln -sf libsqlite3.so.0 "$BUILD/sqlite/libsqlite3.so"
+            ;;
+    esac
 }
 
 # Download + verify + extract the upstream CPython tag archive into
@@ -232,66 +265,6 @@ setup_python() {
         # stays a clean python-<version>/ path).
         mv "$PYTHON_CACHE/cpython-$PYTHON_VERSION" "$PYTHON_SRC"
     fi
-
-    # Always run the patch — the GitHub Actions workflow caches
-    # MagPython/python/ by python-version+sha256, so a fresh download
-    # only happens when the pin moves. On a cache hit, the cached
-    # source tree may pre-date this patch and needs it applied
-    # against. patch_cpython_configure is idempotent: it skips silently
-    # if the marker is already gone.
-    patch_cpython_configure
-}
-
-# Patch CPython's pre-built configure script to stop the Darwin libffi
-# block from clobbering user-supplied LIBFFI_CFLAGS / LIBFFI_LIBS.
-#
-# CPython 3.13's configure.ac (and the generated configure shell script)
-# has a hard-coded block that runs only on Darwin:
-#
-#     have_libffi=missing
-#     if test "x$ac_sys_system" = xDarwin; then
-#         CFLAGS="-I${SDKROOT}/usr/include/ffi $CFLAGS"
-#         <AC_CHECK_HEADER([ffi.h]) + AC_CHECK_LIB([ffi], [ffi_call])>
-#         if both checks pass:
-#             have_libffi=yes
-#             LIBFFI_CFLAGS="-I${SDKROOT}/usr/include/ffi -DUSING_APPLE_OS_LIBFFI=1"
-#             LIBFFI_LIBS="-lffi"
-#         fi
-#     fi
-#
-# On any modern macOS the SDK's <ffi.h> is reachable and `-lffi` resolves
-# to /usr/lib/libffi.dylib (or a Homebrew copy), so the inner assignments
-# always run — and they unconditionally OVERWRITE the user-passed
-# LIBFFI_CFLAGS / LIBFFI_LIBS we set in configure_libmagpython. The
-# subsequent fallback PKG_CHECK_MODULES block (which would honour our env
-# vars) is gated on `have_libffi=missing`, so it's skipped. End result:
-# _ctypes compiles against the SDK's ffi.h and links against
-# /usr/lib/libffi.dylib instead of our pinned static libffi.a, leaving
-# libMagPython.dylib with a NEEDED dependency on system libffi.
-#
-# Drop just the two assignment lines; have_libffi=yes still gets set, so
-# the configure flow proceeds normally with our env-supplied LIBFFI_*
-# values intact. The Linux/Windows builds never enter this block (the
-# `xDarwin` test is false), so the patch is a no-op there.
-#
-# Idempotent: the marker (USING_APPLE_OS_LIBFFI=1) only exists in the
-# pre-patched source, so re-running on an already-patched tree no-ops.
-patch_cpython_configure() {
-    local f="$PYTHON_SRC/configure"
-    if ! grep -q 'USING_APPLE_OS_LIBFFI=1' "$f"; then
-        # Already patched (or upstream removed the marker entirely).
-        return 0
-    fi
-    log "Patching CPython configure: skip Darwin LIBFFI_* overwrite"
-    # Markers chosen to be unique to this block: USING_APPLE_OS_LIBFFI
-    # appears nowhere else, and the bare `LIBFFI_LIBS="-lffi"` form
-    # (no ${VAR-default}) is only in this block — the fallback uses
-    # `LIBFFI_LIBS=${LIBFFI_LIBS-"-lffi"}` which our pattern excludes.
-    sed -i.bak \
-        -e '/USING_APPLE_OS_LIBFFI=1/d' \
-        -e '/^[[:space:]]*LIBFFI_LIBS="-lffi"$/d' \
-        "$f"
-    rm -f "$f.bak"
 }
 
 # Download + verify + extract the upstream zlib tarball into
@@ -760,12 +733,10 @@ install_setup_local() {
 
 # Configure CPython for the libMagPython build. Caller cd's into a build dir.
 # $1: extra LDFLAGS_NODIST (e.g. rpath flag)
-# remaining args: appended to configure (e.g. MACOSX_DEPLOYMENT_TARGET=11.0)
+# remaining args: appended to configure (e.g. LIBFFI_CFLAGS=... on Linux,
+# MACOSX_DEPLOYMENT_TARGET=11.0 on macOS).
 configure_libmagpython() {
     local extra_ldflags="$1"; shift
-    local libffi_inc libffi_lib
-    libffi_inc="$(libffi_include_dir)"
-    libffi_lib="$(libffi_static_lib)"
     # CPython's configure has --with-system-libmpdec on by default and
     # uses pkg-config; with no .pc on PATH it falls back to "-lmpdec -lm"
     # ELSE the user-supplied LIBMPDEC_CFLAGS / LIBMPDEC_LIBS. Pointing the
@@ -773,21 +744,37 @@ configure_libmagpython() {
     # are wired in, and stops _decimal from picking up a system libmpdec
     # instead.
     #
-    # sqlite3 is wired in as -L<dir> -lsqlite3 rather than a bare .a
-    # path because configure runs AC_CHECK_LIB([sqlite3], ...) probes
-    # that prepend a literal -lsqlite3 to the link line; on hosts
-    # without sqlite-devel that prepended -l can't be resolved (the
-    # linker only sees our $BUILD/sqlite directory via LIBSQLITE3_LIBS
-    # AFTER the -l, which is too late) and configure marks
-    # have_supported_sqlite3=no, dropping _sqlite3 from the build.
-    # Pre-cache the probe results below so AC_CHECK_LIB never runs the
-    # link tests at all — have_supported_sqlite3 stays yes regardless
-    # of how the host's linker would resolve `-lsqlite3`. The actual
-    # `_sqlite3` build link still uses LIBSQLITE3_LIBS, where our -L
-    # IS in effect (no AC_CHECK_LIB-prepended -l ahead of it), so the
-    # linker picks our pinned libsqlite3.a (the only file in
-    # $BUILD/sqlite). Pre-caching is robust to linker quirks (e.g. ld
-    # implementations that prefer .so across all -L dirs over .a in any).
+    # sqlite3 is wired in as a normal -I/-L/-lsqlite3 triple. The shared
+    # libsqlite3 in $BUILD/sqlite has the conventional libsqlite3.so.0 /
+    # libsqlite3.0.dylib soname (with the unversioned symlink the linker
+    # resolves -lsqlite3 against), so AC_CHECK_LIB's link probes succeed
+    # the normal autoconf way — no ac_cv_* cache pre-population needed.
+    #
+    # All link flags go into LDFLAGS rather than LDFLAGS_NODIST because
+    # CPython's Makefile.pre.in defines:
+    #   PY_LDFLAGS_NOLTO=$(PY_LDFLAGS) $(CONFIGURE_LDFLAGS_NOLTO) $(LDFLAGS_NODIST)
+    # which is used by Programs/_bootstrap_python — a build-time helper
+    # that loads libpython to freeze modules. PY_LDFLAGS_NOLTO references
+    # only $(LDFLAGS_NODIST), NOT $(CONFIGURE_LDFLAGS_NODIST) (the
+    # autoconf-substituted value of the LDFLAGS_NODIST configure env).
+    # Anything we set via LDFLAGS_NODIST=... at configure-time therefore
+    # never reaches _bootstrap_python's link, and it dies with
+    # "Library not loaded: @rpath/libsqlite3.0.dylib" the first time the
+    # build tries to freeze a module. _freeze_module avoids this by using
+    # PY_CORE_LDFLAGS (which includes both NODIST vars).
+    # PY_LDFLAGS = $(CONFIGURE_LDFLAGS) $(LDFLAGS) is used unconditionally
+    # by every link rule, so LDFLAGS is the one variable that reaches all
+    # of them. We don't ship CPython's sysconfig, so the LDFLAGS-vs-NODIST
+    # "don't leak into user wheels" distinction doesn't apply here.
+    # The $BUILD/sqlite rpath is build-only — the macOS staging step
+    # strips any LC_RPATH under $BUILD, and Linux's `patchelf --set-rpath`
+    # replaces the full RPATH at staging.
+    #
+    # libffi is platform-split: on Linux the caller passes
+    # LIBFFI_CFLAGS / LIBFFI_LIBS pointing at the static libffi.a built
+    # by build_libffi_static; on macOS no LIBFFI_* are passed and
+    # CPython's own Darwin-specific block in configure picks up the
+    # SDK's ffi.h + /usr/lib/libffi.dylib.
     "$PYTHON_SRC/configure" \
         --enable-shared \
         --without-static-libpython \
@@ -797,12 +784,10 @@ configure_libmagpython() {
         --with-system-libmpdec \
         --disable-test-modules \
         --without-pymalloc-debug \
-        LIBFFI_CFLAGS="-I$libffi_inc -I$LIBFFI_SRC/include" \
-        LIBFFI_LIBS="$libffi_lib" \
         ZLIB_CFLAGS="-I$ZLIB_SRC" \
         ZLIB_LIBS="$ZLIB_SRC/libz.a" \
         LIBSQLITE3_CFLAGS="-I$SQLITE_SRC" \
-        LIBSQLITE3_LIBS="-L$BUILD/sqlite -lsqlite3" \
+        LIBSQLITE3_LIBS="-lsqlite3" \
         LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \
         LIBMPDEC_LIBS="$BUILD/libmpdec-out/lib/libmpdec.a -lm" \
         CURSES_CFLAGS="-DHAVE_NCURSESW=1 -I$BUILD/ncurses-out/include -I$BUILD/ncurses-out/include/ncursesw" \
@@ -810,18 +795,7 @@ configure_libmagpython() {
         PANEL_CFLAGS="-DHAVE_NCURSESW=1 -I$BUILD/ncurses-out/include -I$BUILD/ncurses-out/include/ncursesw" \
         PANEL_LIBS="$BUILD/ncurses-out/lib/libpanelw.a $BUILD/ncurses-out/lib/libncursesw.a" \
         CFLAGS_NODIST="-fPIC" \
-        LDFLAGS_NODIST="$extra_ldflags" \
-        ac_cv_lib_sqlite3_sqlite3_bind_double=yes \
-        ac_cv_lib_sqlite3_sqlite3_column_decltype=yes \
-        ac_cv_lib_sqlite3_sqlite3_column_double=yes \
-        ac_cv_lib_sqlite3_sqlite3_complete=yes \
-        ac_cv_lib_sqlite3_sqlite3_progress_handler=yes \
-        ac_cv_lib_sqlite3_sqlite3_result_double=yes \
-        ac_cv_lib_sqlite3_sqlite3_set_authorizer=yes \
-        ac_cv_lib_sqlite3_sqlite3_trace_v2=yes \
-        ac_cv_lib_sqlite3_sqlite3_value_double=yes \
-        ac_cv_lib_sqlite3_sqlite3_load_extension=yes \
-        ac_cv_lib_sqlite3_sqlite3_serialize=yes \
+        LDFLAGS="-L$BUILD/sqlite -Wl,-rpath,$BUILD/sqlite $extra_ldflags" \
         "$@"
 }
 
@@ -918,30 +892,35 @@ stage_headers_and_stdlib() {
 
 # Verify $1 (the libMagPython artifact) has no dynamic linkage to any of
 # the deps we statically bundle. A leakage here means the build picked
-# up a system libsqlite3 / libmpdec / libffi / libz at link time despite
-# our LIBxxx_LIBS / LIBxxx_CFLAGS settings — which can happen if the
-# build host has the matching -dev package installed and its
-# /usr/lib<arch> happens to be searched ahead of our $BUILD/<dep>
-# directory by the linker. The configure-time AC_CHECK_LIB probes can
-# also inadvertently pull in a system .so when AC_CHECK_LIB prepends
-# `-lsqlite3` to LIBS without our `-L` first. Both failure modes are
-# invisible at configure time and to the structural built-in-module
-# check in test.c (the C extension is still in libMagPython, it's just
-# *calling* the system .so for sqlite3 functions). Only post-link
-# inspection catches it.
+# up a system libmpdec / libffi / libz at link time despite our
+# LIBxxx_LIBS / LIBxxx_CFLAGS settings — which can happen if the build
+# host has the matching -dev package installed and its /usr/lib<arch>
+# happens to be searched ahead of our $BUILD/<dep> directory by the
+# linker. Invisible at configure time and to the structural
+# built-in-module check in test.c (the C extension is still in
+# libMagPython, it's just *calling* the system .so for those functions).
+# Only post-link inspection catches it.
+#
+# libsqlite3 is intentionally NOT in the forbidden list — it's shipped as
+# a sibling .so/.dylib (built by build_sqlite_shared and staged next to
+# libMagPython). libffi is forbidden on Linux but allowed on macOS, where
+# the build deliberately uses the SDK's libffi (/usr/lib/libffi.dylib) —
+# CPython's Darwin block in configure auto-detects it.
 verify_no_static_dep_leakage() {
     local libpath="$1"
     log "Verifying $(basename "$libpath") has no dynamic linkage to bundled deps"
-    local deps
+    local deps forbidden_deps
     case "$(uname -s)" in
         Linux)
             # readelf -d prints NEEDED entries as `[libname.so.N]`.
             deps="$(readelf -d "$libpath" | awk '/NEEDED/ { gsub(/[][]/, "", $5); print $5 }')"
+            forbidden_deps="libmpdec libffi libz"
             ;;
         Darwin)
             # otool -L's first line is the file itself; subsequent lines
             # are LC_LOAD_DYLIB references (`<path> (compatibility ...)`).
             deps="$(otool -L "$libpath" | tail -n +2 | awk '{ print $1 }')"
+            forbidden_deps="libmpdec libz"
             ;;
         *)
             echo "verify_no_static_dep_leakage: unsupported OS $(uname -s)" >&2
@@ -949,11 +928,7 @@ verify_no_static_dep_leakage() {
             ;;
     esac
     local forbidden hit fail=0
-    # libsqlite3 / libmpdec / libffi / libz are all statically linked into
-    # libMagPython and must not appear as a runtime dependency. libssl /
-    # libcrypto are intentionally *not* in this list — they're the one dep
-    # we ship as sibling .so/.dylib files (test.c verifies the loaded path).
-    for forbidden in libsqlite3 libmpdec libffi libz; do
+    for forbidden in $forbidden_deps; do
         hit="$(printf '%s\n' "$deps" | grep -E "(^|/)$forbidden\\.(so|dylib)" || true)"
         if [ -n "$hit" ]; then
             echo "ERROR: $libpath dynamically links $forbidden — bundled .a was not used:" >&2
@@ -962,7 +937,7 @@ verify_no_static_dep_leakage() {
         fi
     done
     if [ "$fail" -ne 0 ]; then
-        echo "Inspect LIBSQLITE3_LIBS / LIBMPDEC_LIBS / LIBFFI / ZLIB_LIBS in" >&2
+        echo "Inspect LIBMPDEC_LIBS / LIBFFI / ZLIB_LIBS in" >&2
         echo "configure_libmagpython and the build host's installed -dev packages." >&2
         exit 1
     fi
@@ -1007,6 +982,7 @@ run_smoke_test() {
 #   openssl  -> LICENSE.txt                      (Apache-2.0 since 3.x)
 #   libffi   -> LICENSE                          (MIT; LICENSE-BUILDTOOLS
 #               covers autotools wrappers we don't redistribute)
+#               Linux only — macOS uses the SDK's libffi, no redistribution
 #   libmpdec -> LICENSE.txt                      (BSD)
 #   zlib     -> LICENSE                          (zlib)
 #   sqlite   -> leading /* ... */ block of sqlite3.h. The amalgamation
@@ -1035,7 +1011,11 @@ stage_licenses() {
 
     _stage_license cpython   "$PYTHON_VERSION"   "$PYTHON_SRC"   LICENSE
     _stage_license openssl   "$OPENSSL_VERSION"  "$OPENSSL_SRC"  LICENSE.txt
-    _stage_license libffi    "$LIBFFI_VERSION"   "$LIBFFI_SRC"   LICENSE
+    # libffi is bundled (static) only on Linux; on macOS we use the SDK's
+    # libffi, so there's nothing to attach a LICENSE to here.
+    if [ -d "$LIBFFI_SRC" ]; then
+        _stage_license libffi "$LIBFFI_VERSION" "$LIBFFI_SRC" LICENSE
+    fi
     _stage_license libmpdec  "$LIBMPDEC_VERSION" "$LIBMPDEC_SRC" LICENSE.txt
     _stage_license zlib      "$ZLIB_VERSION"     "$ZLIB_SRC"     LICENSE
 

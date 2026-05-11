@@ -8,6 +8,8 @@
 #     libMagPython.so -> libMagPython.so.1.0
 #     libcrypto.so.<openssl-shlib-version>     # 3 on the 3.x line
 #     libssl.so.<openssl-shlib-version>
+#     libsqlite3.so.0
+#     libsqlite3.so -> libsqlite3.so.0
 #     include/Python/...
 #     lib/...
 
@@ -50,15 +52,21 @@ command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
 prep_build_tree
 setup_python
 install_setup_local
-build_static_deps ""
+build_zlib_static
+build_libffi_static
+build_sqlite_shared
 build_openssl linux-x86_64
 build_libmpdec
 build_ncurses
 
 log "Configuring libMagPython"
 mkdir -p "$BUILD/main"
+LIBFFI_INC="$(libffi_include_dir)"
+LIBFFI_LIB="$(libffi_static_lib)"
 (cd "$BUILD/main"
  configure_libmagpython "-Wl,-rpath,\$\$ORIGIN" \
+     LIBFFI_CFLAGS="-I$LIBFFI_INC -I$LIBFFI_SRC/include" \
+     LIBFFI_LIBS="$LIBFFI_LIB" \
      PYTHON_FOR_REGEN="$HOST_PYTHON")
 
 regen_frozen      "$BUILD/main" "$HOST_PYTHON"
@@ -99,12 +107,16 @@ for f in "$STAGE/libcrypto.so.$OPENSSL_SO_VERSION" "$STAGE/libssl.so.$OPENSSL_SO
     patchelf --set-rpath '$ORIGIN' "$f"
 done
 
+log "Copying libsqlite3 shared lib"
+cp -P "$BUILD/sqlite/libsqlite3.so.0" "$STAGE/"
+ln -sf libsqlite3.so.0 "$STAGE/libsqlite3.so"
+
 log "Stripping debug symbols from shared libs"
 # CPython builds with -g -O3 by default; the embedded debug info adds
 # tens of MB to libMagPython.so and is useless to consumers of the
 # artifact. `strip` (no flags) keeps dynamic symbols intact, which is
 # what shared-library consumers need.
-for f in "$STAGE/libMagPython.so" "$STAGE/libcrypto.so.$OPENSSL_SO_VERSION" "$STAGE/libssl.so.$OPENSSL_SO_VERSION"; do
+for f in "$STAGE/libMagPython.so" "$STAGE/libcrypto.so.$OPENSSL_SO_VERSION" "$STAGE/libssl.so.$OPENSSL_SO_VERSION" "$STAGE/libsqlite3.so.0"; do
     strip "$f"
 done
 
