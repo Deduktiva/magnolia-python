@@ -59,7 +59,8 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "nasm",
       "packageNameTemplate": "netwide-assembler/nasm",
-      "extractVersionTemplate": "^nasm-(?<version>2\\.\\d+\\.\\d+)$"
+      "extractVersionTemplate": "^nasm-(?<version>2\\.\\d+\\.\\d+)$",
+      "versioningTemplate": "loose"
     }
   ],
   "postUpgradeTasks": {
