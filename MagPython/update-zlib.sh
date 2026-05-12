@@ -5,10 +5,6 @@
 # Usage: MagPython/update-zlib.sh <version>
 #   e.g. MagPython/update-zlib.sh 1.3.2
 #
-# madler/zlib doesn't publish per-tarball .sha256 sidecars on its
-# GitHub releases, so this script downloads the tarball, computes
-# SHA-256 locally, and writes both pin files.
-#
 # Compatible with bash 3.2 (the default on macOS).
 
 set -eu

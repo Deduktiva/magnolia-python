@@ -1,6 +1,4 @@
-# Download and unpack zlib. madler/zlib doesn't publish per-tarball
-# .sha256 sidecars on its GitHub releases, so the in-tree pin is the
-# sole hash check.
+# Download and unpack zlib.
 #
 # Keep this file ASCII-only (see download-helpers.ps1's note for why).
 $ErrorActionPreference = "Stop"

@@ -1,7 +1,4 @@
-# Download and unpack libmpdec (mpdecimal). bytereef.org doesn't publish
-# per-tarball .sha256 sidecars (the hashes live only in the HTML table at
-# https://www.bytereef.org/mpdecimal/download.html), so the in-tree pin
-# is the sole hash check.
+# Download and unpack libmpdec (mpdecimal).
 #
 # Keep this file ASCII-only (see download-helpers.ps1's note for why).
 $ErrorActionPreference = "Stop"

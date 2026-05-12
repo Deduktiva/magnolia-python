@@ -5,12 +5,6 @@
 # Usage: MagPython/update-libmpdec.sh <version>
 #   e.g. MagPython/update-libmpdec.sh 2.5.2
 #
-# bytereef.org doesn't publish per-tarball .sha256 sidecars (the
-# hashes live only in the HTML table at
-# https://www.bytereef.org/mpdecimal/download.html), so this script
-# downloads the tarball and computes SHA-256 locally rather than
-# fetching a sidecar.
-#
 # Compatible with bash 3.2 (the default on macOS).
 
 set -eu

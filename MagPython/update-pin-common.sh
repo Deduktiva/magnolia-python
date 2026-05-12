@@ -14,7 +14,7 @@
 
 # update_pin: bump a dependency's version + SHA-256 pin files.
 #
-# Flags (all required except --sidecar-url):
+# Flags (all required):
 #   --name <dep>                e.g. "openssl"; pin files are
 #                                MagPython/<dep>-version /
 #                                MagPython/<dep>-sha256.
@@ -28,13 +28,6 @@
 #                                "3.x line", surfaced in error text.
 #   --tarball-url <tmpl>        URL template for the tarball; literal
 #                                "<v>" is replaced with the version.
-#   --sidecar-url <tmpl>        OPTIONAL. If set, fetch the upstream
-#                                .sha256 sidecar and use its hash.
-#                                If unset, download the tarball and
-#                                compute SHA-256 locally — the slow
-#                                path, used by deps whose upstreams
-#                                don't publish sidecars (libmpdec,
-#                                zlib, libffi, ...).
 #
 # Positional: <version>         the only positional arg.
 update_pin() {
@@ -42,7 +35,6 @@ update_pin() {
     local version_pattern=
     local version_pattern_help=
     local tarball_url_tmpl=
-    local sidecar_url_tmpl=
     local version=
 
     while [ "$#" -gt 0 ]; do
@@ -51,7 +43,6 @@ update_pin() {
             --version-pattern)       version_pattern="$2"; shift 2 ;;
             --version-pattern-help)  version_pattern_help="$2"; shift 2 ;;
             --tarball-url)           tarball_url_tmpl="$2"; shift 2 ;;
-            --sidecar-url)           sidecar_url_tmpl="$2"; shift 2 ;;
             -*)
                 echo "update_pin: unknown flag '$1'" >&2; return 64 ;;
             *)
@@ -93,16 +84,9 @@ update_pin() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
 
-    local sha
-    if [ -n "$sidecar_url_tmpl" ]; then
-        local sidecar_url
-        sidecar_url="$(_update_pin_substitute "$sidecar_url_tmpl" "$version")"
-        sha="$(_update_pin_fetch_sidecar "$sidecar_url")" || return $?
-    else
-        local tarball_url
-        tarball_url="$(_update_pin_substitute "$tarball_url_tmpl" "$version")"
-        sha="$(_update_pin_download_and_hash "$tarball_url")" || return $?
-    fi
+    local sha tarball_url
+    tarball_url="$(_update_pin_substitute "$tarball_url_tmpl" "$version")"
+    sha="$(_update_pin_download_and_hash "$tarball_url")" || return $?
 
     # Validate: 64 lowercase hex chars exactly. A truncated download or
     # an HTML error page returned with a 200 (some upstreams) would
@@ -151,24 +135,6 @@ _update_pin_sha256_cmd() {
     elif command -v sha256sum >/dev/null 2>&1; then echo "sha256sum"
     else echo "Need shasum or sha256sum on PATH" >&2; return 1
     fi
-}
-
-_update_pin_fetch_sidecar() {
-    local url="$1"
-    echo "Fetching $url ..." >&2
-    local tmp
-    tmp="$(mktemp 2>/dev/null || mktemp -t pin-sidecar)"
-    if ! curl --fail --silent --show-error --location --output "$tmp" "$url"; then
-        echo "Failed to fetch the upstream .sha256 sidecar." >&2
-        rm -f "$tmp"
-        return 70
-    fi
-    # Sidecar format: "<hash> *<filename>" or just "<hash>"; first
-    # whitespace-separated token, lowercased.
-    local sha
-    sha="$(awk '{print tolower($1); exit}' "$tmp")"
-    rm -f "$tmp"
-    printf '%s' "$sha"
 }
 
 _update_pin_download_and_hash() {

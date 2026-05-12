@@ -272,9 +272,8 @@ setup_python() {
 # $BUILD so re-runs of the build script (which wipes $BUILD via
 # prep_build_tree) reuse the already-fetched tarball.
 #
-# madler/zlib doesn't publish per-tarball .sha256 sidecars on its
-# GitHub releases, so the expected hash is pinned in-tree at
-# MagPython/zlib-sha256 and checked against the downloaded bytes.
+# The expected hash is pinned in-tree at MagPython/zlib-sha256 and
+# checked against the downloaded bytes.
 setup_zlib() {
     if [ -d "$ZLIB_SRC" ]; then return 0; fi
 
@@ -317,8 +316,8 @@ setup_zlib() {
 # rename it to sqlite-<version> so the path consumers can refer to it
 # via SQLITE_SRC without recomputing the numeric encoding.
 #
-# sqlite.org doesn't publish per-zip .sha256 sidecars, so the expected
-# hash is pinned in-tree at MagPython/sqlite-sha256.
+# The expected hash is pinned in-tree at MagPython/sqlite-sha256 and
+# checked against the downloaded bytes.
 setup_sqlite() {
     if [ -d "$SQLITE_SRC" ]; then return 0; fi
 
@@ -367,9 +366,8 @@ EOF
 # Download + verify + extract the upstream libffi tarball into
 # $LIBFFI_CACHE/libffi-$LIBFFI_VERSION/. Idempotent.
 #
-# libffi/libffi doesn't publish per-tarball .sha256 sidecars on its
-# GitHub releases, so the expected hash is pinned in-tree at
-# MagPython/libffi-sha256 and checked against the downloaded bytes.
+# The expected hash is pinned in-tree at MagPython/libffi-sha256 and
+# checked against the downloaded bytes.
 setup_libffi() {
     if [ -d "$LIBFFI_SRC" ]; then return 0; fi
 
@@ -405,12 +403,8 @@ setup_libffi() {
 # lives outside $BUILD so re-runs of the build script (which wipes
 # $BUILD via prep_build_tree) reuse the already-fetched tarball.
 #
-# bytereef.org publishes hashes only in an HTML table on
-# https://www.bytereef.org/mpdecimal/download.html — there is no per-
-# tarball .sha256 sidecar to fetch. The expected hash is therefore
-# pinned in-tree at MagPython/libmpdec-sha256 and checked against the
-# downloaded bytes. A version bump means updating libmpdec-version AND
-# libmpdec-sha256 together (see README's "Updating pinned libmpdec").
+# The expected hash is pinned in-tree at MagPython/libmpdec-sha256 and
+# checked against the downloaded bytes.
 setup_libmpdec() {
     if [ -d "$LIBMPDEC_SRC" ]; then return 0; fi
 
@@ -613,11 +607,8 @@ openssl_shlib_version() {
 # outside $BUILD so re-runs of the build script (which wipes $BUILD via
 # prep_build_tree) reuse the already-fetched tarball.
 #
-# OpenSSL publishes per-tarball .sha256 sidecars on its GitHub Releases.
 # The expected hash is pinned in-tree at MagPython/openssl-sha256 and
-# checked against the downloaded bytes; the upstream sidecar is also
-# fetched and cross-checked as defense-in-depth (mirrors the Windows
-# download-openssl.ps1).
+# checked against the downloaded bytes.
 setup_openssl() {
     if [ -d "$OPENSSL_SRC" ]; then return 0; fi
 
@@ -625,14 +616,11 @@ setup_openssl() {
     mkdir -p "$OPENSSL_CACHE"
     local base="https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION"
     local tarball="$OPENSSL_CACHE/openssl-$OPENSSL_VERSION.tar.gz"
-    local sidecar="$tarball.sha256"
 
     if [ ! -f "$tarball" ]; then
         curl --fail --silent --show-error --location \
             -o "$tarball" "$base/openssl-$OPENSSL_VERSION.tar.gz"
     fi
-    curl --fail --silent --show-error --location \
-        -o "$sidecar" "$base/openssl-$OPENSSL_VERSION.tar.gz.sha256"
 
     local sha256_cmd
     if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
@@ -643,18 +631,11 @@ setup_openssl() {
     actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
     if [ "$OPENSSL_SHA256" != "$actual" ]; then
         echo "OpenSSL SHA-256 mismatch: expected $OPENSSL_SHA256, got $actual" >&2
-        echo "  (pinned in MagPython/openssl-sha256 — confirm against $base/openssl-$OPENSSL_VERSION.tar.gz.sha256 before changing)" >&2
-        rm -f "$tarball" "$sidecar"
+        echo "  (pinned in MagPython/openssl-sha256 — regenerate via" >&2
+        echo "   MagPython/update-openssl.sh before changing)" >&2
+        rm -f "$tarball"
         exit 1
     fi
-    local upstream
-    upstream="$(awk '{print $1; exit}' "$sidecar")"
-    if [ "$OPENSSL_SHA256" != "$upstream" ]; then
-        echo "Upstream .sha256 sidecar disagrees with MagPython/openssl-sha256: sidecar=$upstream, pinned=$OPENSSL_SHA256" >&2
-        rm -f "$tarball" "$sidecar"
-        exit 1
-    fi
-    rm -f "$sidecar"
 
     tar -xzf "$tarball" -C "$OPENSSL_CACHE"
 }

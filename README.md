@@ -93,8 +93,8 @@ StopOnFirstFailure="True"`:
    `perl Configure VC-WIN32-ONECORE <no-* set>` and then
    `jom -j%NUMBER_OF_PROCESSORS% build_libs` inside the build-time-
    downloaded source tree (`MagPython/openssl/openssl-<v>/`, populated
-   by `download-openssl.ps1` and verified against the pinned SHA-256
-   *and* the upstream `.sha256` sidecar). `download-nasm.ps1` fetches
+   by `download-openssl.ps1` and verified against the pinned SHA-256).
+   `download-nasm.ps1` fetches
    NASM 2.16.01 from nasm.us before the build (NASM is required by
    OpenSSL's x86 assembly). `download-jom.ps1` fetches jom — Qt's
    drop-in `nmake` replacement that supports parallel jobs (`-j`);
@@ -295,23 +295,18 @@ lives in `MagPython/update-pin-common.sh`, and the wrappers refuse
 cross-major bumps so the build glue can be reviewed manually when an
 ABI line changes.
 
-OpenSSL is the only dep whose upstream publishes a `.sha256` sidecar
-the build can cross-check against the in-tree pin (and whose
-`update-openssl.sh` only needs to fetch that sidecar rather than the
-full tarball). For everyone else the in-tree pin is the sole hash
-check — upstreams either don't ship sidecars, or don't ship them in
-a Renovate-trackable form — so `update-<dep>.sh` downloads the
-tarball and computes SHA-256 locally.
+The in-tree pin is the sole hash check; `update-<dep>.sh` downloads
+the tarball and computes SHA-256 locally.
 
-| Dep      | Source                                 | Sidecar | Line | Bump command                   |
-| ---      | ---                                    | ---     | ---  | ---                            |
-| OpenSSL  | `openssl/openssl` GitHub Releases      | yes     | 3.x  | `update-openssl.sh 3.5.7`      |
-| zlib     | `madler/zlib` GitHub Releases          | no      | 1.x  | `update-zlib.sh 1.3.3`         |
-| SQLite   | sqlite.org                             | no      | 3.x  | `update-sqlite.sh 3.53.2 2025` |
-| libffi   | `libffi/libffi` GitHub Releases        | no      | 3.x  | `update-libffi.sh 3.5.3`       |
-| libmpdec | bytereef.org                           | no      | 2.x  | `update-libmpdec.sh 2.5.2`     |
-| ncurses  | ftp.gnu.org                            | no      | 6.x  | `update-ncurses.sh 6.5`        |
-| CPython  | `python/cpython` tag archive on GitHub | no      | 3.x  | `update-python.sh 3.13.14`     |
+| Dep      | Source                                 | Line | Bump command                   |
+| ---      | ---                                    | ---  | ---                            |
+| OpenSSL  | `openssl/openssl` GitHub Releases      | 3.x  | `update-openssl.sh 3.5.7`      |
+| zlib     | `madler/zlib` GitHub Releases          | 1.x  | `update-zlib.sh 1.3.3`         |
+| SQLite   | sqlite.org                             | 3.x  | `update-sqlite.sh 3.53.2 2025` |
+| libffi   | `libffi/libffi` GitHub Releases        | 3.x  | `update-libffi.sh 3.5.3`       |
+| libmpdec | bytereef.org                           | 2.x  | `update-libmpdec.sh 2.5.2`     |
+| ncurses  | ftp.gnu.org                            | 6.x  | `update-ncurses.sh 6.5`        |
+| CPython  | `python/cpython` tag archive on GitHub | 3.x  | `update-python.sh 3.13.14`     |
 
 libmpdec is the C library behind the `_decimal` module. ncurses is
 POSIX-only — the Windows artifact ships no curses module, so there is

@@ -5,9 +5,9 @@
 # Why a separate file: the eight download-*.ps1 scripts (openssl,
 # zlib, libffi, sqlite, libmpdec, python, nasm, jom) each shipped
 # ~50-70 lines of nearly-identical boilerplate around 3 dep-specific
-# bits (URL, archive name, expected extract dir + optional rename /
-# sidecar cross-check). Concentrating the boilerplate here lets each
-# wrapper drop to ~12 lines of pure config.
+# bits (URL, archive name, expected extract dir + optional rename).
+# Concentrating the boilerplate here lets each wrapper drop to ~12
+# lines of pure config.
 #
 # Keep this file ASCII-only. Without a UTF-8 BOM, powershell.exe on
 # Windows reads .ps1 sources as Windows-1252; a UTF-8 em-dash (0xE2 0x80
@@ -58,10 +58,6 @@ $ErrorActionPreference = "Stop"
 #                     produced (relative to WorkDir). If set,
 #                     gets Move-Item'd to RenameTo.
 #   -RenameTo         optional. Companion to RenameFrom.
-#   -SidecarUrl       optional. URL of an upstream .sha256 sidecar
-#                     to fetch and cross-check against the pinned
-#                     hash, as defense-in-depth (catches a tampered
-#                     in-tree pin). Today only OpenSSL has one.
 #   -TarFlags         tar.exe flag string. Defaults to "-xzf" for
 #                     .tar.gz; pass "-xf" for .zip (tar.exe on
 #                     Windows 10+ uses libarchive and handles
@@ -78,7 +74,6 @@ function Get-PinnedSource {
         [string]$WorkDir = '',
         [string]$RenameFrom = '',
         [string]$RenameTo = '',
-        [string]$SidecarUrl = '',
         [string]$TarFlags = '-xzf'
     )
 
@@ -101,19 +96,6 @@ function Get-PinnedSource {
         if ($ExpectedSha256 -ne $actual) {
             Remove-Item -Force $ArchiveName
             throw "SHA-256 mismatch for ${ArchiveName}: expected $ExpectedSha256, got $actual (pinned in MagPython/$Name-sha256 -- regenerate via MagPython/update-$Name.sh before changing)"
-        }
-
-        if ($SidecarUrl -ne '') {
-            $sidecarName = "$ArchiveName.sha256"
-            Invoke-WebRequest -OutFile $sidecarName -Uri $SidecarUrl
-            # Sidecar format is "<hash> *<filename>" or just "<hash>";
-            # take the first whitespace-separated token, lowercased.
-            $sidecarHash = (((Get-Content $sidecarName -Raw).Trim().ToLower()) -split '\s+')[0]
-            if ($sidecarHash -ne $ExpectedSha256) {
-                Remove-Item -Force $ArchiveName, $sidecarName
-                throw "Upstream .sha256 sidecar disagrees with MagPython/$Name-sha256: sidecar=$sidecarHash, pinned=$ExpectedSha256"
-            }
-            Remove-Item -Force $sidecarName
         }
 
         & tar.exe $TarFlags $ArchiveName
