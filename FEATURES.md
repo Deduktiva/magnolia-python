@@ -13,6 +13,7 @@ curses module).
 | Platform     | Artifact                    | Main library          |
 | ---          | ---                         | ---                   |
 | Windows x86  | `MagPython-windows-x86.zip` | `MagPython.dll`       |
+| Windows x64  | `MagPython-windows-x64.zip` | `MagPython.dll`       |
 | Linux x86_64 | `MagPython-linux-x86_64.zip`| `libMagPython.so`     |
 | macOS arm64  | `MagPython-macos-arm64.zip` | `libMagPython.dylib`  |
 
@@ -92,8 +93,8 @@ should treat `curses` as Linux/macOS only.
 ## Notes for embedders
 
 - Windows: single `MagPython.dll`, no separate `.pyd` files; no
-  console subsystem; no manifest. x86 only, `v142` toolset, Windows
-  8.1 baseline (`Py_WINVER = 0x0603`).
+  console subsystem; no manifest. Built for both x86 (Win32) and x64
+  (AMD64), `v142` toolset, Windows 8.1 baseline (`Py_WINVER = 0x0603`).
 - Linux: `SONAME=libMagPython.so`, `RUNPATH=$ORIGIN`. glibc 2.28
   baseline (manylinux_2_28).
 - macOS: `install_name=@rpath/libMagPython.dylib`; OpenSSL

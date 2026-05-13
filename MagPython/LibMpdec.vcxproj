@@ -5,6 +5,10 @@
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8E1D9B45-8D17-4D1F-8B92-5F0F9B7C3D2A}</ProjectGuid>
@@ -24,8 +28,9 @@
       Upstream's libmpdec/Makefile.vc is the supported Windows build path
       (per mpdecimal-X.Y.Z/INSTALL): cd to libmpdec/, then
       `nmake /f Makefile.vc MACHINE=<machine>`. MACHINE=ppro selects the
-      Pentium Pro x87 inline-asm path, which is what CPython's bundled
-      _decimal.vcxproj uses on Win32 too.
+      Pentium Pro x87 inline-asm path on Win32; MACHINE=x64 selects the
+      AMD64 path on x64. Both match what CPython's bundled _decimal.vcxproj
+      uses on the same platforms.
 
       Every rule in Makefile.vc has the literal token `Makefile` as a
       dependency, so running `nmake /f Makefile.vc` directly fails with
@@ -44,17 +49,19 @@
       stable across version bumps; CopyArtifacts then just stages the
       unversioned file straight through with no rename step.
     -->
+    <LibMpdecMachine Condition="'$(Platform)' == 'Win32'">ppro</LibMpdecMachine>
+    <LibMpdecMachine Condition="'$(Platform)' == 'x64'">x64</LibMpdecMachine>
     <NMakeBuildCommandLine>
       cd /D "$(BuildDir)"
       copy /y Makefile.vc Makefile
       nmake /nologo clean
-      nmake /nologo MACHINE=ppro LIBSTATIC=libmpdec.lib libmpdec.lib
+      nmake /nologo MACHINE=$(LibMpdecMachine) LIBSTATIC=libmpdec.lib libmpdec.lib
     </NMakeBuildCommandLine>
     <NMakeReBuildCommandLine>
       cd /D "$(BuildDir)"
       copy /y Makefile.vc Makefile
       nmake /nologo clean
-      nmake /nologo MACHINE=ppro LIBSTATIC=libmpdec.lib libmpdec.lib
+      nmake /nologo MACHINE=$(LibMpdecMachine) LIBSTATIC=libmpdec.lib libmpdec.lib
     </NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>
       if exist "$(BuildDir)\Makefile" cd /D "$(BuildDir)" &amp;&amp; nmake /nologo clean

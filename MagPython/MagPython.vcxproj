@@ -9,6 +9,14 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{031984BE-233E-4D2F-9DFC-AB3B1EA4CB67}</ProjectGuid>
@@ -41,6 +49,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup>
@@ -646,24 +660,26 @@
     <ClCompile Include="$(PythonSourceDir)\PC\dl_nt.c" />
   </ItemGroup>
   <!-- _decimal: links against the libmpdec.lib produced by
-       LibMpdec.vcxproj (which ran nmake /f Makefile.vc MACHINE=ppro on
-       the build-time-downloaded mpdecimal source). CONFIG_32 / PPRO
-       must match the flavour LibMpdec was built with so mpdecimal.h
-       picks the 32-bit typedef + x87 inline-asm code paths in this
-       module's source — same as CPython's bundled
-       _decimal.vcxproj on Win32.
+       LibMpdec.vcxproj. The flavour macros (CONFIG_32+PPRO on Win32,
+       CONFIG_64+ANSI64 on x64) must match the MACHINE setting LibMpdec
+       was built with so mpdecimal.h picks the matching typedef + asm
+       code paths in this module's source — mpdecimal.h has an explicit
+       #error guarding against the mismatch ("cannot use CONFIG_32 with
+       64-bit header"). Same flag pair CPython's bundled _decimal.vcxproj
+       uses for the same platforms.
 
-       BUILD_LIBMPDEC is needed because mpdecimal32vc.h decorates every
-       mpd_* prototype with __declspec(dllimport) when _DLL is defined
-       (which MSVC sets automatically under /MD) and BUILD_LIBMPDEC is
-       not. Without this define, _decimal.obj emits __imp__mpd_* IAT
-       references that the static libmpdec.lib (no import library) can't
-       satisfy, and the link fails with "unresolved external symbol
-       __imp__mpd_sign" et al. CPython's own _decimal.vcxproj sets
-       BUILD_LIBMPDEC for the same reason. -->
+       BUILD_LIBMPDEC is needed because mpdecimal32vc.h / mpdecimal64vc.h
+       decorate every mpd_* prototype with __declspec(dllimport) when
+       _DLL is defined (which MSVC sets automatically under /MD) and
+       BUILD_LIBMPDEC is not. Without this define, _decimal.obj emits
+       __imp__mpd_* IAT references that the static libmpdec.lib (no
+       import library) can't satisfy, and the link fails with
+       "unresolved external symbol __imp__mpd_sign" et al. CPython's own
+       _decimal.vcxproj sets BUILD_LIBMPDEC for the same reason. -->
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\_decimal\_decimal.c">
-      <PreprocessorDefinitions>BUILD_LIBMPDEC;CONFIG_32;PPRO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Platform)' == 'Win32'">BUILD_LIBMPDEC;CONFIG_32;PPRO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Platform)' == 'x64'">BUILD_LIBMPDEC;CONFIG_64;ANSI64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClInclude Include="$(PythonSourceDir)\Modules\_decimal\docstrings.h" />
   </ItemGroup>
@@ -788,8 +804,8 @@
   <Target Name="DumpBinReport" AfterTargets="Build">
     <ItemGroup>
       <DumpBinTarget Include="$(OutDir)MagPython.dll" />
-      <DumpBinTarget Include="$(OutDir)libcrypto-$(OpenSslDllSuffix).dll" />
-      <DumpBinTarget Include="$(OutDir)libssl-$(OpenSslDllSuffix).dll" />
+      <DumpBinTarget Include="$(OutDir)libcrypto-$(OpenSslDllSuffix)$(OpenSslShlibVariant).dll" />
+      <DumpBinTarget Include="$(OutDir)libssl-$(OpenSslDllSuffix)$(OpenSslShlibVariant).dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)dumpbin" />
     <Exec Command="dumpbin /headers &quot;%(DumpBinTarget.Identity)&quot; &gt; &quot;$(OutDir)dumpbin\%(DumpBinTarget.Filename)%(DumpBinTarget.Extension).headers.txt&quot;" />

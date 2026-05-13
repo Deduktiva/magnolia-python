@@ -17,17 +17,25 @@
     (Unix); see README's "Updating pinned <dep>" sections for per-dep
     specifics.
 
-    OpenSslDllSuffix is the only computed property here — it's the
-    soname suffix embedded in Windows DLL names (libcrypto-3.dll on
-    the 3.x line). On the 3.x line OpenSSL's SHLIB_VERSION always
-    equals MAJOR, so we derive the suffix from the major component
-    of the pinned version rather than parsing VERSION.dat (which
-    doesn't exist before the download has run).
+    OpenSslDllSuffix and OpenSslShlibVariant are the only computed
+    properties here. OpenSslDllSuffix is the soname suffix embedded in
+    Windows DLL names (libcrypto-3.dll on the 3.x line). On the 3.x line
+    OpenSSL's SHLIB_VERSION always equals MAJOR, so we derive the suffix
+    from the major component of the pinned version rather than parsing
+    VERSION.dat (which doesn't exist before the download has run).
+
+    OpenSslShlibVariant is OpenSSL's per-target shlib_variant — empty on
+    Win32, "-x64" on x64 (defined for VC-WIN64-common in OpenSSL's
+    Configurations/10-main.conf). Without this the x64 DLLs come out
+    named libcrypto-3-x64.dll / libssl-3-x64.dll and openssl.vcxproj's
+    CopyArtifacts can't find them.
   -->
   <PropertyGroup>
     <_OpenSslVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)openssl-version'))</_OpenSslVersionRaw>
     <OpenSslVersion>$(_OpenSslVersionRaw.Trim())</OpenSslVersion>
     <OpenSslDllSuffix>$([System.Text.RegularExpressions.Regex]::Match('$(OpenSslVersion)', '^([0-9]+)').Groups[1].Value)</OpenSslDllSuffix>
+    <OpenSslShlibVariant Condition="'$(Platform)' == 'x64'">-x64</OpenSslShlibVariant>
+    <OpenSslShlibVariant Condition="'$(OpenSslShlibVariant)' == ''"></OpenSslShlibVariant>
 
     <_LibMpdecVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libmpdec-version'))</_LibMpdecVersionRaw>
     <LibMpdecVersion>$(_LibMpdecVersionRaw.Trim())</LibMpdecVersion>
