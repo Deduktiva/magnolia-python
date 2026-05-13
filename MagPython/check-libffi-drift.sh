@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Verify that every .c/.S/.h file referenced by MagPython/LibFFI.vcxproj
-# exists in the build-time-downloaded libffi tree (or in the project-local
-# MagPython/libffi-msvc-include/, for the pregenerated MSVC headers).
+# exists in the build-time-downloaded libffi tree.
 #
 # Catches the case where upstream renamed/removed a file that
 # LibFFI.vcxproj still references — without this check, the drift only
@@ -25,16 +24,11 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/libffi-version")"
 SOURCE_DIR="$SCRIPT_DIR/libffi/libffi-$VERSION"
-PREGEN_DIR="$SCRIPT_DIR/libffi-msvc-include"
 VCXPROJ="$SCRIPT_DIR/LibFFI.vcxproj"
 
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "ERROR: libffi cache not populated at $SOURCE_DIR" >&2
     echo "       Run \`. MagPython/build-common.sh; setup_libffi\` first." >&2
-    exit 1
-fi
-if [ ! -d "$PREGEN_DIR" ]; then
-    echo "ERROR: project-local pregenerated header dir missing: $PREGEN_DIR" >&2
     exit 1
 fi
 [ -f "$VCXPROJ" ] || { echo "ERROR: missing $VCXPROJ" >&2; exit 1; }
@@ -53,20 +47,9 @@ while IFS= read -r path; do
     # single quotes and silently never matched, falling through to
     # the *) default and reporting a false-positive "all refs OK".
     case "$path" in
-        '$(LibFFITargetPregeneratedIncludeDir)\'*)
-            # $(LibFFITargetPregeneratedIncludeDir) resolves to one of
-            # libffi-msvc-include/{x86,x64} depending on $(Platform);
-            # require the file in BOTH subdirs so a missing per-arch
-            # variant fails the drift check the same way a missing
-            # upstream file would.
-            stripped="${path#'$(LibFFITargetPregeneratedIncludeDir)\'}"
-            ref="$PREGEN_DIR/x86/$stripped (and x64/$stripped)"
-            ref_x86="${PREGEN_DIR}/x86/${stripped//\\//}"
-            ref_x64="${PREGEN_DIR}/x64/${stripped//\\//}"
-            if [ ! -f "$ref_x86" ] || [ ! -f "$ref_x64" ]; then
-                echo "MISSING: $path -> $ref"
-                missing=$((missing + 1))
-            fi
+        '$(LibFFIGeneratedIncludeDir)\'*|'$(LibFFIGeneratedBuildDir)\'*)
+            # ffi.h and fficonfig.h: produced by ./configure at build
+            # time, don't exist on the Linux drift-check host.
             continue
             ;;
         '$(LibFFITargetSourceDir)\'*)
@@ -98,11 +81,8 @@ if [ "$missing" -gt 0 ]; then
     echo
     echo "ERROR: $missing of $total LibFFI.vcxproj refs missing from libffi $VERSION."
     echo
-    echo "Either upstream renamed/removed files in this version (LibFFI.vcxproj"
-    echo "needs editing), or the project-local pregenerated headers are out of"
-    echo "date (re-run MagPython/update-libffi.sh to regenerate ffi.h, and"
-    echo "regenerate fficonfig.h on a Linux/macOS host per README's"
-    echo "'Updating pinned libffi' section)."
+    echo "Upstream renamed/removed files in this version — LibFFI.vcxproj needs"
+    echo "editing to match the new tree layout."
     exit 1
 fi
 

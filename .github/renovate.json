@@ -74,7 +74,6 @@
       "MagPython/zlib-sha256",
       "MagPython/libffi-version",
       "MagPython/libffi-sha256",
-      "MagPython/libffi-msvc-include/ffi.h",
       "MagPython/python-version",
       "MagPython/python-sha256",
       "MagPython/nasm-version",

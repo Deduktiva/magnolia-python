@@ -95,6 +95,17 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.msvc-arch }}
+      # LibFFI.vcxproj runs upstream libffi's ./configure under MSVC
+      # (msvcc.sh CC wrapper) to generate fficonfig.h + ffi.h; needs
+      # bash + autotools. path-type: inherit keeps the MSVC env from
+      # ilammy/msvc-dev-cmd visible to msvcc.sh inside the MSYS2 shell.
+      - if: startsWith(matrix.platform, 'windows-')
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          path-type: inherit
+          update: false
+          install: base-devel autoconf automake libtool make
       - if: startsWith(matrix.platform, 'windows-')
         run: '& msbuild /m /p:Configuration=Release /p:Platform=${{ matrix.msbuild-platform }} MagPython\MagPython.metaproj'
       - if: startsWith(matrix.platform, 'windows-')

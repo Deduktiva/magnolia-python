@@ -1,13 +1,5 @@
 # Download and unpack libffi.
 #
-# This script does NOT regenerate the project-local
-# MagPython/libffi-msvc-include/ffi.h — that's update-libffi.sh's
-# job (run by a maintainer at version-bump time, since regen needs
-# the upstream include/ffi.h.in template). The committed ffi.h is
-# the build's source of truth for the @VERSION@ / @TARGET@ /
-# @HAVE_LONG_DOUBLE@ / @FFI_EXEC_TRAMPOLINE_TABLE@ substitutions
-# autoconf would normally do at configure time on Unix.
-#
 # Keep this file ASCII-only (see download-helpers.ps1's note for why).
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

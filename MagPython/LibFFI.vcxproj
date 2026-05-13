@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" InitialTargets="DownloadLibffi" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" InitialTargets="DownloadLibffi;RegenLibffiMsvcHeaders" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
@@ -44,15 +44,11 @@
     <LibFFITarget Condition="'$(Platform)' == 'x64'">X86_WIN64</LibFFITarget>
     <LibFFISourceDir>$(SourceDir)\src</LibFFISourceDir>
     <LibFFITargetSourceDir>$(SourceDir)\src\x86</LibFFITargetSourceDir>
-    <!-- Project-local pregenerated MSVC headers (ffi.h, fficonfig.h).
-         Upstream libffi only ships pregenerated MSVC headers for aarch64
-         (under msvc_build/aarch64/); the x86_win32 / x86_win64 variants
-         are our own, so they live outside the libffi/ source tree to
-         survive the tarball-replace-in-place that update-libffi.sh does.
-         x86/ and x64/ subdirs hold the two @TARGET@-substituted ffi.h
-         variants plus their matching fficonfig.h. -->
-    <LibFFITargetPregeneratedIncludeDir Condition="'$(Platform)' == 'Win32'">$(MSBuildProjectDirectory)\libffi-msvc-include\x86</LibFFITargetPregeneratedIncludeDir>
-    <LibFFITargetPregeneratedIncludeDir Condition="'$(Platform)' == 'x64'">$(MSBuildProjectDirectory)\libffi-msvc-include\x64</LibFFITargetPregeneratedIncludeDir>
+    <!-- ffi.h and fficonfig.h come out of an autoconf-driven
+         ./configure run (RegenLibffiMsvcHeaders below). Per-Platform
+         builddir so x86 and x64 outputs don't share state. -->
+    <LibFFIGeneratedBuildDir>$(SourceDir)\magpython-msvc-build-$(Platform)</LibFFIGeneratedBuildDir>
+    <LibFFIGeneratedIncludeDir>$(LibFFIGeneratedBuildDir)\include</LibFFIGeneratedIncludeDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup>
@@ -92,20 +88,20 @@
       <PreprocessorDefinitions Condition="'$(Platform)' == 'Win32'">_M_IX86;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)' == 'x64'">_WIN64;_M_AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SourceDir)\include;$(LibFFITargetSourceDir);$(LibFFITargetPregeneratedIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibFFIGeneratedIncludeDir);$(LibFFIGeneratedBuildDir);$(SourceDir)\include;$(LibFFITargetSourceDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OmitFramePointers>true</OmitFramePointers>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <AdditionalUsingDirectories>$(LibFFISourceDir);$(LibFFITargetSourceDir);$(LibFFITargetPregeneratedIncludeDir);%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>$(LibFFISourceDir);$(LibFFITargetSourceDir);$(LibFFIGeneratedIncludeDir);$(LibFFIGeneratedBuildDir);%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="$(LibFFITargetPregeneratedIncludeDir)\ffi.h" />
-    <ClInclude Include="$(LibFFITargetPregeneratedIncludeDir)\fficonfig.h" />
+    <ClInclude Include="$(LibFFIGeneratedIncludeDir)\ffi.h" />
+    <ClInclude Include="$(LibFFIGeneratedBuildDir)\fficonfig.h" />
     <ClInclude Include="$(SourceDir)\include\ffi_cfi.h" />
     <ClInclude Include="$(SourceDir)\include\ffi_common.h" />
-    <ClInclude Include="$(LibFFITargetSourceDir)\asmnames.h" /> 
-    <ClInclude Include="$(LibFFITargetSourceDir)\ffitarget.h" /> 
+    <ClInclude Include="$(LibFFITargetSourceDir)\asmnames.h" />
+    <ClInclude Include="$(LibFFITargetSourceDir)\ffitarget.h" />
     <ClInclude Include="$(LibFFITargetSourceDir)\internal.h" />
   </ItemGroup>
   <!-- Win32 (x86): src/x86/ffi.c + sysv_intel.S, assembled with ml.exe.
@@ -124,8 +120,8 @@
     <CustomBuild Include="$(LibFFITargetSourceDir)\sysv_intel.S">
       <Command>
         cd "$(IntDir)"
-        cl /FA /EP /nologo /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" "%(FullPath)" &gt; asm.i
-        ml /safeseh /c /I"$(SourceDir)\src" /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" /Foasm.obj asm.i
+        cl /FA /EP /nologo /I"$(LibFFIGeneratedIncludeDir)" /I"$(LibFFIGeneratedBuildDir)" /I"$(SourceDir)\include" /I"$(LibFFITargetSourceDir)" "%(FullPath)" &gt; asm.i
+        ml /safeseh /c /I"$(SourceDir)\src" /I"$(LibFFIGeneratedIncludeDir)" /I"$(LibFFIGeneratedBuildDir)" /I"$(SourceDir)\include" /I"$(LibFFITargetSourceDir)" /Foasm.obj asm.i
       </Command>
       <Outputs>$(IntDir)asm.obj;%(Outputs)</Outputs>
     </CustomBuild>
@@ -134,8 +130,8 @@
     <CustomBuild Include="$(LibFFITargetSourceDir)\win64_intel.S">
       <Command>
         cd "$(IntDir)"
-        cl /FA /EP /nologo /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" "%(FullPath)" &gt; asm.i
-        ml64 /c /I"$(SourceDir)\src" /I"$(SourceDir)\include" /I"$(LibFFITargetPregeneratedIncludeDir)" /I"$(LibFFITargetSourceDir)" /Foasm.obj asm.i
+        cl /FA /EP /nologo /I"$(LibFFIGeneratedIncludeDir)" /I"$(LibFFIGeneratedBuildDir)" /I"$(SourceDir)\include" /I"$(LibFFITargetSourceDir)" "%(FullPath)" &gt; asm.i
+        ml64 /c /I"$(SourceDir)\src" /I"$(LibFFIGeneratedIncludeDir)" /I"$(LibFFIGeneratedBuildDir)" /I"$(SourceDir)\include" /I"$(LibFFITargetSourceDir)" /Foasm.obj asm.i
       </Command>
       <Outputs>$(IntDir)asm.obj;%(Outputs)</Outputs>
     </CustomBuild>
@@ -155,9 +151,15 @@
   <Target Name="DownloadLibffi">
     <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-libffi.ps1" />
   </Target>
+  <!-- Runs after DownloadLibffi (InitialTargets ordering). Needs MSYS2
+       bash + autotools on PATH and cl.exe inherited from the enclosing
+       Developer Command Prompt — the script enforces both up front. -->
+  <Target Name="RegenLibffiMsvcHeaders">
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)\build-libffi-msvc-headers.sh&quot; $(Platform)" />
+  </Target>
   <ItemGroup>
-    <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\ffi.h" />
-    <PublicHeader Include="$(LibFFITargetPregeneratedIncludeDir)\fficonfig.h" />
+    <PublicHeader Include="$(LibFFIGeneratedIncludeDir)\ffi.h" />
+    <PublicHeader Include="$(LibFFIGeneratedBuildDir)\fficonfig.h" />
     <PublicHeader Include="$(LibFFITargetSourceDir)\ffitarget.h" />
   </ItemGroup>
   <Target Name="CopyArtifacts" AfterTargets="Build">
