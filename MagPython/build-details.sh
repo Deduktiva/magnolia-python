@@ -7,7 +7,7 @@
 # Usage:
 #   MagPython/build-details.sh <platform> [output-path]
 #
-# Platforms: windows-x86 | linux-x86_64 | macos-arm64
+# Platforms: windows-x86 | windows-x64 | linux-x86_64 | macos-arm64
 #
 # Sources of truth (kept in sync with the build scripts so the .md never
 # drifts from what was actually built):
@@ -20,7 +20,7 @@
 #   MagPython/libmpdec-version     -> LIBMPDEC_VERSION (downloaded at
 #                                     build time, see build-common.sh /
 #                                     download-libmpdec.ps1)
-#   MagPython/common.props         -> MSVC toolset       [windows-x86]
+#   MagPython/common.props         -> MSVC toolset       [windows-x86, windows-x64]
 #   MagPython/build-macos.sh       -> MACOSX_DEPLOYMENT_TARGET [macos-arm64]
 #
 # Matrix-supplied values (container image, runner label) are read from
@@ -77,13 +77,18 @@ matrix_field() {
 }
 
 case "$PLATFORM" in
-    windows-x86)
+    windows-x86|windows-x64)
         MSVC_TOOLSET="$(sed -n -E \
             's|.*<PlatformToolset[^>]*>([^<]+)</PlatformToolset>.*|\1|p' \
             "$REPO/MagPython/common.props" | head -1)"
         require MSVC_TOOLSET
+        # Map platform suffix to its human-readable form for the heading.
+        case "$PLATFORM" in
+            windows-x86) ARCH_TITLE="x86" ;;
+            windows-x64) ARCH_TITLE="x64" ;;
+        esac
         cat > "$OUT" <<EOF
-### Windows x86
+### Windows ${ARCH_TITLE}
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
 - mpdecimal ${LIBMPDEC_VERSION}

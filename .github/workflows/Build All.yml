@@ -33,6 +33,16 @@ jobs:
             # component. Don't bump past windows-2025 without confirming
             # v142 is still present on the new image.
             runs-on: windows-2025
+            msvc-arch: x86
+            msbuild-platform: Win32
+          - platform: windows-x64
+            # Same image as windows-x86 for the same reason — v142 is
+            # only guaranteed on explicitly-labelled Windows images.
+            # The x86.x64 component group covers both host targets, so
+            # the 64-bit cross/native tools land on this image too.
+            runs-on: windows-2025
+            msvc-arch: x64
+            msbuild-platform: x64
           - platform: linux-x86_64
             runs-on: ubuntu-22.04
             container: quay.io/pypa/manylinux_2_28_x86_64
@@ -79,15 +89,16 @@ jobs:
           path: MagPython/python
           key: deps-python-${{ matrix.platform }}-${{ hashFiles('MagPython/python-version', 'MagPython/python-sha256') }}
 
-      # Windows build (existing logic, unchanged behaviour)
-      - if: matrix.platform == 'windows-x86'
+      # Windows builds (shared between windows-x86 and windows-x64; the
+      # MSBuild Platform and the MSVC tools arch come from the matrix).
+      - if: startsWith(matrix.platform, 'windows-')
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x86
-      - if: matrix.platform == 'windows-x86'
-        run: '& msbuild /m /p:Configuration=Release MagPython\MagPython.metaproj'
-      - if: matrix.platform == 'windows-x86'
-        run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython-windows-x86.zip MagPython'
+          arch: ${{ matrix.msvc-arch }}
+      - if: startsWith(matrix.platform, 'windows-')
+        run: '& msbuild /m /p:Configuration=Release /p:Platform=${{ matrix.msbuild-platform }} MagPython\MagPython.metaproj'
+      - if: startsWith(matrix.platform, 'windows-')
+        run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython-${{ matrix.platform }}.zip MagPython'
 
       # Linux build (manylinux_2_28 container)
       - if: matrix.platform == 'linux-x86_64'

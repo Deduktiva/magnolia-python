@@ -54,7 +54,20 @@ while IFS= read -r path; do
     # the *) default and reporting a false-positive "all refs OK".
     case "$path" in
         '$(LibFFITargetPregeneratedIncludeDir)\'*)
-            ref="$PREGEN_DIR/${path#'$(LibFFITargetPregeneratedIncludeDir)\'}"
+            # $(LibFFITargetPregeneratedIncludeDir) resolves to one of
+            # libffi-msvc-include/{x86,x64} depending on $(Platform);
+            # require the file in BOTH subdirs so a missing per-arch
+            # variant fails the drift check the same way a missing
+            # upstream file would.
+            stripped="${path#'$(LibFFITargetPregeneratedIncludeDir)\'}"
+            ref="$PREGEN_DIR/x86/$stripped (and x64/$stripped)"
+            ref_x86="${PREGEN_DIR}/x86/${stripped//\\//}"
+            ref_x64="${PREGEN_DIR}/x64/${stripped//\\//}"
+            if [ ! -f "$ref_x86" ] || [ ! -f "$ref_x64" ]; then
+                echo "MISSING: $path -> $ref"
+                missing=$((missing + 1))
+            fi
+            continue
             ;;
         '$(LibFFITargetSourceDir)\'*)
             ref="$SOURCE_DIR/src/x86/${path#'$(LibFFITargetSourceDir)\'}"

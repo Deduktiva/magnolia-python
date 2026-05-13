@@ -5,6 +5,10 @@
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{37DFD855-7BB5-41C5-A7D0-DE690D35C9A9}</ProjectGuid>
@@ -18,6 +22,13 @@
          common.props derives $(OpenSslVersion) from MagPython/openssl-version. -->
     <BuildDir>$(MSBuildProjectDirectory)\openssl\openssl-$(OpenSslVersion)</BuildDir>
     <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+    <!-- OpenSSL's per-target Configure name. The 32-bit toolchain uses
+         VC-WIN32-ONECORE (x86 ASM), the 64-bit toolchain uses
+         VC-WIN64A-ONECORE (AMD64 ASM). Both ONECORE variants link
+         against api-ms-win-* umbrella libs rather than the full
+         kernel32 surface — same baseline policy for both architectures. -->
+    <OpenSslConfigureTarget Condition="'$(Platform)' == 'Win32'">VC-WIN32-ONECORE</OpenSslConfigureTarget>
+    <OpenSslConfigureTarget Condition="'$(Platform)' == 'x64'">VC-WIN64A-ONECORE</OpenSslConfigureTarget>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
@@ -29,7 +40,7 @@
       rem with "cannot open program database ... if multiple CL.EXE write
       rem to the same .PDB file, please use /FS").
       set CL=/FS
-      perl Configure no-makedepend VC-WIN32-ONECORE no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests no-async no-fips no-docs no-legacy no-cmp no-apps
+      perl Configure no-makedepend $(OpenSslConfigureTarget) no-idea no-mdc2 no-cms no-comp no-ct no-engine no-dso no-ocsp no-srp no-srtp no-ssl3 no-ts no-tests no-async no-fips no-docs no-legacy no-cmp no-apps
       jom -j%NUMBER_OF_PROCESSORS% build_libs
     </NMakeBuildCommandLine>
     <NMakeOutput />
@@ -50,9 +61,13 @@
            otherwise it gets evaluated too early. -->
       <BuiltIncludeCrypto Include="$(BuildDir)\include\crypto\**\*.h" />
       <BuiltIncludeOpenSSL Include="$(BuildDir)\include\openssl\**\*.h" />
-      <LibraryFiles Include="$(BuildDir)\libcrypto-$(OpenSslDllSuffix).dll" />
+      <!-- $(OpenSslShlibVariant) is "-x64" on x64 (OpenSSL's per-target
+           shlib_variant — see common.props) and empty on Win32. The
+           import libs (.lib) never get the variant suffix; only the
+           DLLs do. -->
+      <LibraryFiles Include="$(BuildDir)\libcrypto-$(OpenSslDllSuffix)$(OpenSslShlibVariant).dll" />
       <LibraryFiles Include="$(BuildDir)\libcrypto.lib" />
-      <LibraryFiles Include="$(BuildDir)\libssl-$(OpenSslDllSuffix).dll" />
+      <LibraryFiles Include="$(BuildDir)\libssl-$(OpenSslDllSuffix)$(OpenSslShlibVariant).dll" />
       <LibraryFiles Include="$(BuildDir)\libssl.lib" />
       <LibraryFiles Include="$(BuildDir)\ms\applink.c" />
     </ItemGroup>
