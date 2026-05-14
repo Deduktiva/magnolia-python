@@ -51,5 +51,20 @@
 
     <_PythonVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)python-version'))</_PythonVersionRaw>
     <PythonVersion>$(_PythonVersionRaw.Trim())</PythonVersion>
+    <!--
+      FIELD3 is upstream's stand-in for the patch-level number embedded in
+      the Windows VERSIONINFO resource (PC/python_ver_rc.h's
+      PYVERSION64 = MAJOR, MINOR, FIELD3, PYTHON_API_VERSION). Upstream's
+      PCbuild/python.props parses Include/patchlevel.h to compute it as
+      `micro * 1000 + ReleaseLevelNumber * 10 + serial`. We always pin to
+      stable releases (update-python.sh enforces same-major bumps and
+      CPython only does pre-releases for X.Y.0), so ReleaseLevelNumber is
+      always 15 (final) and serial 0 — derive FIELD3 directly from the
+      pinned version's micro component. Consumed by MagPythonExe.vcxproj
+      as a ResourceCompile preprocessor define when building the
+      MagPython.exe version-info / manifest resources.
+    -->
+    <PythonMicroVersion>$([System.Text.RegularExpressions.Regex]::Match('$(PythonVersion)', '^\d+\.\d+\.(\d+)').Groups[1].Value)</PythonMicroVersion>
+    <PythonField3Value>$([MSBuild]::Add($([MSBuild]::Multiply($(PythonMicroVersion), 1000)), 150))</PythonField3Value>
   </PropertyGroup>
 </Project>

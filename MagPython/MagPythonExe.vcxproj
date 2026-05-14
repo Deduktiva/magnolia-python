@@ -59,6 +59,14 @@
   </ImportGroup>
   <PropertyGroup>
     <TargetName>MagPython</TargetName>
+    <!-- Disable MSBuild's auto-generated assembly manifest so the
+         RT_MANIFEST embedded by python_exe.rc (which references
+         PC/python.manifest) is the one that ends up in the PE
+         resource section. Without this, MSBuild generates a default
+         no-supportedOS manifest and the resource compiler's manifest
+         conflicts with it. Same effect as upstream's python.vcxproj,
+         which inherits this from pyproject.props. -->
+    <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -80,6 +88,21 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
+    <ResourceCompile>
+      <!-- python_exe.rc #includes python_ver_rc.h, which #includes
+           modsupport.h / patchlevel.h from Include/. The RT_MANIFEST
+           and ICON paths in python_exe.rc are resolved relative to
+           the .rc file's own directory (PC/), so python.manifest +
+           icons/python.ico get picked up automatically. -->
+      <AdditionalIncludeDirectories>$(PythonSourceDir)\PC;$(PythonSourceDir)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- python_ver_rc.h's PYVERSION64 macro references FIELD3, which
+           upstream's pyproject.props normally injects as a preprocessor
+           define computed from patchlevel.h. Without it the resource
+           compiler fails with RC2104 ("undefined keyword or key name:
+           FIELD3"). $(PythonField3Value) is computed in common.props
+           from the pinned PythonVersion. -->
+      <PreprocessorDefinitions>FIELD3=$(PythonField3Value);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -94,6 +117,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Programs\python.c" />
+    <!-- Embed CPython's standard EXE resource: version info + icon +
+         RT_MANIFEST pointing at PC/python.manifest. The manifest
+         declares supportedOS GUIDs for Windows 7/8/8.1/10/11 plus
+         longPathAware=true, so GetVersionExW reports the actual OS
+         version (rather than lying with Windows 8.1's build 9600
+         under app-compat). Without it, _pyrepl/main.py rejects the
+         platform with "Windows 10 TH2 or later required" the first
+         time a user drops into the REPL. -->
+    <ResourceCompile Include="$(PythonSourceDir)\PC\python_exe.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
