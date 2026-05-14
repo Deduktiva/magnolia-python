@@ -291,6 +291,91 @@ int main(int argc, char *argv[]) {
         failures += 1;
     }
 
+#ifdef MAGPYTHON_TEST_PYSIDE6
+    // PySide6 import + QCoreApplication round-trip. Linux/macOS only —
+    // the Windows artifact ships no PySide6 (Qt 6 dropped 32-bit
+    // Windows support; the follow-up x64 PR adds it). The test exe is
+    // built with -DMAGPYTHON_TEST_PYSIDE6 on the platforms that have
+    // a PySide6 bundle staged into the artifact tree.
+    //
+    // The site-packages dir relative to argv[0] is computed in Python
+    // rather than C so we can keep using os.path utilities and not
+    // hand-roll a join. The smoke test path here matches what a
+    // downstream embedder would do: insert <artifact-root>/site-packages
+    // at the head of sys.path, then `import PySide6.QtCore`.
+    printf("Exercising PySide6:\n");
+    rc = PyRun_SimpleString(
+        "import os, sys\n"
+        // sys.executable mirrors the program_name set on PyConfig (the
+        // test exe path passed as argv[0] above). Reliable in embedded
+        // interpreters where sys.argv may be the default ['']/[].
+        "_argv0_dir = os.path.dirname(os.path.abspath(sys.executable))\n"
+        "_sitepkgs = os.path.join(_argv0_dir, 'site-packages')\n"
+        "assert os.path.isdir(_sitepkgs), f'site-packages dir not found at {_sitepkgs}'\n"
+        "sys.path.insert(0, _sitepkgs)\n"
+        "print('  site-packages on sys.path:', _sitepkgs)\n"
+        "\n"
+        "# Importing PySide6.QtCore exercises:\n"
+        "#  - importlib's dynamic .so loader (HAVE_DYNAMIC_LOADING)\n"
+        "#  - PySide6.QtCore.abi3.so's NEEDED -> libpython3.X.so symlink\n"
+        "#    -> libMagPython.so chain\n"
+        "#  - libshiboken6 + libpyside6 sibling-of-libMagPython resolution\n"
+        "#  - libQt6Core sibling-of-libMagPython resolution\n"
+        "# If any of the above breaks (linker leak to a system libpython,\n"
+        "# missing rpath, wrong soname), this is where it surfaces.\n"
+        "from PySide6 import QtCore\n"
+        "print('  PySide6 QtCore version:', QtCore.__version__)\n"
+        "print('  Qt6 runtime version:   ', QtCore.qVersion())\n"
+        "\n"
+        "# QCoreApplication wants an argv list. Pass [sys.executable] so\n"
+        "# it has something to set its applicationName from (sys.argv\n"
+        "# may be the default [''] in an embedded interpreter).\n"
+        "app = QtCore.QCoreApplication([sys.executable])\n"
+        "app.setApplicationName('MagPythonSmokeTest')\n"
+        "assert app.applicationName() == 'MagPythonSmokeTest'\n"
+        "print('  QCoreApplication app name:', app.applicationName())\n"
+        "\n"
+        "# Exercise a QObject + signal/slot round trip so we know the\n"
+        "# binding machinery (shiboken6's metaobject glue) wired up\n"
+        "# correctly. signal connect + emit must invoke the slot with\n"
+        "# the right argument.\n"
+        "class Sender(QtCore.QObject):\n"
+        "    fired = QtCore.Signal(int)\n"
+        "class Receiver(QtCore.QObject):\n"
+        "    def __init__(self):\n"
+        "        super().__init__()\n"
+        "        self.received = []\n"
+        "    def on_fired(self, n):\n"
+        "        self.received.append(n)\n"
+        "sender, receiver = Sender(), Receiver()\n"
+        "sender.fired.connect(receiver.on_fired)\n"
+        "sender.fired.emit(42)\n"
+        "sender.fired.emit(7)\n"
+        "assert receiver.received == [42, 7], receiver.received\n"
+        "print('  QObject signal round-trip:', receiver.received)\n"
+        "\n"
+        "# Exercise the QObject property system — covers the meta-call\n"
+        "# path shiboken6 generates for Q_PROPERTY-decorated attributes.\n"
+        "class Bag(QtCore.QObject):\n"
+        "    label = QtCore.Property(str, lambda self: self._label,\n"
+        "                            lambda self, v: setattr(self, '_label', v))\n"
+        "    def __init__(self):\n"
+        "        super().__init__()\n"
+        "        self._label = ''\n"
+        "bag = Bag()\n"
+        "bag.label = 'magpython'\n"
+        "assert bag.property('label') == 'magpython'\n"
+        "print('  Q_PROPERTY round-trip:    ', bag.property('label'))\n"
+        "\n"
+        "# Tear down so a future PyFinalize doesn't trip over a live\n"
+        "# QCoreApplication.\n"
+        "app.deleteLater()\n"
+        "app = None\n");
+    if (rc != 0) {
+        failures += 1;
+    }
+#endif
+
     if (failures != 0) {
         fprintf(stderr, "%d smoke test failure(s)\n", failures);
         return 1;

@@ -2,7 +2,11 @@
 
 A custom build of CPython 3.13.13 for embedding into a host application.
 Builds Windows x86, Windows x64, Linux x86_64, macOS arm64 artifacts to
-be used as development and link targets.
+be used as development and link targets. Linux, macOS, and Windows x64
+additionally bundle Qt6 qtbase (Core only) and PySide6 (Core module)
+built from source against this CPython, so a downstream embedder can
+`import PySide6.QtCore` without further wiring. PySide6 on windows-x86
+is not supported (Qt 6 dropped 32-bit Windows entirely).
 
 ## Build outputs
 
@@ -17,19 +21,24 @@ artifact ships no curses module — CPython upstream relies on the
 `windows-curses` PyPI shim there).
 
 Windows (`MagPython-windows-x86.zip` and `MagPython-windows-x64.zip`,
-same shape — only the binaries' architecture and OpenSSL DLL names
-differ; OpenSSL's `VC-WIN64A` target adds a `-x64` `shlib_variant`
-suffix to the DLLs):
+broadly the same shape — the binaries' architecture and OpenSSL DLL
+names differ, and the windows-x64 zip additionally bundles Qt6 + PySide6
+the same way the POSIX zips do):
 
 ```
 MagPython/
   MagPython.dll                       # Python core + builtin modules + zlib + sqlite + libffi + libmpdec
-  MagPython.exe                       # python3.exe equivalent — Py_Main wrapper linked against MagPython.dll
-  python3.exe                         # copy of MagPython.exe under the canonical CPython binary name
   libcrypto-3.dll / libcrypto-3-x64.dll   # OpenSSL (x86 / x64)
   libssl-3.dll    / libssl-3-x64.dll      # OpenSSL (x86 / x64)
+  Qt6Core.dll                         # x64 only — Qt6 qtbase Core
+  shiboken6.abi3.dll                  # x64 only — PySide6 binding runtime
+  pyside6.abi3.dll                    # x64 only — PySide6 binding runtime
   include/Python/...                  # Public + cpython + internal headers, plus PC/pyconfig.h
   lib/...                             # Pure-Python stdlib (.py files copied from Python/Lib)
+  site-packages/                      # x64 only — PySide6 + shiboken6 Python packages
+    PySide6/__init__.py
+    PySide6/QtCore.pyd                # imports MagPython.dll directly (no python3.dll forwarder)
+    shiboken6/...
 ```
 
 Linux (`MagPython-linux-x86_64.zip`):
@@ -37,16 +46,24 @@ Linux (`MagPython-linux-x86_64.zip`):
 ```
 MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
-  MagPython              # python3 equivalent — Py_BytesMain wrapper, RUNPATH $ORIGIN
-  python3                # copy of MagPython under the canonical CPython binary name
+  libpython3.13.so.1.0   # symlink -> libMagPython.so (for abi3 NEEDED)
+  libpython3.13.so       # symlink -> libMagPython.so (link-time alias)
+  libpython3.so          # symlink -> libMagPython.so (stable-ABI alias)
   libcrypto.so.3
   libssl.so.3
   libsqlite3.so.0        # SONAME libsqlite3.so.0
   libsqlite3.so          # symlink -> libsqlite3.so.0
+  libQt6Core.so.6        # Qt6 Core, RUNPATH $ORIGIN
+  libshiboken6.abi3.so.6.X  # PySide6 binding runtime
+  libpyside6.abi3.so.6.X    # PySide6 binding runtime
   include/Python/...
   lib/python3.13/        # stdlib at the path Python's Unix discovery
                          # looks for (lib/python<X.Y>/os.py)
   lib/python3.13/lib-dynload/   # empty (modules are statically linked)
+  site-packages/
+    PySide6/__init__.py
+    PySide6/QtCore.abi3.so      # PySide6 Core module
+    shiboken6/...               # PySide6 binding-runtime package
 ```
 
 macOS arm64 (`MagPython-macos-arm64.zip`):
@@ -54,24 +71,23 @@ macOS arm64 (`MagPython-macos-arm64.zip`):
 ```
 MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
-  MagPython              # python3 equivalent — Py_BytesMain wrapper, LC_RPATH @loader_path
-  python3                # copy of MagPython under the canonical CPython binary name
+  libpython3.13.dylib    # symlink -> libMagPython.dylib
+  libpython3.dylib       # symlink -> libMagPython.dylib
   libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
   libssl.3.dylib         # install_name @rpath/libssl.3.dylib
   libsqlite3.0.dylib     # install_name @rpath/libsqlite3.0.dylib
   libsqlite3.dylib       # symlink -> libsqlite3.0.dylib
+  libQt6Core.6.dylib     # Qt6 Core
+  libshiboken6.abi3.6.X.dylib  # PySide6 binding runtime
+  libpyside6.abi3.6.X.dylib    # PySide6 binding runtime
   include/Python/...
   lib/python3.13/
   lib/python3.13/lib-dynload/
+  site-packages/
+    PySide6/__init__.py
+    PySide6/QtCore.abi3.so
+    shiboken6/...
 ```
-
-The `MagPython` / `MagPython.exe` binary is upstream's `Programs/python.c`
-compiled against the shipped headers and dynamically linked against
-`libMagPython.{so,dylib,dll}`. The artifact is laid out so the binary's
-path discovery finds the bundled stdlib without env vars:
-`PATH`/`@loader_path`/`$ORIGIN` resolves the lib next door, and Python's
-`os.py` lookup walks up to `lib/python<X.Y>/os.py` in the same artifact
-directory.
 
 Notable differences from a stock CPython Windows build:
 
@@ -171,22 +187,34 @@ StopOnFirstFailure="True"`:
    target then stages headers and the pure-Python stdlib into
    `Release/include/Python/` and `Release/lib/` so the output directory
    is a complete SDK drop.
-8. **`MagPythonExe.vcxproj`** — compiles CPython's `Programs/python.c`
-   (the tiny `wmain` / `Py_Main` wrapper that ships as `python3.exe`
-   upstream) and emits `MagPython.exe` into `Release/`, dynamically
-   linked against `MagPython.dll` via the `#pragma comment(lib,
-   "MagPython.lib")` in the project-patched `pyconfig.h`. A
-   post-build `<Exec>` runs `MagPython.exe --version` as a smoke test.
-9. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
+8. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
    that calls `Py_Initialize`, prints the compiler string, and runs an
    `import sys` line), copies the DLLs and `lib/` next to it, and **executes
    `test.exe`** as part of the build via an `<Exec>` task. A failed smoke
    test fails the build.
 
+After the metaproj completes, the windows-x64 path additionally runs
+`MagPython/build-pyside6-windows.sh` (driven by the workflow, not the
+metaproj — it shells out to CMake + Ninja against MSVC and is awkward
+to express as a vcxproj). The script fetches the same Qt6 + PySide6
+source tarballs the Linux/macOS builds use, configures qtbase Core
+only via CMake, then builds shiboken6 + pyside6 with
+`Python_LIBRARY=MagPython/Release/MagPython.lib` so the linker
+records `MagPython.dll` as the IAT DLL name on every generated
+`.pyd`. The resulting DLLs + site-packages are staged into
+`MagPython/Release/` next to `MagPython.dll`. No `python3.dll`
+forwarder is shipped — pre-built abi3 wheels from PyPI (which link
+against upstream's `python3.lib` and would expect `python3.dll` at
+load time) are out of scope; only the bundled PySide6 + extensions
+a downstream builds against this SDK (whose `pyconfig.h` `#pragma
+comment(lib)` is rewritten to `MagPython.lib`) are supported.
+windows-x86 skips this step (Qt 6 has no 32-bit Windows port).
+
 `MagPython/common.props` pins the defaults: `Platform=Win32`,
 `Configuration=Release`, `PlatformToolset=v142`. Build the x64 artifact
 by overriding the platform: `msbuild /m /p:Configuration=Release
-/p:Platform=x64 MagPython\MagPython.metaproj`.
+/p:Platform=x64 MagPython\MagPython.metaproj`. Add the PySide6 bundle
+locally after that with `bash MagPython/build-pyside6-windows.sh`.
 
 ### Linux and macOS
 
@@ -254,7 +282,7 @@ shape as the Windows metaproj:
    produces a libpython that contains the same module subset as
    `MagPython/MagPython.vcxproj` does on Windows, plus the POSIX-only
    `_curses` / `_curses_panel` modules backed by the static ncurses.
-7. **Rename, stage, smoke test, zip** — `libpython3.13.{so.1.0,dylib}` is
+7. **Rename, stage libMagPython** — `libpython3.13.{so.1.0,dylib}` is
    copied to `libMagPython.{so,dylib}` and its SONAME / install name is
    rewritten with `patchelf` (Linux) or `install_name_tool` (macOS).
    Linux additionally rewrites the RUNPATH to `$ORIGIN` so the artifact
@@ -266,12 +294,34 @@ shape as the Windows metaproj:
    install. Headers and the pure-Python stdlib are staged next to the
    libs (with a `Python/python.h -> Python.h` symlink so
    `MagPython/test.c`'s lowercase include resolves on case-sensitive
-   filesystems), `MagPython/test.c` is built and run against the staged
-   tree (failure fails the build), the `MagPython` interpreter binary
-   (CPython's `Programs/python.c`, dynamically linked against
-   `libMagPython.{so,dylib}` with `$ORIGIN` / `@loader_path` rpath) is
-   compiled into `$STAGE/` and smoke-tested with `--version`, and the
-   final zip is produced.
+   filesystems).
+8. **libpython symlinks** — `libpython3.13.{so.1.0,so,dylib}` and
+   `libpython3.{so,dylib}` are added as symlinks pointing at
+   `libMagPython.{so,dylib}`. Any abi3 / stable-ABI extension built
+   with `-lpythonX.Y` ends up with a NEEDED of `libpythonX.Y.so.1.0` —
+   the symlink chain forwards that into `libMagPython.so` at runtime
+   without changing libMagPython's SONAME.
+9. **Qt6 + PySide6** — `setup_qt6` / `build_qt6` fetches and builds
+   qtbase (Core feature only — gui/widgets/network/sql/etc. are all
+   `-DQT_FEATURE_*=OFF`) via CMake + Ninja into `$BUILD/qt6-out`.
+   `setup_pyside6` / `build_pyside6` fetches the pyside-setup tarball
+   and builds shiboken6 and pyside6 (Core module only) against our
+   Qt6 + our libMagPython (via `Python_INCLUDE_DIR` /
+   `Python_LIBRARY` pointed at the staged tree). `stage_pyside6`
+   copies `libQt6Core`, `libshiboken6`, `libpyside6` into `$STAGE`
+   next to `libMagPython`, copies the PySide6/shiboken6 Python
+   packages into `$STAGE/site-packages/`, rewrites RPATHs /
+   install_names so the binaries resolve as siblings of
+   libMagPython, and strips debug symbols. The pip-installed `cmake`
+   (>=3.21) + `ninja` from the host Python are used on both
+   platforms; `clang` + `libclang` come from the system package
+   manager on Linux and from Xcode on macOS.
+10. **Smoke test + zip** — `MagPython/test.c` is built (with
+    `-DMAGPYTHON_TEST_PYSIDE6=1` on POSIX) and run against the
+    staged tree. The smoke test imports PySide6, instantiates a
+    QCoreApplication, exercises a signal/slot round trip and a
+    Q_PROPERTY access. Failure fails the build. The final zip is
+    produced from `$BUILD/stage/MagPython/`.
 
 The host Python required by `regen-frozen` is
 `/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
@@ -351,6 +401,8 @@ the tarball and computes SHA-256 locally.
 | libmpdec | bytereef.org                           | 2.x  | `update-libmpdec.sh 2.5.2`     |
 | ncurses  | ftp.gnu.org                            | 6.x  | `update-ncurses.sh 6.5`        |
 | CPython  | `python/cpython` tag archive on GitHub | 3.x  | `update-python.sh 3.13.14`     |
+| Qt6      | download.qt.io (qtbase submodule)      | 6.x  | edit `qt6-version` / `qt6-sha256` (no update-script yet — let the first build run, copy the actual sha from the mismatch message) |
+| PySide6  | download.qt.io (pyside-setup)          | 6.x  | edit `pyside6-version` / `pyside6-sha256` (same bootstrap-via-CI workflow as Qt6) |
 
 libmpdec is the C library behind the `_decimal` module. ncurses is
 POSIX-only — the Windows artifact ships no curses module, so there is
@@ -433,5 +485,7 @@ by name.
 | libmpdec      | BSD-2-Clause                                                                               |
 | SQLite        | public domain (from the comment in `sqlite3.h`, cf. https://www.sqlite.org/copyright.html) |
 | ncurses       | MIT-style "X11" license                                                                    |
+| Qt6 qtbase    | LGPL-3.0-only (with the usual relinking exception)                                         |
+| PySide6       | LGPL-3.0-only                                                                              |
 
 License files are added to the build artifacts for downstream consumers.

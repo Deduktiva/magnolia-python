@@ -144,6 +144,63 @@ fi
 NCURSES_CACHE="$REPO/MagPython/ncurses"
 NCURSES_SRC="$NCURSES_CACHE/ncurses-$NCURSES_VERSION"
 
+# Qt6 is downloaded at build time rather than vendored. POSIX-only here;
+# windows-x64 uses the same pin via build-pyside6-windows.sh (which sources
+# this file in spirit but runs Qt6's CMake build natively, not through the
+# POSIX helpers below). windows-x86 ships no Qt/PySide6 — Qt 6 dropped
+# 32-bit Windows entirely. Only qtbase is built, with every feature except
+# Core disabled, so the artifact carries one library (libQt6Core) plus
+# PySide6.QtCore bindings — enough for a downstream host application to
+# embed Qt's event loop, signal/slot, QObject, and property system.
+# Anything beyond Core is the downstream's responsibility to add (see
+# README's PySide6 section for the recipe).
+QT6_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/qt6-version")"
+if [ -z "$QT6_VERSION" ]; then
+    echo "Failed to read Qt6 version from MagPython/qt6-version" >&2
+    exit 1
+fi
+QT6_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/qt6-sha256")"
+if [ -z "$QT6_SHA256" ]; then
+    echo "Failed to read Qt6 sha256 from MagPython/qt6-sha256" >&2
+    exit 1
+fi
+QT6_CACHE="$REPO/MagPython/qt6"
+QT6_SRC="$QT6_CACHE/qtbase-everywhere-src-$QT6_VERSION"
+# Qt6's release stream uses major.minor.0 / major.minor.1 / ... within a
+# major.minor track, with the tarball directory derived from the
+# major.minor pair. Pre-compute the track so the URL stays a single
+# substitution.
+QT6_TRACK="$(printf '%s' "$QT6_VERSION" | awk -F. '{ printf "%s.%s\n", $1, $2 }')"
+
+# PySide6 is the Python bindings for Qt; bundled in this artifact rather
+# than installed from the PyPI wheel because the wheels' .abi3.so files
+# are built against the upstream CPython runtime and have rpaths /
+# Qt-library dependencies that don't match MagPython's relocatable
+# $ORIGIN-rpath shape. Building from source against our libMagPython +
+# our Qt6 produces a binary that ships next to libMagPython.so with
+# matching linkage. POSIX-only — see QT6 block above.
+#
+# Same version pin as Qt6: PySide6 6.X.Y is built against Qt 6.X (the
+# tarball major.minor must match the host Qt's major.minor, with the
+# PySide6 patch number free to differ). Set to 6.8.0 in this PR.
+PYSIDE6_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/pyside6-version")"
+if [ -z "$PYSIDE6_VERSION" ]; then
+    echo "Failed to read PySide6 version from MagPython/pyside6-version" >&2
+    exit 1
+fi
+PYSIDE6_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/pyside6-sha256")"
+if [ -z "$PYSIDE6_SHA256" ]; then
+    echo "Failed to read PySide6 sha256 from MagPython/pyside6-sha256" >&2
+    exit 1
+fi
+PYSIDE6_CACHE="$REPO/MagPython/pyside6"
+# Qt names the PySide6 source tarball with the major.minor (no patch)
+# even when the directory uses the full version — e.g.
+# `PySide6-6.8.0-src/pyside-setup-everywhere-src-6.8.tar.xz`. Carry both
+# forms so the URL and the extracted-dir path stay in lockstep.
+PYSIDE6_MAJOR_MINOR="$(printf '%s' "$PYSIDE6_VERSION" | awk -F. '{ printf "%s.%s\n", $1, $2 }')"
+PYSIDE6_SRC="$PYSIDE6_CACHE/pyside-setup-everywhere-src-$PYSIDE6_MAJOR_MINOR"
+
 log() { printf '\n=== %s ===\n' "$*"; }
 
 prep_build_tree() {
@@ -982,7 +1039,14 @@ build_magpython_exe() {
 run_smoke_test() {
     local rpath_token="$1"; shift
     log "Building smoke test"
+    # -DMAGPYTHON_TEST_PYSIDE6 enables the PySide6 import + Q*Application
+    # block in test.c. The PySide6 bundle is staged into
+    # $STAGE/site-packages by stage_pyside6 on POSIX; if a future build
+    # script ends up here without having staged PySide6 (e.g. a stripped
+    # platform that intentionally omits it), pass -UMAGPYTHON_TEST_PYSIDE6
+    # in $@.
     cc "$REPO/MagPython/test.c" \
+        -DMAGPYTHON_TEST_PYSIDE6=1 \
         -I"$STAGE/include" \
         -L"$STAGE" \
         "-Wl,-rpath,${rpath_token}" \
@@ -995,7 +1059,13 @@ run_smoke_test() {
     # finds `lib/python$PY_X_Y/os.py` next to the executable and computes
     # the right sys.prefix. Same shape as the Windows test which runs
     # MagPython.dll's smoke test without setting any env vars.
-    (cd "$STAGE" && ./MagPython_test)
+    #
+    # QT_QPA_PLATFORM=offscreen forces Qt to use the headless platform
+    # plugin so the smoke test runs on CI machines without an X server
+    # / display attached. We don't ship QtGui in the artifact today, so
+    # this is defensive against a future QtGui addition triggering
+    # platform-plugin discovery.
+    (cd "$STAGE" && QT_QPA_PLATFORM=offscreen ./MagPython_test)
     rm -f "$STAGE/MagPython_test"
 }
 
@@ -1044,6 +1114,18 @@ stage_licenses() {
     fi
     _stage_license libmpdec  "$LIBMPDEC_VERSION" "$LIBMPDEC_SRC" LICENSE.txt
     _stage_license zlib      "$ZLIB_VERSION"     "$ZLIB_SRC"     LICENSE
+    # Qt6 / PySide6 are POSIX-only and the source trees only exist
+    # after setup_qt6 / setup_pyside6 has run — guard with `-d` so a
+    # platform without them (or an early-exit before they're fetched)
+    # doesn't break this step. Qt6 ships LICENSES/<text>.txt rather
+    # than a single LICENSE file; LGPL-3.0-only is the active license
+    # for qtbase. PySide6 ships LICENSES/LGPL-3.0-only.txt as well.
+    if [ -d "$QT6_SRC" ] && [ -f "$QT6_SRC/LICENSES/LGPL-3.0-only.txt" ]; then
+        _stage_license qt6 "$QT6_VERSION" "$QT6_SRC/LICENSES" LGPL-3.0-only.txt
+    fi
+    if [ -d "$PYSIDE6_SRC" ] && [ -f "$PYSIDE6_SRC/LICENSES/LGPL-3.0-only.txt" ]; then
+        _stage_license pyside6 "$PYSIDE6_VERSION" "$PYSIDE6_SRC/LICENSES" LGPL-3.0-only.txt
+    fi
 
     {
         printf 'sqlite %s\n\n' "$SQLITE_VERSION"
@@ -1087,4 +1169,417 @@ zip_artifact() {
     rm -f "$out"
     (cd "$BUILD/stage" && zip -qr "$out" MagPython)
     ls -lh "$out"
+}
+
+# Download + verify + extract the upstream Qt6 qtbase tarball into
+# $QT6_CACHE/qtbase-everywhere-src-$QT6_VERSION/. Idempotent — the cache
+# lives outside $BUILD so re-runs of the build script (which wipes $BUILD
+# via prep_build_tree) reuse the already-fetched tarball.
+#
+# We fetch the qtbase submodule tarball, not the full qt-everywhere
+# tarball: PySide6.QtCore only needs qtbase Core, and the full source
+# tree is ~1.5GB whereas qtbase alone is ~50MB. If a future module is
+# added that needs (say) qtdeclarative or qtsvg, the equivalent
+# submodule-only tarball can be fetched here in parallel.
+#
+# The expected hash is pinned in-tree at MagPython/qt6-sha256 and
+# checked against the downloaded bytes.
+setup_qt6() {
+    if [ -d "$QT6_SRC" ]; then return 0; fi
+
+    log "Fetching Qt6 qtbase $QT6_VERSION"
+    mkdir -p "$QT6_CACHE"
+    local url="https://download.qt.io/archive/qt/$QT6_TRACK/$QT6_VERSION/submodules/qtbase-everywhere-src-$QT6_VERSION.tar.xz"
+    local tarball="$QT6_CACHE/qtbase-everywhere-src-$QT6_VERSION.tar.xz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$url"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$QT6_SHA256" != "$actual" ]; then
+        echo "Qt6 qtbase SHA-256 mismatch: expected $QT6_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/qt6-sha256 — confirm against the metalink at" >&2
+        echo "   https://download.qt.io/archive/qt/$QT6_TRACK/$QT6_VERSION/submodules/qtbase-everywhere-src-$QT6_VERSION.tar.xz.metalink" >&2
+        echo "   before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xJf "$tarball" -C "$QT6_CACHE"
+}
+
+# Build Qt6 qtbase as a shared lib + headers + CMake config at
+# $BUILD/qt6-out via upstream's CMake build. Only Core is enabled
+# (every other qtbase feature is turned off via -DFEATURE_*=OFF so
+# the build doesn't spend time on Gui / Widgets / Network / SQL / etc.,
+# none of which Core needs and none of which PySide6.QtCore consumes).
+# Output: $BUILD/qt6-out/lib/libQt6Core.{so,dylib} plus the
+# Qt6CoreConfig.cmake bits PySide6's setup CMake reads.
+#
+# CMAKE_INSTALL_RPATH=$ORIGIN (Linux) / @loader_path (macOS) so
+# libQt6Core can find sibling libs (if any are added later) the same
+# way libMagPython does. Bundle install is `cmake --install` rather
+# than `make install` because Qt6 dropped qmake-driven installs.
+#
+# CMake / Ninja are expected on PATH (installed via pip install
+# ninja cmake / brew install ninja in the per-platform build scripts);
+# C++17 compiler from the system toolchain.
+#
+# $1: extra cmake -D... args appended (e.g. -DCMAKE_OSX_DEPLOYMENT_TARGET
+#     on macOS, an extra dependency hint on Linux).
+build_qt6() {
+    setup_qt6
+    log "Configuring Qt6 qtbase $QT6_VERSION (Core only)"
+    mkdir -p "$BUILD/qt6-build"
+
+    local rpath_token
+    case "$(uname -s)" in
+        Darwin) rpath_token='@loader_path' ;;
+        *)      rpath_token='$ORIGIN' ;;
+    esac
+
+    # Disable everything that isn't Core. Qt6's CMake build uses
+    # `-DFEATURE_<name>=OFF` to skip a feature; the most relevant ones
+    # are listed here. The set was derived by reading qtbase/configure.cmake
+    # at the pinned version and noting which feature groups produce a
+    # separate library that consumers might NEEDED-link. -DBUILD_<module>
+    # toggles drop entire qtbase sub-libs.
+    #
+    # Host tools (qmake6, moc, rcc, uic, syncqt) are built by default —
+    # PySide6's CMake invokes them while generating bindings and we'd
+    # rather pay the few extra minutes here than figure out which
+    # subset PySide6 actually wants. Same reason we don't pass
+    # QT_BUILD_TOOLS_BY_DEFAULT=OFF: cmake_install.cmake still tries
+    # to copy every tool's output and aborts on the first missing
+    # libexec/<tool> file.
+    cmake -S "$QT6_SRC" -B "$BUILD/qt6-build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="$BUILD/qt6-out" \
+        -DCMAKE_INSTALL_RPATH="$rpath_token" \
+        -DBUILD_SHARED_LIBS=ON \
+        -DQT_BUILD_EXAMPLES=OFF \
+        -DQT_BUILD_TESTS=OFF \
+        -DQT_FEATURE_gui=OFF \
+        -DQT_FEATURE_widgets=OFF \
+        -DQT_FEATURE_network=OFF \
+        -DQT_FEATURE_sql=OFF \
+        -DQT_FEATURE_testlib=OFF \
+        -DQT_FEATURE_xml=OFF \
+        -DQT_FEATURE_dbus=OFF \
+        -DQT_FEATURE_concurrent=OFF \
+        -DQT_FEATURE_printsupport=OFF \
+        -DQT_FEATURE_opengl=OFF \
+        -DQT_FEATURE_icu=OFF \
+        "$@"
+
+    log "Building Qt6 qtbase"
+    cmake --build "$BUILD/qt6-build" -j "$JOBS"
+    cmake --install "$BUILD/qt6-build"
+}
+
+# Download + verify + extract the upstream pyside-setup tarball into
+# $PYSIDE6_CACHE/pyside-setup-everywhere-src-$PYSIDE6_VERSION/. Idempotent.
+#
+# Same shape as setup_qt6: outside $BUILD so it's preserved across
+# prep_build_tree wipes; SHA-256 pinned in-tree.
+setup_pyside6() {
+    if [ -d "$PYSIDE6_SRC" ]; then return 0; fi
+
+    log "Fetching PySide6 $PYSIDE6_VERSION"
+    mkdir -p "$PYSIDE6_CACHE"
+    # Qt publishes the source tarball under `PySide6-<X.Y.Z>-src/` but
+    # the tarball itself is named with the major.minor only:
+    #   PySide6-6.8.0-src/pyside-setup-everywhere-src-6.8.tar.xz
+    # The extracted tree also lacks the patch component — it's
+    # `pyside-setup-everywhere-src-6.8/`. PYSIDE6_MAJOR_MINOR
+    # captures that form for both filenames and PYSIDE6_SRC's path.
+    local dirname url tarball
+    dirname="PySide6-$PYSIDE6_VERSION-src"
+    url="https://download.qt.io/official_releases/QtForPython/pyside6/$dirname/pyside-setup-everywhere-src-$PYSIDE6_MAJOR_MINOR.tar.xz"
+    tarball="$PYSIDE6_CACHE/pyside-setup-everywhere-src-$PYSIDE6_MAJOR_MINOR.tar.xz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$url"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$PYSIDE6_SHA256" != "$actual" ]; then
+        echo "PySide6 SHA-256 mismatch: expected $PYSIDE6_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/pyside6-sha256 — confirm via the metalink at" >&2
+        echo "   the same dir as the tarball before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xJf "$tarball" -C "$PYSIDE6_CACHE"
+    # Upstream extracts to pyside-setup-everywhere-src-<version>/, which
+    # matches $PYSIDE6_SRC already — no rename needed.
+}
+
+# Build PySide6 shiboken6 + pyside6 (Core module only) against our Qt6 +
+# the MagPython interpreter staged at $STAGE/python3. Mirrors
+# setup_libmpdec / build_ncurses shape: a setup_* fetch step, then a
+# build_* step that runs the upstream build system and stages into a
+# $BUILD subdir.
+#
+# Deliberately uses ONLY our own Python — no host python on the path.
+# build_magpython_exe staged $STAGE/python3 (CPython's Programs/python.c
+# wrapper linked against libMagPython). shiboken6's CMake
+# `find_package(Python ... Development.Module)` invokes
+# Python_EXECUTABLE to populate Python_INCLUDE_DIRS / Python_LIBRARIES
+# from sysconfig; pointing at our binary keeps the entire ABI surface
+# in lockstep (compile-time + link-time + runtime), avoiding the "found
+# suitable version but missing Development.Module" failure mode a host
+# python + staged Python_INCLUDE_DIR/Python_LIBRARY override produces
+# when the overrides don't match the executable's reported paths.
+#
+# At runtime, the resulting .so files have NEEDED libpython3.13.so.1.0
+# (or LC_LOAD_DYLIB libpython3.13.dylib on macOS). The artifact's
+# libpython3.13.so.1.0 / libpython3.13.dylib symlinks (staged by
+# stage_libpython_symlinks) point at libMagPython, so the runtime
+# resolution lands in libMagPython.
+#
+# shiboken6 depends on libclang to parse Qt6 headers; libclang is
+# expected on the system (installed via build-linux.sh / build-macos.sh
+# per platform).
+build_pyside6() {
+    setup_pyside6
+
+    local our_python="$STAGE/python3"
+    [ -x "$our_python" ] || { echo "build_pyside6: $our_python not found or not executable; build_magpython_exe must run first" >&2; exit 1; }
+
+    local rpath_token
+    case "$(uname -s)" in
+        Darwin) rpath_token='@loader_path' ;;
+        *)      rpath_token='$ORIGIN' ;;
+    esac
+
+    # PySide6's build expects CMAKE_PREFIX_PATH to find Qt6; point it
+    # at the Qt6 install we just built.
+    export CMAKE_PREFIX_PATH="$BUILD/qt6-out${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+
+    log "Building shiboken6 $PYSIDE6_VERSION"
+    mkdir -p "$BUILD/shiboken6-build"
+    cmake -S "$PYSIDE6_SRC/sources/shiboken6" -B "$BUILD/shiboken6-build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="$BUILD/pyside6-out" \
+        -DCMAKE_INSTALL_RPATH="$rpath_token" \
+        -DBUILD_TESTS=OFF \
+        -DUSE_PYTHON_VERSION="$PY_X_Y" \
+        -DPython_EXECUTABLE="$our_python" \
+        -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+        -DSHIBOKEN_BUILD_TOOLS=ON
+    cmake --build "$BUILD/shiboken6-build" -j "$JOBS"
+    cmake --install "$BUILD/shiboken6-build"
+
+    log "Building pyside6 $PYSIDE6_VERSION (Core module only)"
+    mkdir -p "$BUILD/pyside6-build"
+    cmake -S "$PYSIDE6_SRC/sources/pyside6" -B "$BUILD/pyside6-build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="$BUILD/pyside6-out" \
+        -DCMAKE_INSTALL_RPATH="$rpath_token" \
+        -DBUILD_TESTS=OFF \
+        -DMODULES="Core" \
+        -DUSE_PYTHON_VERSION="$PY_X_Y" \
+        -DPython_EXECUTABLE="$our_python" \
+        -DShiboken6_DIR="$BUILD/pyside6-out/lib/cmake/Shiboken6" \
+        -DShiboken6Generator_DIR="$BUILD/pyside6-out/lib/cmake/Shiboken6Generator" \
+        -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+    cmake --build "$BUILD/pyside6-build" -j "$JOBS"
+    cmake --install "$BUILD/pyside6-build"
+}
+
+# Stage PySide6 + libQt6Core into the artifact tree. Goes under
+# site-packages/ next to libQt6Core/ — Python's import machinery picks
+# up site-packages automatically via the lib/python<X.Y>/site-packages
+# convention (the staged stdlib already has that dir from CPython's Lib/).
+#
+# Layout in the final zip:
+#   MagPython/
+#     libQt6Core.<so.6 | 6.dylib>   ← Qt's Core library
+#     libshiboken6.abi3.so.<ver>    ← PySide6 binding runtime
+#     libpyside6.abi3.so.<ver>      ← PySide6 binding runtime
+#     site-packages/
+#       PySide6/__init__.py
+#       PySide6/QtCore.abi3.so      ← Python module
+#       shiboken6/...               ← Python module
+#
+# The downstream host application adds <artifact>/MagPython/site-packages
+# to sys.path (or PYTHONPATH) to make `import PySide6.QtCore` resolve.
+# Libraries (libQt6Core, libshiboken6, libpyside6) are siblings of
+# libMagPython so the runtime loader finds them via the same $ORIGIN /
+# @loader_path rpath the embedder already sets up.
+stage_pyside6() {
+    log "Staging PySide6 + Qt6 Core into $STAGE/"
+    # Qt6Core lib: the cmake install drops it under $BUILD/qt6-out/lib.
+    case "$(uname -s)" in
+        Darwin)
+            cp -P "$BUILD/qt6-out/lib"/libQt6Core.*.dylib "$STAGE/" 2>/dev/null || true
+            cp -P "$BUILD/qt6-out/lib"/libQt6Core.dylib "$STAGE/" 2>/dev/null || true
+            ;;
+        *)
+            cp -P "$BUILD/qt6-out/lib"/libQt6Core.so* "$STAGE/" 2>/dev/null || true
+            ;;
+    esac
+
+    # shiboken6/pyside6 runtime libs: PySide6's install drops them under
+    # $BUILD/pyside6-out/lib (some versions use lib64 on x86_64 — handle
+    # both with a glob).
+    local pyside_libdir
+    for pyside_libdir in "$BUILD/pyside6-out/lib" "$BUILD/pyside6-out/lib64"; do
+        [ -d "$pyside_libdir" ] || continue
+        case "$(uname -s)" in
+            Darwin)
+                cp -P "$pyside_libdir"/libshiboken6.*.dylib "$STAGE/" 2>/dev/null || true
+                cp -P "$pyside_libdir"/libpyside6.*.dylib   "$STAGE/" 2>/dev/null || true
+                ;;
+            *)
+                cp -P "$pyside_libdir"/libshiboken6.*.so*   "$STAGE/" 2>/dev/null || true
+                cp -P "$pyside_libdir"/libpyside6.*.so*     "$STAGE/" 2>/dev/null || true
+                ;;
+        esac
+    done
+
+    # Python modules. PySide6's install places them under
+    # <prefix>/lib/pythonX.Y/site-packages/{PySide6,shiboken6}/. Copy the
+    # full tree so consumers can `import PySide6.QtCore` and `import
+    # shiboken6` without further wiring.
+    mkdir -p "$STAGE/site-packages"
+    local py_sitepkgs="$BUILD/pyside6-out/lib/python$PY_X_Y/site-packages"
+    [ -d "$py_sitepkgs" ] || py_sitepkgs="$BUILD/pyside6-out/lib64/python$PY_X_Y/site-packages"
+    if [ -d "$py_sitepkgs" ]; then
+        cp -R "$py_sitepkgs/." "$STAGE/site-packages/"
+    else
+        echo "stage_pyside6: PySide6 site-packages not found under $BUILD/pyside6-out" >&2
+        exit 1
+    fi
+
+    # Rewrite install_name / rpaths on the staged binaries so they
+    # resolve as siblings of libMagPython (matches the rest of the artifact).
+    case "$(uname -s)" in
+        Darwin)
+            for f in "$STAGE"/libQt6Core.*.dylib "$STAGE"/libshiboken6.*.dylib "$STAGE"/libpyside6.*.dylib "$STAGE"/site-packages/PySide6/*.dylib "$STAGE"/site-packages/PySide6/QtCore.abi3.so; do
+                [ -f "$f" ] || continue
+                base="$(basename "$f")"
+                # If it's a top-level library, make its install_name @rpath/<base>.
+                case "$base" in
+                    libQt6Core*|libshiboken6*|libpyside6*)
+                        install_name_tool -id "@rpath/$base" "$f" 2>/dev/null || true
+                        ;;
+                esac
+                # Rewrite any absolute LC_LOAD_DYLIB entries that point under
+                # the build tree to @rpath/<basename>.
+                otool -L "$f" \
+                    | awk -v root="$BUILD" 'NR>1 && $1 ~ root {print $1}' \
+                    | while read -r path; do
+                        b="$(basename "$path")"
+                        install_name_tool -change "$path" "@rpath/$b" "$f" 2>/dev/null || true
+                    done
+                # Drop absolute LC_RPATHs under $BUILD; add @loader_path
+                # (already covered by libMagPython's tree but cheap to
+                # double-add — install_name_tool ignores duplicates).
+                otool -l "$f" \
+                    | awk '/^ +cmd LC_RPATH/{r=1;next} r && /path /{print $2;r=0}' \
+                    | while read -r rp; do
+                        case "$rp" in
+                            "$BUILD"/*) install_name_tool -delete_rpath "$rp" "$f" 2>/dev/null || true ;;
+                        esac
+                    done
+                if ! otool -l "$f" \
+                        | awk '/^ +cmd LC_RPATH/{r=1;next} r && /path /{print $2;r=0}' \
+                        | grep -qx '@loader_path'; then
+                    install_name_tool -add_rpath '@loader_path' "$f" 2>/dev/null || true
+                fi
+            done
+            ;;
+        *)
+            for f in "$STAGE"/libQt6Core.so* "$STAGE"/libshiboken6.*.so* "$STAGE"/libpyside6.*.so* "$STAGE"/site-packages/PySide6/*.so "$STAGE"/site-packages/PySide6/QtCore.abi3.so; do
+                [ -f "$f" ] || continue
+                # patchelf is already a hard requirement for the Linux
+                # build (see build-linux.sh's preflight check).
+                patchelf --set-rpath '$ORIGIN/../..' "$f" 2>/dev/null || true
+                # libQt6Core etc. sit at the top of the artifact, so
+                # $ORIGIN is the same dir as libMagPython.so. For the
+                # site-packages/PySide6/*.so files, they sit one
+                # subdirectory deeper, so $ORIGIN/../.. lands at the
+                # MagPython/ dir — that's where libQt6Core/libshiboken6
+                # are. Override per-file:
+                case "$f" in
+                    "$STAGE"/libQt6Core.so*|"$STAGE"/libshiboken6.*|"$STAGE"/libpyside6.*)
+                        patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+                        ;;
+                esac
+            done
+            ;;
+    esac
+
+    # Strip debug symbols off the bundled binaries — Qt6 in particular
+    # ships substantial debug info even in Release builds. Same intent as
+    # the libMagPython / libcrypto strip step.
+    case "$(uname -s)" in
+        Darwin)
+            for f in "$STAGE"/libQt6Core.*.dylib "$STAGE"/libshiboken6.*.dylib "$STAGE"/libpyside6.*.dylib "$STAGE"/site-packages/PySide6/*.dylib "$STAGE"/site-packages/PySide6/*.so; do
+                [ -f "$f" ] || continue
+                strip -x "$f" 2>/dev/null || true
+            done
+            ;;
+        *)
+            for f in "$STAGE"/libQt6Core.so* "$STAGE"/libshiboken6.*.so* "$STAGE"/libpyside6.*.so* "$STAGE"/site-packages/PySide6/*.so; do
+                [ -f "$f" ] || continue
+                strip "$f" 2>/dev/null || true
+            done
+            ;;
+    esac
+}
+
+# libpython symlinks consumed by build_pyside6's PySide6 link step: the
+# CMake build's `find_package(Python)` plus PySide6's linker invocation
+# expect a libpythonX.Y.{so.1.0,dylib} sibling to libMagPython. We added
+# the libpython forwarder by symlinking onto libMagPython so PySide6's
+# NEEDED / LC_LOAD_DYLIB entry comes out as the canonical libpythonX.Y
+# name, with runtime resolution landing in libMagPython.
+#
+# Called from build-linux.sh / build-macos.sh after libMagPython is
+# staged (so the symlink target exists) and before build_pyside6 (so
+# the PySide6 link sees it).
+stage_libpython_symlinks() {
+    log "Adding libpython symlinks for PySide6 linkage"
+    case "$(uname -s)" in
+        Darwin)
+            ln -sf libMagPython.dylib "$STAGE/libpython$PY_X_Y.dylib"
+            ln -sf libMagPython.dylib "$STAGE/libpython3.dylib"
+            ;;
+        *)
+            # Linux libpython convention is libpythonX.Y.so.1.0 (the
+            # real file) with libpythonX.Y.so as the unversioned linker
+            # alias. Both point at libMagPython.so; the linker uses the
+            # unversioned name to resolve -lpythonX.Y at link time, and
+            # the .so.1.0 form is what gets recorded as the binary's
+            # NEEDED entry (because libMagPython.so's SONAME is
+            # libMagPython.so — see the soname forwarding note below).
+            #
+            # Note: the SONAME on libMagPython.so stays libMagPython.so;
+            # the symlinks are file-tree fixtures only. The dynamic
+            # linker walks symlink chains and applies the resolved
+            # file's SONAME, so a NEEDED of `libpythonX.Y.so.1.0`
+            # against this symlink chain ends up loading libMagPython.so
+            # under that NEEDED entry — exactly what we want.
+            ln -sf libMagPython.so "$STAGE/libpython$PY_X_Y.so.1.0"
+            ln -sf libMagPython.so "$STAGE/libpython$PY_X_Y.so"
+            ln -sf libMagPython.so "$STAGE/libpython3.so"
+            ;;
+    esac
 }

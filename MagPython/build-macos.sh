@@ -29,6 +29,26 @@ HOST_PYTHON="$(command -v python3)"
 
 command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 
+# Qt6 + PySide6 add cmake + ninja + libclang to the dep list. The
+# macos-14 runner ships Xcode's clang (so libclang headers / dylib are
+# available under the SDK) and a stock cmake, but no ninja by default.
+# Install cmake + ninja as Python wheels via the host pip — same source
+# of truth as the Linux build, and avoids needing brew install on a
+# clean runner.
+#
+# Homebrew's python3 is PEP 668 ("externally managed"), so pip refuses
+# to touch site-packages without --break-system-packages. The runner
+# is throwaway and we only install two pure-CLI wheels, so going
+# through the override is cleaner than spinning up a venv just to
+# expose cmake/ninja on PATH.
+"$HOST_PYTHON" -m pip install --upgrade --quiet --break-system-packages 'cmake>=3.21' ninja
+# pip drops the cmake / ninja CLIs under the host python's bin dir;
+# put it ahead of PATH so Qt6's CMake-driven build finds the newer
+# cmake rather than the stock one shipped with the runner.
+export PATH="$(dirname "$HOST_PYTHON"):$PATH"
+command -v cmake >/dev/null || { echo "cmake not found after pip install"; exit 1; }
+command -v ninja >/dev/null || { echo "ninja not found after pip install"; exit 1; }
+
 prep_build_tree
 setup_python
 install_setup_local
@@ -166,10 +186,28 @@ done
 
 stage_headers_and_stdlib "$BUILD/main"
 stage_openssl_headers
-stage_licenses
+# Same ordering as build-linux.sh: leakage check on libMagPython
+# before Qt6 sibling dylibs land, license staging after Qt6/PySide6
+# source trees exist.
 verify_no_static_dep_leakage "$STAGE/libMagPython.dylib"
-run_smoke_test '@loader_path'
+
+# Build + bundle Qt6 + PySide6 against the libMagPython we just staged.
+# Same shape as the Linux build: symlinks → Qt6 → PySide6 → stage.
+# CMAKE_OSX_DEPLOYMENT_TARGET is threaded through so Qt6's link rules
+# emit -mmacosx-version-min=11.0, matching what MACOSX_DEPLOYMENT_TARGET
+# already does for libMagPython itself.
+stage_libpython_symlinks
+# MagPython interpreter (CPython's Programs/python.c against libMagPython,
+# with python3 alias). The PySide6 build uses $STAGE/python3 as its
+# Python_EXECUTABLE — see the rationale in build-linux.sh's call site.
 build_magpython_exe '@loader_path'
+build_qt6 -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET"
+build_pyside6
+stage_pyside6
+
+stage_licenses
+
+run_smoke_test '@loader_path'
 
 # Sanity: only @rpath/* and system libs should remain in the LC_LOAD_DYLIB
 # entries of any shipped dylib. libssl in particular must not retain the

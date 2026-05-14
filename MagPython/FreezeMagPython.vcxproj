@@ -73,6 +73,10 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>Py_NO_ENABLE_SHARED;Py_BUILD_CORE;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- PY3_DLLNAME — dynload_win.c reads it (purely diagnostic
+           string used in error messages). Matches the define added
+           to MagPython.vcxproj; see the comment there. -->
+      <PreprocessorDefinitions>PY3_DLLNAME=L"python3";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(OutDir)\include</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <!-- from python.props -->
@@ -233,6 +237,14 @@
     <ClCompile Include="$(PythonSourceDir)\Python\hashtable.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\import.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\importdl.c" />
+    <!-- dynload_win.c — needed alongside importdl.c whenever
+         HAVE_DYNAMIC_LOADING is defined in the consumed pyconfig.h
+         (it provides _PyImport_FindSharedFuncptrWindows and
+         _PyImport_DynLoadFiletab, both referenced by importdl.c).
+         The freeze tool itself doesn't dlopen anything, but we share
+         pyconfig.h with MagPython.vcxproj, which keeps the directive
+         on for the bundled PySide6.QtCore.pyd. -->
+    <ClCompile Include="$(PythonSourceDir)\Python\dynload_win.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\initconfig.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\interpconfig.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\instruction_sequence.c" />

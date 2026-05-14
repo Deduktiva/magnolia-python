@@ -33,21 +33,41 @@ HOST_PYTHON="/opt/python/cp313-cp313/bin/python3"
 # package omits — NOTES-PERL.md documents that RPM-based distros need
 # perl-core for the full set. Install both on demand. Keep idempotent so
 # re-runs are cheap.
+#
+# Qt6 + PySide6 add three more system deps on top: cmake (>= 3.21 for
+# Qt6's CMake build), ninja (the Qt6 / PySide6 builds drive their
+# build via Ninja for parallel job control), and clang + llvm-devel
+# (libclang headers / shared lib are what shiboken6 dlopens to parse Qt
+# headers and generate Python bindings). manylinux_2_28's AlmaLinux 8
+# base image carries old cmake (3.20) so we install a current cmake +
+# ninja via pip — both ship binary wheels and are easier to keep in
+# step with upstream than rebuilding the EL8 packages.
 if ! command -v zip >/dev/null \
    || ! perl -MIPC::Cmd -e1 >/dev/null 2>&1 \
-   || ! perl -MTime::Piece -e1 >/dev/null 2>&1; then
+   || ! perl -MTime::Piece -e1 >/dev/null 2>&1 \
+   || ! command -v clang >/dev/null \
+   || ! ls /usr/lib*/libclang.so* >/dev/null 2>&1; then
     if command -v dnf >/dev/null; then
-        dnf install -y zip perl-core
+        dnf install -y zip perl-core clang clang-devel llvm-devel
     elif command -v yum >/dev/null; then
-        yum install -y zip perl-core
+        yum install -y zip perl-core clang clang-devel llvm-devel
     elif command -v apt-get >/dev/null; then
-        apt-get update && apt-get install -y zip
+        apt-get update && apt-get install -y zip clang libclang-dev llvm-dev
         # Debian/Ubuntu's `perl` package already includes the core modules.
     else
-        echo "no supported package manager to install zip / perl-core"; exit 1
+        echo "no supported package manager to install zip / perl-core / clang"; exit 1
     fi
 fi
 command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
+# Use the host CPython's pip to install cmake + ninja as binary wheels.
+# Keeps the host PATH overlay scoped to whatever python3 lives in;
+# manylinux_2_28's /opt/python/cp313-cp313/bin is the natural target.
+"$HOST_PYTHON" -m pip install --upgrade --quiet 'cmake>=3.21' ninja
+# Surface the pip-installed binaries on PATH (pip drops them in the
+# matching Python's bin/).
+export PATH="$(dirname "$HOST_PYTHON"):$PATH"
+command -v cmake >/dev/null || { echo "cmake not found after pip install"; exit 1; }
+command -v ninja >/dev/null || { echo "ninja not found after pip install"; exit 1; }
 
 prep_build_tree
 setup_python
@@ -122,9 +142,39 @@ done
 
 stage_headers_and_stdlib "$BUILD/main"
 stage_openssl_headers
-stage_licenses
+# Run the libMagPython static-dep-leakage check BEFORE Qt6 sibling libs
+# land next to it — Qt6 may pull in libstdc++/libm/etc. that the
+# verifier shouldn't see as part of libMagPython's NEEDED entries
+# (it operates on a single .so).
 verify_no_static_dep_leakage "$STAGE/libMagPython.so"
-run_smoke_test '$ORIGIN' -ldl
+
+# Build + bundle Qt6 + PySide6 against the libMagPython we just produced.
+# Symlinks first (PySide6's link step needs a libpythonX.Y.so to resolve
+# -lpythonX.Y against), then Qt6 qtbase Core, then PySide6 (shiboken6 +
+# pyside6), then stage everything into $STAGE.
+#
+# This block is what makes the artifact a self-contained PySide6
+# consumption SDK: a downstream host application can drop the MagPython/
+# directory next to its binary, add MagPython/site-packages to sys.path,
+# and `import PySide6.QtCore` resolves into libraries the downstream
+# never had to build or curate.
+stage_libpython_symlinks
+# Build the MagPython interpreter (CPython's Programs/python.c against
+# libMagPython, with python3 alias). PySide6's `find_package(Python ...
+# Development.Module)` runs against this binary so its sysconfig data
+# is in lockstep with the headers and libpython the resulting .so files
+# will link against — using the host's python on the runner would cause
+# the ABI / sysconfig-mismatch failure mode shiboken6 dies on otherwise.
 build_magpython_exe '$ORIGIN'
+build_qt6
+build_pyside6
+stage_pyside6
+
+# License staging runs last so Qt6 + PySide6 source trees are already
+# fetched (their LICENSE entries are in stage_licenses, guarded by
+# `[ -d ... ]` so a platform without them is a no-op).
+stage_licenses
+
+run_smoke_test '$ORIGIN' -ldl
 
 zip_artifact linux-x86_64
