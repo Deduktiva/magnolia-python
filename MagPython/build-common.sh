@@ -869,6 +869,22 @@ stage_headers_and_stdlib() {
     # on rsync (manylinux_2_28 doesn't ship it) or GNU-specific cp --parents.
     (cd "$PYTHON_SRC/Lib" && find . -name '*.py' -print0 | tar --null -T - -cf -) \
         | (cd "$STAGE/lib/python$PY_X_Y" && tar -xf -)
+    # Pull in the build-generated _sysconfigdata_<abi>_<plat>_<multi>.py.
+    # sysconfig._init_posix imports it by name (see Lib/sysconfig/__init__.py
+    # _get_sysconfigdata_name); upstream's `make install` would copy it
+    # alongside the rest of the stdlib, but we don't run install — only
+    # make. Without it, anything that asks sysconfig for config vars
+    # (e.g. `help()` → pydoc → sysconfig.get_path) raises
+    # ModuleNotFoundError on first use. The `pybuilddir.txt` Makefile
+    # target writes the file under build/lib.<platform>-cpython-X.Y/;
+    # exactly one such .py per build.
+    local sysconfigdata_file
+    sysconfigdata_file="$(find "$build_dir/build" -maxdepth 2 -type f -name '_sysconfigdata_*.py' -print -quit 2>/dev/null || true)"
+    if [ -z "$sysconfigdata_file" ]; then
+        echo "stage_headers_and_stdlib: could not find generated _sysconfigdata_*.py under $build_dir/build/" >&2
+        exit 1
+    fi
+    cp "$sysconfigdata_file" "$STAGE/lib/python$PY_X_Y/"
 }
 
 # Verify $1 (the libMagPython artifact) has no dynamic linkage to any of
