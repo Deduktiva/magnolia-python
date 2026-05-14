@@ -924,6 +924,35 @@ verify_no_static_dep_leakage() {
     fi
 }
 
+# Build the MagPython executable (CPython's Programs/python.c — a tiny
+# wrapper around Py_BytesMain) and stage it next to libMagPython in the
+# artifact tree. Counterpart to MagPython.exe on Windows
+# (MagPythonExe.vcxproj). Dynamically linked against libMagPython.so/.dylib
+# via -lMagPython; rpath '$ORIGIN' / '@loader_path' so the binary finds
+# its sibling lib + lib/python<X.Y>/ stdlib without env vars when invoked
+# from inside the artifact dir.
+#
+# Also stages a `python3` copy next to it so consumers expecting the
+# canonical CPython binary name find one in the artifact. Same shape
+# upstream uses (python3 alongside python3.<minor> on Linux/macOS); a
+# copy rather than a symlink keeps `zip` happy across all three
+# platforms (Windows artifact does the same — see MagPythonExe.vcxproj).
+# $1: rpath token ('$ORIGIN' on Linux, '@loader_path' on macOS).
+build_magpython_exe() {
+    local rpath_token="$1"
+    log "Building MagPython executable"
+    cc "$PYTHON_SRC/Programs/python.c" \
+        -I"$STAGE/include/Python" \
+        -L"$STAGE" \
+        "-Wl,-rpath,${rpath_token}" \
+        -lMagPython \
+        -o "$STAGE/MagPython"
+    log "Smoke-testing MagPython --version"
+    (cd "$STAGE" && ./MagPython --version)
+    log "Staging python3 alias next to MagPython"
+    cp "$STAGE/MagPython" "$STAGE/python3"
+}
+
 # Build and run the smoke test (MagPython/test.c) against the staged tree.
 # $1: rpath token ('$ORIGIN' on Linux, '@loader_path' on macOS).
 # $2..: extra link args (e.g. '-ldl' on Linux for dladdr; macOS has it

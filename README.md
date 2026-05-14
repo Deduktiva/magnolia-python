@@ -24,6 +24,8 @@ suffix to the DLLs):
 ```
 MagPython/
   MagPython.dll                       # Python core + builtin modules + zlib + sqlite + libffi + libmpdec
+  MagPython.exe                       # python3.exe equivalent — Py_Main wrapper linked against MagPython.dll
+  python3.exe                         # copy of MagPython.exe under the canonical CPython binary name
   libcrypto-3.dll / libcrypto-3-x64.dll   # OpenSSL (x86 / x64)
   libssl-3.dll    / libssl-3-x64.dll      # OpenSSL (x86 / x64)
   include/Python/...                  # Public + cpython + internal headers, plus PC/pyconfig.h
@@ -35,6 +37,8 @@ Linux (`MagPython-linux-x86_64.zip`):
 ```
 MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
+  MagPython              # python3 equivalent — Py_BytesMain wrapper, RUNPATH $ORIGIN
+  python3                # copy of MagPython under the canonical CPython binary name
   libcrypto.so.3
   libssl.so.3
   libsqlite3.so.0        # SONAME libsqlite3.so.0
@@ -50,6 +54,8 @@ macOS arm64 (`MagPython-macos-arm64.zip`):
 ```
 MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
+  MagPython              # python3 equivalent — Py_BytesMain wrapper, LC_RPATH @loader_path
+  python3                # copy of MagPython under the canonical CPython binary name
   libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
   libssl.3.dylib         # install_name @rpath/libssl.3.dylib
   libsqlite3.0.dylib     # install_name @rpath/libsqlite3.0.dylib
@@ -58,6 +64,14 @@ MagPython/
   lib/python3.13/
   lib/python3.13/lib-dynload/
 ```
+
+The `MagPython` / `MagPython.exe` binary is upstream's `Programs/python.c`
+compiled against the shipped headers and dynamically linked against
+`libMagPython.{so,dylib,dll}`. The artifact is laid out so the binary's
+path discovery finds the bundled stdlib without env vars:
+`PATH`/`@loader_path`/`$ORIGIN` resolves the lib next door, and Python's
+`os.py` lookup walks up to `lib/python<X.Y>/os.py` in the same artifact
+directory.
 
 Notable differences from a stock CPython Windows build:
 
@@ -157,7 +171,13 @@ StopOnFirstFailure="True"`:
    target then stages headers and the pure-Python stdlib into
    `Release/include/Python/` and `Release/lib/` so the output directory
    is a complete SDK drop.
-8. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
+8. **`MagPythonExe.vcxproj`** — compiles CPython's `Programs/python.c`
+   (the tiny `wmain` / `Py_Main` wrapper that ships as `python3.exe`
+   upstream) and emits `MagPython.exe` into `Release/`, dynamically
+   linked against `MagPython.dll` via the `#pragma comment(lib,
+   "MagPython.lib")` in the project-patched `pyconfig.h`. A
+   post-build `<Exec>` runs `MagPython.exe --version` as a smoke test.
+9. **`test.vcxproj`** — compiles `MagPython/test.c` (a tiny embedding host
    that calls `Py_Initialize`, prints the compiler string, and runs an
    `import sys` line), copies the DLLs and `lib/` next to it, and **executes
    `test.exe`** as part of the build via an `<Exec>` task. A failed smoke
@@ -247,7 +267,11 @@ shape as the Windows metaproj:
    libs (with a `Python/python.h -> Python.h` symlink so
    `MagPython/test.c`'s lowercase include resolves on case-sensitive
    filesystems), `MagPython/test.c` is built and run against the staged
-   tree (failure fails the build), and the final zip is produced.
+   tree (failure fails the build), the `MagPython` interpreter binary
+   (CPython's `Programs/python.c`, dynamically linked against
+   `libMagPython.{so,dylib}` with `$ORIGIN` / `@loader_path` rpath) is
+   compiled into `$STAGE/` and smoke-tested with `--version`, and the
+   final zip is produced.
 
 The host Python required by `regen-frozen` is
 `/opt/python/cp313-cp313/bin/python3` inside the manylinux_2_28 container
