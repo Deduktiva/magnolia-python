@@ -125,5 +125,6 @@ stage_openssl_headers
 stage_licenses
 verify_no_static_dep_leakage "$STAGE/libMagPython.so"
 run_smoke_test '$ORIGIN' -ldl
+build_magpython_exe '$ORIGIN'
 
 zip_artifact linux-x86_64

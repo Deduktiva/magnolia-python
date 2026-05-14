@@ -19,6 +19,7 @@ on:
       - 'MagPython/python-sha256'
       - 'MagPython/MagPython.vcxproj'
       - 'MagPython/FreezeMagPython.vcxproj'
+      - 'MagPython/MagPythonExe.vcxproj'
   workflow_dispatch:
 
 jobs:

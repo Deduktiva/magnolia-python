@@ -13,6 +13,7 @@
         <ProjectLibMpdec Include="$(SolutionDir)\LibMpdec.vcxproj" />
         <ProjectFreezeMagPython Include="$(SolutionDir)\FreezeMagPython.vcxproj" />
         <ProjectMagPython Include="$(SolutionDir)\MagPython.vcxproj" />
+        <ProjectMagPythonExe Include="$(SolutionDir)\MagPythonExe.vcxproj" />
         <ProjectTest Include="$(SolutionDir)\test.vcxproj" />
     </ItemGroup>
 
@@ -57,6 +58,12 @@
                 BuildInParallel="True" StopOnFirstFailure="True"
                 Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
                 Projects="@(ProjectMagPython)">
+            <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
+        </MSBuild>
+        <MSBuild
+                BuildInParallel="True" StopOnFirstFailure="True"
+                Properties="SolutionDir=$(SolutionDir);Configuration=$(Configuration);Platform=$(Platform)"
+                Projects="@(ProjectMagPythonExe)">
             <Output TaskParameter="TargetOutputs" ItemName="CollectedBuildOutput"/>
         </MSBuild>
         <MSBuild

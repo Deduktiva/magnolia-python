@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MagPython.exe — the python3.exe equivalent for the MagPython artifact.
+
+  Tiny console program (CPython upstream's Programs/python.c) that calls
+  Py_Main, linked dynamically against MagPython.dll via the
+  #pragma comment(lib, "MagPython.lib") rewritten into pyconfig.h by
+  magpython-pyconfig-h.targets. Builds AFTER MagPython.vcxproj so the
+  staged headers + import lib in $(MSBuildProjectDirectory)\$(Configuration)
+  are present, and emits MagPython.exe into the same Release directory so
+  the artifact zip picks it up next to MagPython.dll.
+
+  Modelled on test.vcxproj — same shape, different source file, output
+  goes into the shared Release dir rather than a private subdir.
+-->
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{1C9B5AA8-7F4F-4D0C-A0AB-7E2D8B9D1A11}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>MagPythonExe</RootNamespace>
+    <ProjectName>MagPythonExe</ProjectName>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <PropertyGroup>
+    <PythonSourceDir>$(MSBuildProjectDirectory)\python\python-$(PythonVersion)\</PythonSourceDir>
+    <IntDir>$(MSBuildProjectDirectory)\$(Configuration)-MagPythonExe\</IntDir>
+    <!-- Share OutDir with MagPython.vcxproj so MagPython.exe lands next
+         to MagPython.dll and is picked up by the artifact zip without
+         a separate copy step. Same pattern the dep Makefile-type
+         projects use (their CopyArtifacts targets stage into this dir
+         too). The intermediate dir above stays private so MSBuild's
+         per-project tracking doesn't see the .dll's outputs. -->
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <TargetName>MagPython</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_CONSOLE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Pull in the staged headers next to MagPython.dll (Python.h +
+           the pragma-patched pyconfig.h that auto-links MagPython.lib).
+           Programs/python.c does `#include "Python.h"`, so the Python
+           subdir needs to be on the include path directly. -->
+      <AdditionalIncludeDirectories>$(OutDir)\Include\Python</AdditionalIncludeDirectories>
+      <CompileAsManaged>false</CompileAsManaged>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <OmitFramePointers>true</OmitFramePointers>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <!-- MagPython.lib (the import lib for MagPython.dll) is dropped
+           into $(OutDir) by MagPython.vcxproj's link step. The pragma
+           in pyconfig.h auto-references MagPython.lib by name, so we
+           only need to put $(OutDir) on the search path. -->
+      <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(PythonSourceDir)\Programs\python.c" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+
+  <!-- Smoke-test the built MagPython.exe by invoking it with the
+       version flag. The full artifact (MagPython.dll, stdlib, OpenSSL
+       DLLs) is already in $(OutDir), so the exe runs in place. A
+       failure here fails the build (same shape as test.vcxproj's
+       RunTest). -->
+  <Target Name="RunVersion" AfterTargets="Build">
+    <Exec Command="&quot;$(OutDir)MagPython.exe&quot; --version" UseCommandProcessor="false" ContinueOnError="false" />
+  </Target>
+</Project>

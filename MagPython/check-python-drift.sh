@@ -35,7 +35,7 @@ fi
 
 missing_total=0
 ref_total=0
-for vcxproj in "$SCRIPT_DIR/MagPython.vcxproj" "$SCRIPT_DIR/FreezeMagPython.vcxproj"; do
+for vcxproj in "$SCRIPT_DIR/MagPython.vcxproj" "$SCRIPT_DIR/FreezeMagPython.vcxproj" "$SCRIPT_DIR/MagPythonExe.vcxproj"; do
     [ -f "$vcxproj" ] || { echo "ERROR: missing $vcxproj" >&2; exit 1; }
 
     # Pull each Include="$(PythonSourceDir)\..." path that ends in .c or .h.
