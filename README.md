@@ -25,6 +25,7 @@ suffix to the DLLs):
 MagPython/
   MagPython.dll                       # Python core + builtin modules + zlib + sqlite + libffi + libmpdec
   MagPython.exe                       # python3.exe equivalent — Py_Main wrapper linked against MagPython.dll
+  python3.exe                         # copy of MagPython.exe under the canonical CPython binary name
   libcrypto-3.dll / libcrypto-3-x64.dll   # OpenSSL (x86 / x64)
   libssl-3.dll    / libssl-3-x64.dll      # OpenSSL (x86 / x64)
   include/Python/...                  # Public + cpython + internal headers, plus PC/pyconfig.h
@@ -37,6 +38,7 @@ Linux (`MagPython-linux-x86_64.zip`):
 MagPython/
   libMagPython.so        # SONAME libMagPython.so, RUNPATH $ORIGIN
   MagPython              # python3 equivalent — Py_BytesMain wrapper, RUNPATH $ORIGIN
+  python3                # copy of MagPython under the canonical CPython binary name
   libcrypto.so.3
   libssl.so.3
   libsqlite3.so.0        # SONAME libsqlite3.so.0
@@ -53,6 +55,7 @@ macOS arm64 (`MagPython-macos-arm64.zip`):
 MagPython/
   libMagPython.dylib     # install_name @rpath/libMagPython.dylib
   MagPython              # python3 equivalent — Py_BytesMain wrapper, LC_RPATH @loader_path
+  python3                # copy of MagPython under the canonical CPython binary name
   libcrypto.3.dylib      # install_name @rpath/libcrypto.3.dylib
   libssl.3.dylib         # install_name @rpath/libssl.3.dylib
   libsqlite3.0.dylib     # install_name @rpath/libsqlite3.0.dylib

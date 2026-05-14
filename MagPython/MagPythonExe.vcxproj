@@ -107,4 +107,13 @@
   <Target Name="RunVersion" AfterTargets="Build">
     <Exec Command="&quot;$(OutDir)MagPython.exe&quot; --version" UseCommandProcessor="false" ContinueOnError="false" />
   </Target>
+
+  <!-- Stage a python3.exe alias alongside MagPython.exe so consumers
+       expecting the canonical CPython binary name find one in the
+       artifact. Plain Copy rather than a symlink because the Windows
+       artifact is zipped and unzipped by tools that don't preserve
+       NTFS junctions / symlinks reliably. -->
+  <Target Name="CopyAsPython3" AfterTargets="RunVersion">
+    <Copy SourceFiles="$(OutDir)MagPython.exe" DestinationFiles="$(OutDir)python3.exe" />
+  </Target>
 </Project>
