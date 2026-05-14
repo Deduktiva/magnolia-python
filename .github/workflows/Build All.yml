@@ -17,7 +17,11 @@ jobs:
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.container }}
-    timeout-minutes: 30
+    # Bumped from 30 to 120 to absorb the Qt6 + PySide6 source builds
+    # on linux-x86_64 / macos-arm64 (~30-50 min combined on a fresh
+    # cache). Windows isn't affected — Qt 6 dropped 32-bit Windows and
+    # the windows-x86 path is unchanged from before this PR.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +54,22 @@ jobs:
             runs-on: macos-14
     steps:
       - uses: actions/checkout@v6
+
+      # Pin the host Python to 3.13 on macos-arm64. Our libMagPython is
+      # built against the CPython 3.13.13 source tree (MagPython/python-version),
+      # and build-macos.sh uses the host python3 as PYTHON_FOR_REGEN /
+      # for `pip install cmake ninja`. macos-14's default python3 has been
+      # 3.14 for a while, so we pin it back to 3.13.
+      #
+      # Linux uses the manylinux container's /opt/python/cp313-cp313
+      # directly. windows-x64 no longer needs a pinned host Python at all:
+      # MagPythonExe.vcxproj builds our own python3.exe linked against
+      # MagPython.lib, and the PySide6 build invokes that directly (see
+      # build-pyside6-windows.sh).
+      - if: matrix.platform == 'macos-arm64'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
       # Cache the build-time-downloaded source trees so subsequent CI
       # runs skip the download + extract when the version+SHA pins
@@ -88,6 +108,22 @@ jobs:
         with:
           path: MagPython/python
           key: deps-python-${{ matrix.platform }}-${{ hashFiles('MagPython/python-version', 'MagPython/python-sha256') }}
+      # Qt6 / PySide6 caches only matter on linux-x86_64 and macos-arm64
+      # — the windows-x86 build has no Qt/PySide6 step. Keying off the
+      # pin files mirrors the other dep caches: a version bump
+      # invalidates, a no-op push reuses.
+      - name: Cache Qt6 download
+        if: matrix.platform != 'windows-x86'
+        uses: actions/cache@v5
+        with:
+          path: MagPython/qt6
+          key: deps-qt6-${{ matrix.platform }}-${{ hashFiles('MagPython/qt6-version', 'MagPython/qt6-sha256') }}
+      - name: Cache PySide6 download
+        if: matrix.platform != 'windows-x86'
+        uses: actions/cache@v5
+        with:
+          path: MagPython/pyside6
+          key: deps-pyside6-${{ matrix.platform }}-${{ hashFiles('MagPython/pyside6-version', 'MagPython/pyside6-sha256') }}
 
       # Windows builds (shared between windows-x86 and windows-x64; the
       # MSBuild Platform and the MSVC tools arch come from the matrix).
@@ -108,6 +144,28 @@ jobs:
           install: base-devel autoconf automake libtool make
       - if: startsWith(matrix.platform, 'windows-')
         run: '& msbuild /m /p:Configuration=Release /p:Platform=${{ matrix.msbuild-platform }} MagPython\MagPython.metaproj'
+
+      # windows-x64 only: build Qt6 + PySide6 from source against the
+      # MagPython.dll the msbuild step just produced, and stage the
+      # resulting DLLs + site-packages into MagPython\Release\ so the
+      # subsequent rename+zip step picks them up. Skipped on
+      # windows-x86 because Qt 6 dropped 32-bit Windows entirely.
+      - name: Install LLVM (for shiboken6 libclang)
+        if: matrix.platform == 'windows-x64'
+        run: choco install --no-progress -y llvm
+      - name: Install host cmake + ninja
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        # --break-system-packages: defensive parity with build-macos.sh's
+        # invocation; harmless on Windows runner Pythons that aren't PEP
+        # 668 managed and the only correct option when the runner image
+        # ever switches to a managed Python.
+        run: python -m pip install --upgrade --quiet --break-system-packages 'cmake>=3.21' ninja
+      - name: Build Qt6 + PySide6 (windows-x64)
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        run: ./MagPython/build-pyside6-windows.sh
+
       - if: startsWith(matrix.platform, 'windows-')
         run: 'cd MagPython && ren Release MagPython && 7z a -r ..\MagPython-${{ matrix.platform }}.zip MagPython'
 

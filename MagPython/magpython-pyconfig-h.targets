@@ -3,18 +3,24 @@
 
   <!--
     Generate $(IntDir)\pyconfig.h from $(PythonSourceDir)\PC\pyconfig.h.in
-    with two project-local edits:
+    with one project-local edit:
 
-      1. The libname pragma (#pragma comment(lib, "python313*.lib"))
-         is rewritten to "MagPython.lib". The pragma only fires for
-         consumers that don't define Py_BUILD_CORE / Py_BUILD_CORE_BUILTIN
-         (i.e. extensions linking against MagPython.dll using our
-         shipped headers), so this affects downstream linkage only.
+      The libname pragma (#pragma comment(lib, "python313*.lib"))
+      is rewritten to "MagPython.lib". The pragma only fires for
+      consumers that don't define Py_BUILD_CORE / Py_BUILD_CORE_BUILTIN
+      (i.e. extensions linking against MagPython.dll using our
+      shipped headers), so this affects downstream linkage only.
 
-      2. HAVE_DYNAMIC_LOADING is commented out: libMagPython.dll
-         statically links every C extension it ships (see
-         MagPython-config.c), so the dynamic-loading code paths
-         should not be compiled.
+    Until the windows-x64 PySide6 bundle landed, this targets file
+    also commented out HAVE_DYNAMIC_LOADING: libMagPython.dll
+    statically links every stdlib C extension it ships (see
+    MagPython-config.c), so we didn't need the dynamic-loading code
+    paths for our own modules. But abi3 .pyd files (PySide6.QtCore,
+    shiboken6, anything a downstream `pip install`s) go through
+    importlib's ExtensionFileLoader, which compiles out when
+    HAVE_DYNAMIC_LOADING is undefined. Keeping the directive defined
+    leaves the runtime cost in (~tens of KB of code) but is the price
+    of admission for abi3 consumption.
 
     Doing the substitutions at build time (rather than editing
     PC\pyconfig.h.in in the imported tree) keeps the imported tree
@@ -32,16 +38,14 @@
   <Target Name="GenerateMagPythonConfigH" BeforeTargets="ClCompile" Inputs="$(PythonSourceDir)\PC\pyconfig.h.in" Outputs="$(IntDir)pyconfig.h">
     <PropertyGroup>
       <_PyConfigSrc>$([System.IO.File]::ReadAllText('$(PythonSourceDir)\PC\pyconfig.h.in'))</_PyConfigSrc>
-      <!-- Two booleans the assertions below check; computing them in
-           PropertyGroup (rather than directly inside Condition="...")
-           keeps property-function syntax out of the condition parser,
-           which gets confused by file content containing quotes/=/etc. -->
+      <!-- Computed in PropertyGroup (rather than directly inside
+           Condition="...") so property-function syntax stays out of
+           the condition parser, which gets confused by file content
+           containing quotes/=/etc. -->
       <_HasLibnamePragma>$(_PyConfigSrc.Contains('python313'))</_HasLibnamePragma>
-      <_HasDynLoading>$(_PyConfigSrc.Contains('%23define HAVE_DYNAMIC_LOADING'))</_HasDynLoading>
-      <_PyConfigPatched>$(_PyConfigSrc.Replace('"python313t_d.lib"', '"MagPython_d.lib"').Replace('"python313_d.lib"', '"MagPython_d.lib"').Replace('"python313t.lib"', '"MagPython.lib"').Replace('"python313.lib"', '"MagPython.lib"').Replace('"python3t.lib"', '"MagPython.lib"').Replace('"python3.lib"', '"MagPython.lib"').Replace('%23define HAVE_DYNAMIC_LOADING', '/* %23define HAVE_DYNAMIC_LOADING */'))</_PyConfigPatched>
+      <_PyConfigPatched>$(_PyConfigSrc.Replace('"python313t_d.lib"', '"MagPython_d.lib"').Replace('"python313_d.lib"', '"MagPython_d.lib"').Replace('"python313t.lib"', '"MagPython.lib"').Replace('"python313.lib"', '"MagPython.lib"').Replace('"python3t.lib"', '"MagPython.lib"').Replace('"python3.lib"', '"MagPython.lib"'))</_PyConfigPatched>
     </PropertyGroup>
     <Error Text="GenerateMagPythonConfigH: libname pragma block (python313*.lib) not found in PC\pyconfig.h.in — upstream may have moved or renamed it; update the .Replace() chain in MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasLibnamePragma)' != 'True'" />
-    <Error Text="GenerateMagPythonConfigH: '#define HAVE_DYNAMIC_LOADING' not found in PC\pyconfig.h.in — upstream may have changed the directive; update MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasDynLoading)' != 'True'" />
     <MakeDir Directories="$(IntDir)" />
     <WriteLinesToFile File="$(IntDir)pyconfig.h" Lines="$(_PyConfigPatched)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>

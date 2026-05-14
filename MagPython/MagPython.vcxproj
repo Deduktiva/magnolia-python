@@ -87,6 +87,15 @@
       <!-- from python.props -->
       <PreprocessorDefinitions>_USRDLL;Py_BUILD_CORE;Py_BUILD_CORE_BUILTIN;Py_ENABLE_SHARED;MS_DLL_ID="";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- PY3_DLLNAME — upstream sets this in PCbuild/pyproject.props
+           as L"$(Py3DllName)$(PyDebugExt)" (Py3DllName = "python3"),
+           and dynload_win.c references it to build a path next to
+           the stable-ABI DLL when loading an abi3 extension. We
+           don't import pyproject.props so this define has to live
+           here; the value is purely diagnostic (it appears in error
+           messages) so keeping it as "python3" matches what stock
+           CPython users see. -->
+      <PreprocessorDefinitions>PY3_DLLNAME=L"python3";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <!-- $(IntDir) comes before $(PySourcePath)PC so the
            build-time-generated pyconfig.h (see GenerateMagPythonConfigH
            target below) shadows anything in PC; in CPython 3.13 PC
@@ -561,6 +570,15 @@
     <ClCompile Include="$(PythonSourceDir)\Python\hashtable.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\import.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\importdl.c" />
+    <!-- dynload_win.c provides _PyImport_FindSharedFuncptr (the Windows
+         LoadLibraryExW + GetProcAddress backend for importdl.c). Needs
+         to be compiled in for .pyd loading via importlib's
+         ExtensionFileLoader — without it the linker errors out the
+         moment HAVE_DYNAMIC_LOADING is left defined in pyconfig.h.
+         Pulled in to support the bundled PySide6 .pyd files on x64
+         (which import MagPython.dll directly, not python3.dll — we
+         ship no forwarder; see MagPython/build-pyside6-windows.sh). -->
+    <ClCompile Include="$(PythonSourceDir)\Python\dynload_win.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\initconfig.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\interpconfig.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\instruction_sequence.c" />

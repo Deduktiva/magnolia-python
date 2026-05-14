@@ -50,6 +50,13 @@ OPENSSL_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/openssl-version")"
 
 LIBMPDEC_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libmpdec-version")"
 
+# Qt6 + PySide6 ship in the Linux, macOS, and windows-x64 artifacts;
+# windows-x86 has none (Qt 6 dropped 32-bit Windows entirely). The
+# per-platform case statement below references them in those three arms
+# only.
+QT6_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/qt6-version")"
+PYSIDE6_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/pyside6-version")"
+
 require PY_VERSION
 require OPENSSL_VERSION
 require LIBMPDEC_VERSION
@@ -87,12 +94,24 @@ case "$PLATFORM" in
             windows-x86) ARCH_TITLE="x86" ;;
             windows-x64) ARCH_TITLE="x64" ;;
         esac
+        # windows-x64 also bundles Qt6 + PySide6; windows-x86 doesn't
+        # (Qt 6 has no 32-bit Windows port).
+        QT_LINE=""
+        PYSIDE6_LINE=""
+        if [ "$PLATFORM" = "windows-x64" ]; then
+            require QT6_VERSION
+            require PYSIDE6_VERSION
+            QT_LINE="- Qt ${QT6_VERSION} (qtbase Core)"
+            PYSIDE6_LINE="- PySide6 ${PYSIDE6_VERSION} (Core module)"
+        fi
         cat > "$OUT" <<EOF
 ### Windows ${ARCH_TITLE}
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
 - mpdecimal ${LIBMPDEC_VERSION}
-- MSVC Toolset ${MSVC_TOOLSET}
+${QT_LINE:+$QT_LINE
+}${PYSIDE6_LINE:+$PYSIDE6_LINE
+}- MSVC Toolset ${MSVC_TOOLSET}
 EOF
         ;;
     linux-x86_64)
@@ -100,11 +119,15 @@ EOF
         MANYLINUX_TAG="$(printf '%s' "$CONTAINER" \
             | sed -n -E 's|.*quay\.io/pypa/(manylinux[^ ]+).*|\1|p')"
         require MANYLINUX_TAG
+        require QT6_VERSION
+        require PYSIDE6_VERSION
         cat > "$OUT" <<EOF
 ### Linux x86_64
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
 - mpdecimal ${LIBMPDEC_VERSION}
+- Qt ${QT6_VERSION} (qtbase Core)
+- PySide6 ${PYSIDE6_VERSION} (Core module)
 - ${MANYLINUX_TAG}
 EOF
         ;;
@@ -115,11 +138,15 @@ EOF
             's|^export MACOSX_DEPLOYMENT_TARGET=([0-9.]+).*|\1|p' \
             "$REPO/MagPython/build-macos.sh" | head -1)"
         require MACOS_DEPLOY_TARGET
+        require QT6_VERSION
+        require PYSIDE6_VERSION
         cat > "$OUT" <<EOF
 ### macOS arm64
 - Python ${PY_VERSION}
 - OpenSSL ${OPENSSL_VERSION}
 - mpdecimal ${LIBMPDEC_VERSION}
+- Qt ${QT6_VERSION} (qtbase Core)
+- PySide6 ${PYSIDE6_VERSION} (Core module)
 - ${RUNNER} runner, MACOSX_DEPLOYMENT_TARGET=${MACOS_DEPLOY_TARGET}
 EOF
         ;;
