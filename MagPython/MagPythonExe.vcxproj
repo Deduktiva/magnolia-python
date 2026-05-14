@@ -95,6 +95,13 @@
            the .rc file's own directory (PC/), so python.manifest +
            icons/python.ico get picked up automatically. -->
       <AdditionalIncludeDirectories>$(PythonSourceDir)\PC;$(PythonSourceDir)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- python_ver_rc.h's PYVERSION64 macro references FIELD3, which
+           upstream's pyproject.props normally injects as a preprocessor
+           define computed from patchlevel.h. Without it the resource
+           compiler fails with RC2104 ("undefined keyword or key name:
+           FIELD3"). $(PythonField3Value) is computed in common.props
+           from the pinned PythonVersion. -->
+      <PreprocessorDefinitions>FIELD3=$(PythonField3Value);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
       <SubSystem>Console</SubSystem>
