@@ -265,6 +265,31 @@ setup_python() {
         # stays a clean python-<version>/ path).
         mv "$PYTHON_CACHE/cpython-$PYTHON_VERSION" "$PYTHON_SRC"
     fi
+
+    # macOS: upstream's libpython dylib link rule omits $(MODLIBS). With stdlib
+    # modules linked statically into libpython, their per-module linker deps
+    # in $(MODLIBS) are forgotton by the libpython.dylib rule.
+    # -undefined dynamic_lookup hides the missing symbols at link time, but
+    # dyld then aborts at process launch with e.g.
+    #   symbol not found in flat namespace '_mpd_callocfunc'
+    # The Linux .so rule already references $(MODLIBS), so this is macOS-only.
+    # https://github.com/python/cpython/pull/145186
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local makefile_in="$PYTHON_SRC/Makefile.pre.in"
+        if ! grep -qF -- '-o $@ $(LIBRARY_OBJS) $(MODLIBS) $(DTRACE_OBJS)' "$makefile_in"; then
+            log "Patching Makefile.pre.in dylib rule to include MODLIBS (macOS)"
+            awk '
+                /-o \$@ \$\(LIBRARY_OBJS\) \$\(DTRACE_OBJS\) \$\(SHLIBS\) \$\(LIBC\) \$\(LIBM\)/ {
+                    sub(/\$\(LIBRARY_OBJS\) \$\(DTRACE_OBJS\)/,
+                        "$(LIBRARY_OBJS) $(MODLIBS) $(DTRACE_OBJS)")
+                    patched = 1
+                }
+                { print }
+                END { if (!patched) { print "ERROR: dylib rule pattern not found in Makefile.pre.in" > "/dev/stderr"; exit 1 } }
+            ' "$makefile_in" > "$makefile_in.tmp"
+            mv "$makefile_in.tmp" "$makefile_in"
+        fi
+    fi
 }
 
 # Download + verify + extract the upstream zlib tarball into
