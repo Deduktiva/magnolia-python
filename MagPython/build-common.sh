@@ -730,11 +730,11 @@ regen_frozen() {
 
 # Drop in the project's Setup.local (disables stdlib modules that aren't in
 # MagPython/MagPython.vcxproj on Windows, so libMagPython matches that
-# subset on every platform). Run before configure so the file is in place
-# when makesetup processes it.
+# subset on every platform).
 install_setup_local() {
-    log "Installing MagPython/Setup.local -> python-$PYTHON_VERSION/Modules/Setup.local"
-    cp "$REPO/MagPython/Setup.local" "$PYTHON_SRC/Modules/Setup.local"
+    log "Installing MagPython/Setup.local -> main/Modules/Setup.local"
+    cp "$REPO/MagPython/Setup.local" "$BUILD/main/Modules/Setup.local"
+    cd "$BUILD/main" && ./config.status && make Makefile
 }
 
 # Configure CPython for the libMagPython build. Caller cd's into a build dir.
@@ -790,6 +790,7 @@ configure_libmagpython() {
         --with-system-libmpdec \
         --disable-test-modules \
         --without-pymalloc-debug \
+        MODULE_BUILDTYPE=static \
         ZLIB_CFLAGS="-I$ZLIB_SRC" \
         ZLIB_LIBS="$ZLIB_SRC/libz.a" \
         LIBSQLITE3_CFLAGS="-I$SQLITE_SRC" \
@@ -803,60 +804,6 @@ configure_libmagpython() {
         CFLAGS_NODIST="-fPIC" \
         LDFLAGS="-L$BUILD/sqlite -Wl,-rpath,$BUILD/sqlite $extra_ldflags" \
         "$@"
-}
-
-# Rewrite Modules/Setup.stdlib post-configure so we get the same module
-# subset as MagPython/MagPython.vcxproj on Windows:
-#
-#   1. Flip the `*shared*` directive at the top to `*static*` so every
-#      kept module gets linked into libpython rather than dlopen'd as a
-#      separate .so.
-#   2. Comment out the lines for modules listed under `*disabled*` in
-#      MagPython/Setup.local. (`*disabled*` in Setup.local is recorded
-#      into config.c's runtime DISABLED list but does NOT prevent
-#      compilation — makesetup processes each Setup file independently,
-#      so a module enabled in Setup.stdlib still gets a build rule.
-#      Commenting the stdlib line is what actually skips the build.)
-#   3. Re-run makesetup so Makefile and Modules/config.c pick up the edits.
-flip_modules_to_static() {
-    local build_dir="$1"
-    local setup_local="$REPO/MagPython/Setup.local"
-    log "Rewriting Modules/Setup.stdlib (static + disabled-by-policy)"
-    awk -v setup_local="$setup_local" '
-        BEGIN {
-            # Read the disabled module names from Setup.local into a set.
-            in_disabled = 0
-            while ((getline line < setup_local) > 0) {
-                if (line ~ /^\*disabled\*$/) { in_disabled = 1; continue }
-                if (line ~ /^\*/)            { in_disabled = 0; continue }
-                if (!in_disabled)            { continue }
-                # Skip blank lines and comments
-                sub(/#.*$/, "", line)
-                gsub(/[ \t]+/, " ", line)
-                sub(/^ +/, "", line); sub(/ +$/, "", line)
-                if (line == "") continue
-                disabled[line] = 1
-            }
-            close(setup_local)
-        }
-        # Flip the build-type directive once.
-        /^\*shared\*$/ { print "*static*"; next }
-        # Comment out lines whose first whitespace-separated token is a
-        # disabled module name. Active stdlib lines look like:
-        #   <modname> <sources> [flags...]
-        # Skip lines that are already commented out or empty.
-        /^[^#[:space:]]/ {
-            modname = $1
-            if (modname in disabled) {
-                print "# disabled-by-magpython " $0
-                next
-            }
-        }
-        { print }
-    ' "$build_dir/Modules/Setup.stdlib" > "$build_dir/Modules/Setup.stdlib.tmp"
-    mv "$build_dir/Modules/Setup.stdlib.tmp" "$build_dir/Modules/Setup.stdlib"
-    # Re-run makesetup so config.c and module rules pick up the new linkage.
-    (cd "$build_dir" && make -j1 Makefile Modules/config.c)
 }
 
 # Stage OpenSSL development files (public + internal headers) into the artifact

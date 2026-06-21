@@ -31,7 +31,6 @@ command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 
 prep_build_tree
 setup_python
-install_setup_local
 build_zlib_static
 # libffi is the SDK's /usr/lib/libffi.dylib on macOS — CPython's Darwin
 # block in configure auto-detects the SDK headers and -lffi. No
@@ -52,9 +51,9 @@ mkdir -p "$BUILD/main"
  configure_libmagpython "-Wl,-rpath,@loader_path" \
      --enable-universalsdk=no \
      PYTHON_FOR_REGEN="$HOST_PYTHON")
+install_setup_local
 
 regen_frozen      "$BUILD/main" "$HOST_PYTHON"
-flip_modules_to_static "$BUILD/main"
 
 log "Building libpython"
 (cd "$BUILD/main" && make -j"$JOBS")
