@@ -23,7 +23,12 @@
 
 set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=build-common.sh
+source "$SCRIPT_DIR/build-common.sh"
+setup_python
+set +x
+
 VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/python-version")"
 SOURCE_DIR="$SCRIPT_DIR/python/python-$VERSION"
 

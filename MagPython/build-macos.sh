@@ -31,7 +31,6 @@ command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 
 prep_build_tree
 setup_python
-install_setup_local
 build_zlib_static
 # libffi is the SDK's /usr/lib/libffi.dylib on macOS — CPython's Darwin
 # block in configure auto-detects the SDK headers and -lffi. No
@@ -52,39 +51,12 @@ mkdir -p "$BUILD/main"
  configure_libmagpython "-Wl,-rpath,@loader_path" \
      --enable-universalsdk=no \
      PYTHON_FOR_REGEN="$HOST_PYTHON")
+install_setup_local
 
 regen_frozen      "$BUILD/main" "$HOST_PYTHON"
-flip_modules_to_static "$BUILD/main"
-
-# CPython's libpython dylib link rule on macOS uses $(SHLIB_LIBS) only,
-# while the Linux .so rule uses $(MODLIBS) $(SHLIBS) $(LIBS). With our
-# stdlib modules (_ssl, _hashopenssl, ...) statically linked into
-# libpython, their per-module linker flags (-lssl, -lcrypto, ...) live
-# in $(MODLIBS) — unreferenced on macOS. -undefined dynamic_lookup hides
-# this at link time, but the smoke test then dies with
-#   dyld: symbol not found in flat namespace '_GENERAL_NAME_free'
-# because libcrypto isn't loaded into the process. Append $(MODLIBS) to
-# the dylib rule so the link records the right LC_LOAD_DYLIB entries.
-log "Patching Makefile to include MODLIBS in the dylib link"
-# Python/Makefile.pre.in line 826-827 has the macOS dylib rule:
-#   $(CC) -dynamiclib ... -o $@ $(LIBRARY_OBJS) $(DTRACE_OBJS) $(SHLIBS) $(LIBC) $(LIBM)
-# The .sl (HP-UX) rule a few lines below uses $(LIBRARY_OBJS) $(MODLIBS)
-# $(SHLIBS) $(LIBC) $(LIBM) — the dylib variant is just missing $(MODLIBS).
-# Inject it so the libpython.dylib link picks up per-module deps
-# (-lssl, -lcrypto, ...) and records LC_LOAD_DYLIB entries for them.
-awk '
-    /-o \$@ \$\(LIBRARY_OBJS\) \$\(DTRACE_OBJS\) \$\(SHLIBS\) \$\(LIBC\) \$\(LIBM\)/ {
-        sub(/\$\(LIBRARY_OBJS\) \$\(DTRACE_OBJS\)/,
-            "$(LIBRARY_OBJS) $(MODLIBS) $(DTRACE_OBJS)")
-        patched = 1
-    }
-    { print }
-    END { if (!patched) { print "ERROR: dylib rule pattern not found in Makefile" > "/dev/stderr"; exit 1 } }
-' "$BUILD/main/Makefile" > "$BUILD/main/Makefile.tmp"
-mv "$BUILD/main/Makefile.tmp" "$BUILD/main/Makefile"
 
 log "Building libpython"
-(cd "$BUILD/main" && make -j"$JOBS")
+(cd "$BUILD/main" && make -j)
 
 log "Renaming libpython$PY_X_Y -> libMagPython"
 (cd "$BUILD/main"

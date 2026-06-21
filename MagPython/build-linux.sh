@@ -51,7 +51,6 @@ command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
 
 prep_build_tree
 setup_python
-install_setup_local
 build_zlib_static
 build_libffi_static
 build_sqlite_shared
@@ -68,12 +67,12 @@ LIBFFI_LIB="$(libffi_static_lib)"
      LIBFFI_CFLAGS="-I$LIBFFI_INC -I$LIBFFI_SRC/include" \
      LIBFFI_LIBS="$LIBFFI_LIB" \
      PYTHON_FOR_REGEN="$HOST_PYTHON")
+install_setup_local
 
 regen_frozen      "$BUILD/main" "$HOST_PYTHON"
-flip_modules_to_static "$BUILD/main"
 
 log "Building libpython"
-(cd "$BUILD/main" && make -j"$JOBS")
+(cd "$BUILD/main" && make -j)
 
 log "Renaming libpython$PY_X_Y -> libMagPython"
 (cd "$BUILD/main"
