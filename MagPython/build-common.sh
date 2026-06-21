@@ -12,7 +12,6 @@ set -x
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$REPO/build-out"
 STAGE="$BUILD/stage/MagPython"
-JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 # CPython is downloaded at build time rather than vendored. Same shape
 # as the other devendored deps. PY_X_Y is the major.minor pair every
@@ -160,7 +159,7 @@ build_zlib_static() {
     (cd "$ZLIB_SRC"
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
      CFLAGS="-O3 -fPIC" ./configure --static
-     make -j"$JOBS" libz.a)
+     make -j libz.a)
 }
 
 # Build libffi as a static lib at $LIBFFI_SRC/<triple>/.libs/libffi.a (plus
@@ -176,7 +175,7 @@ build_libffi_static() {
      local args=(--enable-static --disable-shared --with-pic --disable-docs)
      [ -n "$libffi_host" ] && args+=(--host="$libffi_host")
      ./configure "${args[@]}"
-     make -j"$JOBS")
+     make -j)
 }
 
 # Build sqlite3 as a shared lib at $BUILD/sqlite/libsqlite3.<so.0|0.dylib>
@@ -482,7 +481,7 @@ build_libmpdec() {
          --disable-cxx \
          CFLAGS="-O2 -fPIC" \
          "$@"
-     make -j"$JOBS"
+     make -j
      make install)
 }
 
@@ -571,7 +570,7 @@ build_ncurses() {
          --enable-pc-files=no \
          --without-termlib \
          CFLAGS="-O2 -fPIC"
-     make -j"$JOBS"
+     make -j
      # Install only the .a files and headers — `make install` would
      # also run `install.data`, which compiles ncurses' terminfo
      # database with `tic`. We pass `--without-progs`, so `tic` isn't
@@ -689,7 +688,7 @@ build_openssl() {
          no-uplink no-fips no-docs no-legacy no-cmp no-apps \
          --prefix="$BUILD/openssl-out" \
          --openssldir="$BUILD/openssl-out/ssl"
-     make -j"$JOBS"
+     make -j
      make install_sw)
 
     verify_openssl_install
@@ -725,7 +724,7 @@ regen_frozen() {
     local host_python="$2"
     log "Regenerating frozen modules with $host_python"
     (cd "$build_dir"
-     make -j"$JOBS" PYTHON_FOR_REGEN="$host_python" regen-frozen)
+     make -j PYTHON_FOR_REGEN="$host_python" regen-frozen)
 }
 
 # Drop in the project's Setup.local (disables stdlib modules that aren't in

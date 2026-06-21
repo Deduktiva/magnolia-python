@@ -56,7 +56,7 @@ install_setup_local
 regen_frozen      "$BUILD/main" "$HOST_PYTHON"
 
 log "Building libpython"
-(cd "$BUILD/main" && make -j"$JOBS")
+(cd "$BUILD/main" && make -j)
 
 log "Renaming libpython$PY_X_Y -> libMagPython"
 (cd "$BUILD/main"
