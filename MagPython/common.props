@@ -43,6 +43,9 @@
     <_ZlibVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)zlib-version'))</_ZlibVersionRaw>
     <ZlibVersion>$(_ZlibVersionRaw.Trim())</ZlibVersion>
 
+    <_ZStdVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)zstd-version'))</_ZStdVersionRaw>
+    <ZStdVersion>$(_ZStdVersionRaw.Trim())</ZStdVersion>
+
     <_LibFFIVersionRaw>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)libffi-version'))</_LibFFIVersionRaw>
     <LibFFIVersion>$(_LibFFIVersionRaw.Trim())</LibFFIVersion>
 

@@ -26,7 +26,18 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "zlib",
       "packageNameTemplate": "madler/zlib",
-      "extractVersionTemplate": "^v(?<version>1\\.\\d+\\.\\d+)$"
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^MagPython/zstd-version$/"
+      ],
+      "matchStrings": ["^(?<currentValue>.+?)\\s*$"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "zstd",
+      "packageNameTemplate": "facebook/zstd",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
     },
     {
       "customType": "regex",
@@ -37,7 +48,7 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "libffi",
       "packageNameTemplate": "libffi/libffi",
-      "extractVersionTemplate": "^v(?<version>3\\.\\d+\\.\\d+)$"
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
     },
     {
       "customType": "regex",
@@ -48,7 +59,7 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "python",
       "packageNameTemplate": "python/cpython",
-      "extractVersionTemplate": "^v(?<version>3\\.\\d+\\.\\d+)$"
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
     },
     {
       "customType": "regex",
@@ -59,7 +70,7 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "nasm",
       "packageNameTemplate": "netwide-assembler/nasm",
-      "extractVersionTemplate": "^nasm-(?<version>2\\.\\d+\\.\\d+)$",
+      "extractVersionTemplate": "^nasm-(?<version>\\d+\\.\\d+\\.\\d+)$",
       "versioningTemplate": "loose"
     }
   ],
@@ -72,6 +83,8 @@
       "MagPython/openssl-sha256",
       "MagPython/zlib-version",
       "MagPython/zlib-sha256",
+      "MagPython/zstd-version",
+      "MagPython/zstd-sha256",
       "MagPython/libffi-version",
       "MagPython/libffi-sha256",
       "MagPython/python-version",
@@ -84,7 +97,7 @@
   "packageRules": [
     {
       "matchManagers": ["custom.regex"],
-      "matchDepNames": ["openssl", "zlib", "libffi", "python", "nasm"],
+      "matchDepNames": ["openssl", "zlib", "zstd", "libffi", "python", "nasm"],
       "commitMessageTopic": "{{depName}} pin",
       "commitMessageAction": "Bump",
       "groupName": null

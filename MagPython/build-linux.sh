@@ -52,6 +52,7 @@ command -v patchelf >/dev/null || { echo "patchelf not found"; exit 1; }
 prep_build_tree
 setup_python
 build_zlib_static
+build_zstd_static
 build_libffi_static
 build_sqlite_shared
 build_openssl linux-x86_64
