@@ -22,24 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-x86
-            # Explicit label, not windows-latest: the build needs the
-            # v142 toolset component (see README), which is only
-            # guaranteed to be present on the explicitly-labelled
-            # images. As of 2026-05-12 GitHub redirects this label to
-            # the windows-2025-vs2026 image (VS 2026 replacing VS 2022);
-            # v142 is preserved on that image via the
-            # Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64
-            # component. Don't bump past windows-2025 without confirming
-            # v142 is still present on the new image.
-            runs-on: windows-2025
-            msvc-arch: x86
-            msbuild-platform: Win32
           - platform: windows-x64
-            # Same image as windows-x86 for the same reason — v142 is
-            # only guaranteed on explicitly-labelled Windows images.
-            # The x86.x64 component group covers both host targets, so
-            # the 64-bit cross/native tools land on this image too.
+            # Needs v142 MSVC toolset, pinned windows image where we know it exists.
             runs-on: windows-2025
             msvc-arch: x64
             msbuild-platform: x64
