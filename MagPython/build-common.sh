@@ -1075,6 +1075,7 @@ stage_licenses() {
     fi
     _stage_license libmpdec  "$LIBMPDEC_VERSION" "$LIBMPDEC_SRC" LICENSE.txt
     _stage_license zlib      "$ZLIB_VERSION"     "$ZLIB_SRC"     LICENSE
+    _stage_license zstd      "$ZSTD_VERSION"     "$ZSTD_SRC"     LICENSE
 
     {
         printf 'sqlite %s\n\n' "$SQLITE_VERSION"

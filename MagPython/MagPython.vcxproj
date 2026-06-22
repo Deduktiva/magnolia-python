@@ -789,6 +789,11 @@
         <Version>$(ZlibVersion)</Version>
         <Mode>Copy</Mode>
       </_License>
+      <_License Include="$(MSBuildProjectDirectory)\zstd\zstd-$(ZStdVersion)\LICENSE">
+        <Dep>zstd</Dep>
+        <Version>$(ZStdVersion)</Version>
+        <Mode>Copy</Mode>
+      </_License>
       <_License Include="$(MSBuildProjectDirectory)\sqlite\sqlite-$(SQLiteVersion)\sqlite3.h">
         <Dep>sqlite</Dep>
         <Version>$(SQLiteVersion)</Version>
