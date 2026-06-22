@@ -733,7 +733,7 @@ regen_frozen() {
 install_setup_local() {
     log "Installing MagPython/Setup.local -> main/Modules/Setup.local"
     cp "$REPO/MagPython/Setup.local" "$BUILD/main/Modules/Setup.local"
-    cd "$BUILD/main" && ./config.status && make Makefile
+    cd "$BUILD/main" && ./config.status && rm -f Makefile && make -f Makefile.pre Makefile
 }
 
 # Configure CPython for the libMagPython build. Caller cd's into a build dir.
