@@ -110,7 +110,6 @@
        then the architecture-matching MASM dialect (ml / ml64) consumes it. -->
   <ItemGroup>
     <ClCompile Include="$(LibFFISourceDir)\closures.c" />
-    <ClCompile Include="$(LibFFISourceDir)\dlmalloc.c" />
     <ClCompile Include="$(LibFFISourceDir)\prep_cif.c" />
     <ClCompile Include="$(LibFFISourceDir)\types.c" />
     <ClCompile Include="$(LibFFITargetSourceDir)\ffi.c" Condition="'$(Platform)' == 'Win32'" />
