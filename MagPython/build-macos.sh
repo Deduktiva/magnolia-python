@@ -32,6 +32,7 @@ command -v zip >/dev/null || { echo "zip not found"; exit 1; }
 prep_build_tree
 setup_python
 build_zlib_static
+build_zstd_static
 # libffi is the SDK's /usr/lib/libffi.dylib on macOS — CPython's Darwin
 # block in configure auto-detects the SDK headers and -lffi. No
 # libMagPython-bundled libffi here (unlike the Linux build).

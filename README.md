@@ -23,7 +23,7 @@ suffix to the DLLs):
 
 ```
 MagPython/
-  MagPython.dll                       # Python core + builtin modules + zlib + sqlite + libffi + libmpdec
+  MagPython.dll                       # Python core + builtin modules + zlib + zstd + sqlite + libffi + libmpdec
   MagPython.exe                       # python3.exe equivalent — Py_Main wrapper linked against MagPython.dll
   python3.exe                         # copy of MagPython.exe under the canonical CPython binary name
   libcrypto-3.dll / libcrypto-3-x64.dll   # OpenSSL (x86 / x64)
@@ -346,6 +346,7 @@ the tarball and computes SHA-256 locally.
 | ---      | ---                                    | ---  | ---                            |
 | OpenSSL  | `openssl/openssl` GitHub Releases      | 3.x  | `update-openssl.sh 3.5.7`      |
 | zlib     | `madler/zlib` GitHub Releases          | 1.x  | `update-zlib.sh 1.3.3`         |
+| zstd     | `facebook/zstd` GitHub Releases        | 1.x  | `update-zstd.sh 1.5.7`         |
 | SQLite   | sqlite.org                             | 3.x  | `update-sqlite.sh 3.53.2 2025` |
 | libffi   | `libffi/libffi` GitHub Releases        | 3.x  | `update-libffi.sh 3.5.3`       |
 | libmpdec | bytereef.org                           | 2.x  | `update-libmpdec.sh 2.5.2`     |
@@ -429,6 +430,7 @@ by name.
 | CPython       | PSF License                                                                                |
 | OpenSSL       | Apache-2.0 license                                                                         |
 | zlib          | zlib license                                                                               |
+| zstd          | BSD-3-Clause                                                                               |
 | libffi        | MIT                                                                                        |
 | libmpdec      | BSD-2-Clause                                                                               |
 | SQLite        | public domain (from the comment in `sqlite3.h`, cf. https://www.sqlite.org/copyright.html) |

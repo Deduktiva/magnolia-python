@@ -115,6 +115,7 @@ extern PyObject* PyInit__sqlite3(void);
 extern PyObject* PyInit__decimal(void);
 extern PyObject* PyInit__asyncio(void);
 extern PyObject* PyInit__queue(void);
+extern PyObject* PyInit__zstd(void);
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
@@ -211,6 +212,7 @@ struct _inittab _PyImport_Inittab[] = {
     {"_decimal", PyInit__decimal},
     {"_asyncio", PyInit__asyncio},
     {"_queue", PyInit__queue},
+    {"_zstd", PyInit__zstd},
 
 /* tools/freeze/makeconfig.py marker for additional "_inittab" entries */
 /* -- ADDMODULE MARKER 2 -- */

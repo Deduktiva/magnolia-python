@@ -20,6 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{36DFC1C0-EB3A-48D0-8E5B-A09387F102E2}</ProjectGuid>
+    <TargetName>libffi</TargetName>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>LibFFI</RootNamespace>
     <ProjectName>LibFFI</ProjectName>

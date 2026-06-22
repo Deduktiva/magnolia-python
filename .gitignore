@@ -1,49 +1,13 @@
-/.idea
-/MagPython/jom/
-/MagPython/jom.zip
-# libmpdec is downloaded + extracted at build time (see
-# download-libmpdec.ps1 / setup_libmpdec in build-common.sh). Pinned
-# version lives in MagPython/libmpdec-version.
-/MagPython/libmpdec/
-# OpenSSL is downloaded + extracted at build time (see
-# download-openssl.ps1 / setup_openssl in build-common.sh). Pinned
-# version + expected SHA-256 live in MagPython/openssl-version and
-# MagPython/openssl-sha256.
-/MagPython/openssl/
-# zlib is downloaded + extracted at build time (see
-# download-zlib.ps1 / setup_zlib in build-common.sh). Pinned
-# version + expected SHA-256 live in MagPython/zlib-version and
-# MagPython/zlib-sha256.
-/MagPython/zlib/
-# libffi is downloaded + extracted at build time (see
-# download-libffi.ps1 / setup_libffi in build-common.sh). Pinned
-# version + expected SHA-256 live in MagPython/libffi-version and
-# MagPython/libffi-sha256.
-/MagPython/libffi/
-# SQLite is downloaded + extracted at build time (see
-# download-sqlite.ps1 / setup_sqlite in build-common.sh). Pinned
-# version + year + expected SHA-256 live in MagPython/sqlite-version,
-# MagPython/sqlite-year and MagPython/sqlite-sha256.
-/MagPython/sqlite/
-# ncurses is downloaded + extracted at build time on POSIX (see
-# setup_ncurses in build-common.sh; no Windows equivalent — the
-# Windows artifact ships no curses module). Pinned version + expected
-# SHA-256 live in MagPython/ncurses-version and MagPython/ncurses-sha256.
-/MagPython/ncurses/
-# CPython is downloaded + extracted at build time (see
-# download-python.ps1 / setup_python in build-common.sh). Pinned
-# version + expected SHA-256 live in MagPython/python-version and
-# MagPython/python-sha256.
-/MagPython/python/
-
-# Unix build outputs (build-linux.sh / build-macos.sh)
 /build-out/
-/MagPython-windows-x86.zip
-/MagPython-windows-x64.zip
-/MagPython-linux-x86_64.zip
-/MagPython-macos-arm64.zip
-# build-details.sh output (per-platform release-notes fragment).
-/MagPython-windows-x86.md
-/MagPython-windows-x64.md
-/MagPython-linux-x86_64.md
-/MagPython-macos-arm64.md
+/MagPython-*.md
+/MagPython-*.zip
+/MagPython/*zip
+/MagPython/jom/
+/MagPython/libffi/
+/MagPython/libmpdec/
+/MagPython/ncurses/
+/MagPython/openssl/
+/MagPython/python/
+/MagPython/sqlite/
+/MagPython/zlib/
+/MagPython/zstd/

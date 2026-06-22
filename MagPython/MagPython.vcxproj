@@ -611,12 +611,12 @@
     <ClCompile Include="$(PythonSourceDir)\Python\tracemalloc.c" />
     <ClCompile Include="$(PythonSourceDir)\Python\uniqueid.c" />
   </ItemGroup>
-  <!-- CPython's zlibmodule.c is the only zlib-adjacent source compiled
-       directly into MagPython.dll. zlib itself is built as a separate
-       static lib by ZLib.vcxproj and linked via the
-       <Library Include="$(OutDir)\zlib.lib"/> entry below. -->
   <ItemGroup>
     <ClCompile Include="$(PythonSourceDir)\Modules\zlibmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_zstd\_zstdmodule.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_zstd\compressor.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_zstd\decompressor.c" />
+    <ClCompile Include="$(PythonSourceDir)\Modules\_zstd\zstddict.c" />
   </ItemGroup>
   <ItemGroup>
     <!-- _hashlib -->
@@ -719,6 +719,7 @@
     <Library Include="$(OutDir)\libffi.lib" />
     <Library Include="$(OutDir)\libmpdec.lib" />
     <Library Include="$(OutDir)\zlib.lib" />
+    <Library Include="$(OutDir)\zstd.lib" />
     <Library Include="$(OutDir)\sqlite3.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

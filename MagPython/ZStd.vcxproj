@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" InitialTargets="DownloadZStd" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8BFD8150-94D5-4BF9-8A50-7BD9929A0850}</ProjectGuid>
+    <ProjectName>ZStd</ProjectName>
+    <TargetName>zstd</TargetName>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="common.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <BuildDir>$(MSBuildProjectDirectory)\zstd\zstd-$(ZStdVersion)</BuildDir>
+    <OutDir>$(MSBuildProjectDirectory)\$(Configuration)\</OutDir>
+    <IncludePath>$(IncludePath);$(BuildDir)\lib;$(BuildDir)\programs\legacy;$(BuildDir)\lib\legacy;$(BuildDir)\lib\common;$(BuildDir)\lib\dictBuilder;$(UniversalCRT_IncludePath);</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemGroup>
+    <ClCompile Include="$(BuildDir)\lib\common\pool.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\debug.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\threading.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\entropy_common.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\hist.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\error_private.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\xxhash.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\zstd_common.c" />
+    <ClCompile Include="$(BuildDir)\lib\common\fse_decompress.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\fse_compress.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\huf_compress.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_compress.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_compress_literals.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_compress_sequences.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_compress_superblock.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_preSplit.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_fast.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_double_fast.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_lazy.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_opt.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstd_ldm.c" />
+    <ClCompile Include="$(BuildDir)\lib\compress\zstdmt_compress.c" />
+    <ClCompile Include="$(BuildDir)\lib\decompress\huf_decompress.c" />
+    <ClCompile Include="$(BuildDir)\lib\decompress\zstd_decompress.c" />
+    <ClCompile Include="$(BuildDir)\lib\decompress\zstd_decompress_block.c" />
+    <ClCompile Include="$(BuildDir)\lib\decompress\zstd_ddict.c" />
+    <ClCompile Include="$(BuildDir)\lib\dictBuilder\cover.c" />
+    <ClCompile Include="$(BuildDir)\lib\dictBuilder\fastcover.c" />
+    <ClCompile Include="$(BuildDir)\lib\dictBuilder\divsufsort.c" />
+    <ClCompile Include="$(BuildDir)\lib\dictBuilder\zdict.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v01.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v02.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v03.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v04.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v05.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v06.c" />
+    <ClCompile Include="$(BuildDir)\lib\legacy\zstd_v07.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(BuildDir)\lib\common\pool.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\threading.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\bitstream.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\error_private.h" />
+    <ClInclude Include="$(BuildDir)\lib\zstd_errors.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\mem.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\fse.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\huf.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\xxhash.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_legacy.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v01.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v02.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v03.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v04.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v05.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v06.h" />
+    <ClInclude Include="$(BuildDir)\lib\legacy\zstd_v07.h" />
+    <ClInclude Include="$(BuildDir)\lib\zstd.h" />
+    <ClInclude Include="$(BuildDir)\lib\common\zstd_internal.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_compress.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_compress_literals.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_compress_sequences.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_cwksp.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_compress_superblock.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_fast.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_double_fast.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_lazy.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_opt.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstd_ldm.h" />
+    <ClInclude Include="$(BuildDir)\lib\compress\zstdmt_compress.h" />
+    <ClInclude Include="$(BuildDir)\lib\decompress\zstd_ddict.h" />
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>ZSTD_MULTITHREAD=1;ZSTD_LEGACY_SUPPORT=5;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnablePREfast>false</EnablePREfast>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>ZSTD_MULTITHREAD=1;ZSTD_LEGACY_SUPPORT=5;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <EnablePREfast>false</EnablePREfast>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <OmitFramePointers>true</OmitFramePointers>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="DownloadZStd" BeforeTargets="Build">
+    <Exec Command="powershell.exe -NonInteractive -executionpolicy Unrestricted -file $(MSBuildProjectDirectory)\download-zstd.ps1" />
+  </Target>
+  <ItemGroup>
+    <PublicHeader Include="$(BuildDir)\lib\common\allocations.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\bits.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\bitstream.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\compiler.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\cpu.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\debug.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\error_private.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\fse.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\huf.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\mem.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\pool.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\portability_macros.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\threading.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\xxhash.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\zstd_deps.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\zstd_internal.h" />
+    <PublicHeader Include="$(BuildDir)\lib\common\zstd_trace.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\clevels.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\hist.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_compress_internal.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_compress_literals.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_compress_sequences.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_compress_superblock.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_cwksp.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_double_fast.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_fast.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_lazy.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_ldm_geartab.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_ldm.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_opt.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstd_preSplit.h" />
+    <PublicHeader Include="$(BuildDir)\lib\compress\zstdmt_compress.h" />
+    <PublicHeader Include="$(BuildDir)\lib\decompress\zstd_ddict.h" />
+    <PublicHeader Include="$(BuildDir)\lib\decompress\zstd_decompress_block.h" />
+    <PublicHeader Include="$(BuildDir)\lib\decompress\zstd_decompress_internal.h" />
+    <PublicHeader Include="$(BuildDir)\lib\deprecated\zbuff.h" />
+    <PublicHeader Include="$(BuildDir)\lib\dictBuilder\cover.h" />
+    <PublicHeader Include="$(BuildDir)\lib\dictBuilder\divsufsort.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_legacy.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v01.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v02.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v03.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v04.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v05.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v06.h" />
+    <PublicHeader Include="$(BuildDir)\lib\legacy\zstd_v07.h" />
+    <PublicHeader Include="$(BuildDir)\lib\zdict.h" />
+    <PublicHeader Include="$(BuildDir)\lib\zstd_errors.h" />
+    <PublicHeader Include="$(BuildDir)\lib\zstd.h" />
+  </ItemGroup>
+  <Target Name="CopyArtifacts" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)" />
+    <MakeDir Directories="$(OutDir)\include" />
+    <Copy SourceFiles="@(PublicHeader)" DestinationFolder="$(OutDir)\include\" />
+  </Target>
+</Project>

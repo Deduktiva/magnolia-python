@@ -57,6 +57,11 @@ jobs:
         with:
           path: MagPython/zlib
           key: deps-zlib-${{ matrix.platform }}-${{ hashFiles('MagPython/zlib-version', 'MagPython/zlib-sha256') }}
+      - name: Cache zstd download
+        uses: actions/cache@v5
+        with:
+          path: MagPython/zstd
+          key: deps-zstd-${{ matrix.platform }}-${{ hashFiles('MagPython/zstd-version', 'MagPython/zstd-sha256') }}
       - name: Cache libffi download
         uses: actions/cache@v5
         with:

@@ -194,6 +194,7 @@ int main(int argc, char *argv[]) {
     failures += try_import("ctypes") != 0;
     failures += try_import("hashlib") != 0;
     failures += try_import("sqlite3") != 0;
+    failures += try_import("compression.zstd") != 0;
 
     // Exercise each module a little to make sure the C extensions
     // actually load and not just the Python wrappers. The crypto block

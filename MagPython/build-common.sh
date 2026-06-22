@@ -87,6 +87,20 @@ fi
 ZLIB_CACHE="$REPO/MagPython/zlib"
 ZLIB_SRC="$ZLIB_CACHE/zlib-$ZLIB_VERSION"
 
+# zstd compression library
+ZSTD_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/zstd-version")"
+if [ -z "$ZSTD_VERSION" ]; then
+    echo "Failed to read zstd version from MagPython/zstd-version" >&2
+    exit 1
+fi
+ZSTD_SHA256="$(tr -d '[:space:]' < "$REPO/MagPython/zstd-sha256")"
+if [ -z "$ZSTD_SHA256" ]; then
+    echo "Failed to read zstd sha256 from MagPython/zstd-sha256" >&2
+    exit 1
+fi
+ZSTD_CACHE="$REPO/MagPython/zstd"
+ZSTD_SRC="$ZSTD_CACHE/zstd-$ZSTD_VERSION"
+
 # libffi is downloaded at build time rather than vendored. Same shape
 # as the OpenSSL / libmpdec / zlib blocks above.
 LIBFFI_VERSION="$(tr -d '[:space:]' < "$REPO/MagPython/libffi-version")"
@@ -160,6 +174,15 @@ build_zlib_static() {
      [ -f Makefile ] && make distclean >/dev/null 2>&1 || true
      CFLAGS="-O3 -fPIC" ./configure --static
      make -j libz.a)
+}
+
+# Build zstd as a static lib at $ZSTD_SRC/lib/libzstd.a,
+# headers in lib/zdict.h lib/zstd_errors.h lib/zstd.h.
+build_zstd_static() {
+    setup_zstd
+    log "Building zstd libs"
+    (cd "$ZSTD_SRC" && make -j lib V=1 CFLAGS="-O3 -fPIC")
+    find "$ZSTD_SRC/lib"
 }
 
 # Build libffi as a static lib at $LIBFFI_SRC/<triple>/.libs/libffi.a (plus
@@ -385,6 +408,41 @@ EOF
     (cd "$SQLITE_CACHE" && unzip -q "$zipname")
     # Rename upstream sqlite-amalgamation-<numeric>/ to sqlite-<version>/.
     mv "$SQLITE_CACHE/sqlite-amalgamation-$sq_num" "$SQLITE_SRC"
+}
+
+# Download + verify + extract the upstream zstd tarball into
+# $ZSTD_CACHE/zstd-$ZSTD_VERSION/. Idempotent.
+#
+# The expected hash is pinned in-tree at MagPython/zstd-sha256 and
+# checked against the downloaded bytes.
+setup_zstd() {
+    if [ -d "$ZSTD_SRC" ]; then return 0; fi
+
+    log "Fetching zstd $ZSTD_VERSION"
+    mkdir -p "$ZSTD_CACHE"
+    local base="https://github.com/facebook/zstd/releases/download/v$ZSTD_VERSION"
+    local tarball="$ZSTD_CACHE/zstd-$ZSTD_VERSION.tar.gz"
+
+    if [ ! -f "$tarball" ]; then
+        curl --fail --silent --show-error --location \
+            -o "$tarball" "$base/zstd-$ZSTD_VERSION.tar.gz"
+    fi
+
+    local sha256_cmd
+    if command -v shasum >/dev/null 2>&1; then sha256_cmd="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then sha256_cmd="sha256sum"
+    else echo "Need shasum or sha256sum" >&2; exit 1; fi
+    local actual
+    actual="$($sha256_cmd "$tarball" | awk '{print $1}')"
+    if [ "$ZSTD_SHA256" != "$actual" ]; then
+        echo "zstd SHA-256 mismatch: expected $ZSTD_SHA256, got $actual" >&2
+        echo "  (pinned in MagPython/zstd-sha256 — regenerate via" >&2
+        echo "   MagPython/update-zstd.sh before changing)" >&2
+        rm -f "$tarball"
+        exit 1
+    fi
+
+    tar -xzf "$tarball" -C "$ZSTD_CACHE"
 }
 
 # Download + verify + extract the upstream libffi tarball into
@@ -792,6 +850,8 @@ configure_libmagpython() {
         MODULE_BUILDTYPE=static \
         ZLIB_CFLAGS="-I$ZLIB_SRC" \
         ZLIB_LIBS="$ZLIB_SRC/libz.a" \
+        LIBZSTD_CFLAGS="-I$ZSTD_SRC/lib" \
+        LIBZSTD_LIBS="$ZSTD_SRC/lib/libzstd.a" \
         LIBSQLITE3_CFLAGS="-I$SQLITE_SRC" \
         LIBSQLITE3_LIBS="-lsqlite3" \
         LIBMPDEC_CFLAGS="-I$BUILD/libmpdec-out/include" \
