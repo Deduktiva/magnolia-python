@@ -2,10 +2,10 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <!--
-    Generate $(IntDir)\pyconfig.h from $(PythonSourceDir)\PC\pyconfig.h.in
+    Generate $(IntDir)\pyconfig.h from $(PythonSourceDir)\PC\pyconfig.h
     with two project-local edits:
 
-      1. The libname pragma (#pragma comment(lib, "python313*.lib"))
+      1. The libname pragma (#pragma comment(lib, "python314*.lib"))
          is rewritten to "MagPython.lib". The pragma only fires for
          consumers that don't define Py_BUILD_CORE / Py_BUILD_CORE_BUILTIN
          (i.e. extensions linking against MagPython.dll using our
@@ -17,7 +17,7 @@
          should not be compiled.
 
     Doing the substitutions at build time (rather than editing
-    PC\pyconfig.h.in in the imported tree) keeps the imported tree
+    PC\pyconfig.h in the imported tree) keeps the imported tree
     byte-identical to upstream, so update-python.sh's wipe-and-replace
     doesn't have to be followed by a manual re-patch step on Windows.
 
@@ -29,19 +29,19 @@
     <AdditionalIncludeDirectories> so the generated copy shadows any
     upstream pyconfig.h that may reappear in a future bump.
   -->
-  <Target Name="GenerateMagPythonConfigH" BeforeTargets="ClCompile" Inputs="$(PythonSourceDir)\PC\pyconfig.h.in" Outputs="$(IntDir)pyconfig.h">
+  <Target Name="GenerateMagPythonConfigH" BeforeTargets="ClCompile" Inputs="$(PythonSourceDir)\PC\pyconfig.h" Outputs="$(IntDir)pyconfig.h">
     <PropertyGroup>
-      <_PyConfigSrc>$([System.IO.File]::ReadAllText('$(PythonSourceDir)\PC\pyconfig.h.in'))</_PyConfigSrc>
+      <_PyConfigSrc>$([System.IO.File]::ReadAllText('$(PythonSourceDir)\PC\pyconfig.h'))</_PyConfigSrc>
       <!-- Two booleans the assertions below check; computing them in
            PropertyGroup (rather than directly inside Condition="...")
            keeps property-function syntax out of the condition parser,
            which gets confused by file content containing quotes/=/etc. -->
-      <_HasLibnamePragma>$(_PyConfigSrc.Contains('python313'))</_HasLibnamePragma>
+      <_HasLibnamePragma>$(_PyConfigSrc.Contains('python314'))</_HasLibnamePragma>
       <_HasDynLoading>$(_PyConfigSrc.Contains('%23define HAVE_DYNAMIC_LOADING'))</_HasDynLoading>
-      <_PyConfigPatched>$(_PyConfigSrc.Replace('"python313t_d.lib"', '"MagPython_d.lib"').Replace('"python313_d.lib"', '"MagPython_d.lib"').Replace('"python313t.lib"', '"MagPython.lib"').Replace('"python313.lib"', '"MagPython.lib"').Replace('"python3t.lib"', '"MagPython.lib"').Replace('"python3.lib"', '"MagPython.lib"').Replace('%23define HAVE_DYNAMIC_LOADING', '/* %23define HAVE_DYNAMIC_LOADING */'))</_PyConfigPatched>
+      <_PyConfigPatched>$(_PyConfigSrc.Replace('"python314t_d.lib"', '"MagPython_d.lib"').Replace('"python314_d.lib"', '"MagPython_d.lib"').Replace('"python314t.lib"', '"MagPython.lib"').Replace('"python314.lib"', '"MagPython.lib"').Replace('"python3t.lib"', '"MagPython.lib"').Replace('"python3.lib"', '"MagPython.lib"').Replace('%23define HAVE_DYNAMIC_LOADING', '/* %23define HAVE_DYNAMIC_LOADING */'))</_PyConfigPatched>
     </PropertyGroup>
-    <Error Text="GenerateMagPythonConfigH: libname pragma block (python313*.lib) not found in PC\pyconfig.h.in — upstream may have moved or renamed it; update the .Replace() chain in MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasLibnamePragma)' != 'True'" />
-    <Error Text="GenerateMagPythonConfigH: '#define HAVE_DYNAMIC_LOADING' not found in PC\pyconfig.h.in — upstream may have changed the directive; update MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasDynLoading)' != 'True'" />
+    <Error Text="GenerateMagPythonConfigH: libname pragma block (python314*.lib) not found in PC\pyconfig.h — upstream may have moved or renamed it; update the .Replace() chain in MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasLibnamePragma)' != 'True'" />
+    <Error Text="GenerateMagPythonConfigH: '#define HAVE_DYNAMIC_LOADING' not found in PC\pyconfig.h — upstream may have changed the directive; update MagPython/magpython-pyconfig-h.targets." Condition="'$(_HasDynLoading)' != 'True'" />
     <MakeDir Directories="$(IntDir)" />
     <WriteLinesToFile File="$(IntDir)pyconfig.h" Lines="$(_PyConfigPatched)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>

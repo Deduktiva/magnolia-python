@@ -1,4 +1,4 @@
-﻿#include <Python/Python.h>
+#include <Python/Python.h>
 #include <openssl/opensslv.h>
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
@@ -103,7 +103,7 @@ static int get_lib_path_for(void *addr, char *out, size_t out_size) {
 // being picked up via LD_LIBRARY_PATH / DYLD_LIBRARY_PATH / PATH ahead
 // of the artifact's $ORIGIN / @loader_path / DLL search dir). The path
 // check is what makes the openssl validation robust to a system shipping
-// the same OpenSSL version as our pin — version-string match alone can't
+// the same OpenSSL version as our pin - version-string match alone can't
 // distinguish "loaded ours" from "loaded system's".
 static int exercise_openssl(void) {
     const char *header_ver = OPENSSL_VERSION_TEXT;
@@ -198,7 +198,7 @@ int main(int argc, char *argv[]) {
     // Exercise each module a little to make sure the C extensions
     // actually load and not just the Python wrappers. The crypto block
     // generates 32 bytes of secret material via libcrypto's RAND, then
-    // uses it as an HMAC key and as PBKDF2/scrypt salt — that path
+    // uses it as an HMAC key and as PBKDF2/scrypt salt - that path
     // touches RAND, EVP digest, HMAC, PKCS5_PBKDF2_HMAC, and
     // EVP_PBE_scrypt, which is most of the surface CPython's
     // _hashopenssl wraps. The TLS block sanity-checks libssl's cipher
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
         "# In-process TLS handshake via MemoryBIO. We expect it to fail\n"
         "# because we haven't loaded a server cert, but the failure must\n"
         "# come from the certificate-required check, not from libssl\n"
-        "# itself misbehaving — proves the handshake state machine runs.\n"
+        "# itself misbehaving - proves the handshake state machine runs.\n"
         "client = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)\n"
         "client.check_hostname = False\n"
         "client.verify_mode = ssl.CERT_NONE\n"
@@ -261,7 +261,7 @@ int main(int argc, char *argv[]) {
         "# + Setup.local on Unix). Together with the linkage of libmpdec.a\n"
         "# / libz.a / libffi.a (Linux) into libMagPython and the sibling\n"
         "# libsqlite3 / libffi (macOS-system) loaded from @rpath, this is\n"
-        "# what guarantees we're using OUR pinned dep at runtime — a\n"
+        "# what guarantees we're using OUR pinned dep at runtime - a\n"
         "# version-string match could be a coincidence if the host happens\n"
         "# to ship the same upstream version.\n"
         "import _sqlite3, _decimal, _ctypes, _ssl, _hashlib, zlib\n"
