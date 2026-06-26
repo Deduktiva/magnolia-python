@@ -43,37 +43,37 @@ jobs:
       # actions/cache@v4 scopes the cache key by OS implicitly, so
       # per-platform tarball extraction state stays isolated.
       - name: Cache OpenSSL download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/openssl
           key: deps-openssl-${{ matrix.platform }}-${{ hashFiles('MagPython/openssl-version', 'MagPython/openssl-sha256') }}
       - name: Cache libmpdec download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/libmpdec
           key: deps-libmpdec-${{ matrix.platform }}-${{ hashFiles('MagPython/libmpdec-version', 'MagPython/libmpdec-sha256') }}
       - name: Cache zlib download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/zlib
           key: deps-zlib-${{ matrix.platform }}-${{ hashFiles('MagPython/zlib-version', 'MagPython/zlib-sha256') }}
       - name: Cache zstd download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/zstd
           key: deps-zstd-${{ matrix.platform }}-${{ hashFiles('MagPython/zstd-version', 'MagPython/zstd-sha256') }}
       - name: Cache libffi download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/libffi
           key: deps-libffi-${{ matrix.platform }}-${{ hashFiles('MagPython/libffi-version', 'MagPython/libffi-sha256') }}
       - name: Cache SQLite download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/sqlite
           key: deps-sqlite-${{ matrix.platform }}-${{ hashFiles('MagPython/sqlite-version', 'MagPython/sqlite-year', 'MagPython/sqlite-sha256') }}
       - name: Cache CPython download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: MagPython/python
           key: deps-python-${{ matrix.platform }}-${{ hashFiles('MagPython/python-version', 'MagPython/python-sha256') }}
