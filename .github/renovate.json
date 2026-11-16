@@ -101,6 +101,22 @@
       "commitMessageTopic": "{{depName}} pin",
       "commitMessageAction": "Bump",
       "groupName": null
+    },
+    {
+      "description": "Slow-moving build deps: one bundled PR per quarter. Tick the group on the Dependency Dashboard to get it early.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["libffi", "nasm", "zlib", "zstd"],
+      "groupName": "build deps",
+      "groupSlug": "build-deps",
+      "commitMessageTopic": "build dep pins",
+      "schedule": ["* 0-5 1 1,4,7,10 *"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Stay on the Python 3.14 line; minor bumps are done by hand.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["python"],
+      "allowedVersions": "<3.15"
     }
   ]
 }
