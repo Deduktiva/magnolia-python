@@ -111,6 +111,12 @@
       "commitMessageTopic": "build dep pins",
       "schedule": ["* 0-5 1 1,4,7,10 *"],
       "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Stay on the Python 3.14 line; minor bumps are done by hand.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["python"],
+      "allowedVersions": "<3.15"
     }
   ]
 }
